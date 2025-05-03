@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Showroom - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+      
+    import { Renderer, TouchController, CollisionModes, SkyBox } from "@"
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        enableLighting: true,
+        backColor: [0.96, .98, 1, 1],
+        enablePostprocess: true,
+        renderingImage: {
+          gamma: 1.2,
+        },
+        enableAntialias: true,
+        enableShadow: false,
+        bloomEffect: {
+          threshold: 0.05,
+          gamma: 2.2,
+        },
+      });
+      
+      const scene = renderer.createScene();
+
+      window._scene = scene;
+
+      scene.createObjectFromURL("/models/showroom.toba", obj => {
+        window.obj = obj;
+        scene.add(obj);
+
+        obj.eachChild(child => {
+          if (child.mat) {
+            // fix a bake problem
+            if (child.mat.emission > 1) {
+              child.mat.emission = 1;
+            }
+          }
+        });
+
+        // limit the move range inside the floor
+        const floorObj = obj.findObjectByName("floor");
+        if (floorObj) {
+          scene.mainCamera.collisionMode = CollisionModes.NavMesh;
+          scene.mainCamera.collisionTarget = floorObj;
+        }
+
+        setupSkyBox();
+      });
+
+      function setupSkyBox() {
+        const baseurl = "/textures/cubemap/city-night/"
+        const skyImageUrls = [
+          baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
+          baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
+        ];
+
+        scene.skybox = new SkyBox(renderer, skyImageUrls);
+      }
+
+      scene.sun.location.set(0, 1, 0);
+      scene.sun.mat.color = [1, 1, 1];
+
+      scene.mainCamera.fieldOfView = 75;
+      scene.mainCamera.location.set(-2.55, 1.5, 2.12);
+      scene.mainCamera.angle.set(-3, 310, 0);
+
+      const cameraController = new TouchController(scene);
+
+      scene.show();
+    });
+
+
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Drag to adjust the camera, scroll to move.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Particle - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+  
+    import { Renderer, Viewer, SceneObject, ParticleObject, Shapes, ParticleMesh, PointLight, ObjectViewController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        renderPixelRatio: 1,
+        backColor: [0.1],
+        enablePostprocess: true,
+        enableLighting: false,
+        bloomEffect: {
+          threshold: 0.5,
+          gamma: 1.0,
+        },
+        renderingImage: {
+          resolutionRatio: 0.5,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+    
+      const count = 20000;
+
+      const particles = new Array(count);
+
+      for (let i = 0; i < count; i++) {
+        particles[i] = {
+          speed: Math.random() * 0.2 + 0.02,
+          angle: 0,
+          x: Math.random() * 20 - 10,
+          y: Math.random() * 20 - 10,
+          z: Math.random() * 20 - 10,
+          ox: Math.random() * 20 - 10,
+          oy: Math.random() * 20 - 10,
+          oz: Math.random() * 20 - 10,
+          r: 1,//Math.random(),
+          g: Math.random() * 0.5,
+          b: Math.random(),
+          size: 2,
+        };
+      }
+
+      const pm = new ParticleMesh(count);
+      function update(p, i) {
+        pm.vertexBuffer._t_set(i * 3, p.x, p.y, p.z);
+        pm.vertexBuffer._t_set((count + i) * 3, p.r, p.g, p.b);
+        pm.vertexBuffer._t_set((count * 2 * 3 + i), p.size);
+        pm.update();
+      }
+
+      const pobj = new ParticleObject();
+      pobj.angle.x = 20;
+      pobj.addMesh(pm);
+      
+      scene.add(pobj);
+
+      const globalSpeed = 0.2;
+
+      scene.on('frame', () => {
+        for (let i = 0; i < count; i++) {
+          const p = particles[i];
+
+          p.x += (p.ox - p.x) * p.speed * globalSpeed;
+          p.y += (p.oy - p.y) * p.speed * globalSpeed;
+          p.z += (p.oz - p.z) * p.speed * globalSpeed;
+
+          update(p, i);
+        }
+      })
+
+      function setAll(iterator) {
+        for (let i = 0; i < count; i++) {
+          iterator(particles[i], i);
+        }
+      }
+
+      let mountainVertices;
+
+      function collapse() {
+        setAll(p => {
+          var mv = mountainVertices[parseInt(Math.random() * mountainVertices.length)];
+
+          p.ox = mv.x;
+          p.oy = mv.y;
+          p.oz = mv.z;
+        });
+      }
+
+      function expand() {
+        setAll(p => {
+          p.ox = Math.random() * 5 - 2.5;
+          p.oy = Math.random() * 5 - 2.5;
+          p.oz = Math.random() * 5 - 2.5;
+        });
+      }
+
+      scene.createObjectFromURL("/models/mountain.toba", rootObject => {
+        const mesh = rootObject.objects[0].meshes[0];
+        mountainVertices = mesh.extractPoints();
+        
+        collapse();
+
+        scene.animate({ "duration": 2, }, t => {
+          pobj.angle.y = 140 + 180 * t;
+        })
+      })
+
+      let collapsed = true;
+      this.setInterval(() => {
+        if (collapsed) {
+          expand();
+        } else {
+          collapse();
+        }
+        collapsed = !collapsed;
+      }, 5000);
+
+      const camera = scene.mainCamera;
+      camera.location.set(0, 0, 10);
+      camera.angle.set(0, 0, 0);
+      camera.fieldOfView = 20;
+      
+      new ObjectViewController(scene, {
+        targetObject: pobj
+      });
+
+      scene.animation = true;
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+  <div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div class="text-center">Visual effects with a simple particle system.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

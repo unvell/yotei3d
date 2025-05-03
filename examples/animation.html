@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Animation - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, ModelViewer, Keys, ObjectViewController } from "@";
+    const { CubeMesh, PlaneMesh } = Shapes;
+  
+    const texWoodImage = '/img/textures/wood.jpg';
+    const texFloorImage = '/img/textures/floor.jpg';
+
+    window.addEventListener("load", (e) => {
+      const renderer = new Renderer({
+        enableShadow: true,
+        backColor: [.15, .15, .15],
+      });
+      const scene = renderer.createScene();
+      window._scene = scene;
+      
+      let lastAnimation = undefined;
+    
+      const manifest = {
+        objects: {
+          cube1: {
+            mesh: new CubeMesh(),
+            location: [-1, 0.25, 0.2],
+            scale: [0.5, 0.5, 0.5],
+            mat: { tex: texWoodImage },
+
+            onmouseup: function() {
+              lastAnimation = scene.animate({ duration: 2, delay: 0.5 }, t => {
+                const s = 0.25 + Math.abs(Math.sin(t * Math.PI * 5) / 10);
+                this.location.y = s;
+              });
+            },
+
+            // children: {
+            //   label: { location: [0, 0.75, 0], innerHTML: "Delay" },
+            // },
+          },
+        
+          cube2: {
+            mesh: new CubeMesh(),
+            location: [0, 0.5, 0],
+            scale: [1, 1, 1],
+            mat: { tex: texWoodImage },
+
+            onmouseup: function() {
+              lastAnimation = scene.animate({ duration: 1, effect: "smooth" }, (t) => {
+                this.angle.y = t * 360;
+              });
+            },
+
+            // children: {
+            //   label: { location: [0, 0.75, 0], innerHTML: "Normal" },
+            // },
+          },
+
+          cube3: {
+            mesh: new CubeMesh(),
+            location: [1.2, 0.35, -0.2],
+            scale: [0.7, 0.7, 0.7],
+            mat: { tex: texWoodImage },
+
+            onmouseup: function() {
+              lastAnimation = scene.animate({ duration: 1, repeat: 2 }, (t) => {
+                this.location.x = 1.2 + Math.sin(t * Math.PI * 10) / 10;
+              });
+            },
+          
+            // children: {
+            //   label: { location: [0, 0.75, 0], innerHTML: "Repeat" },
+            // },
+          },
+
+          floor: {
+            mesh: new PlaneMesh(1, 1),
+            scale: [6, 6, 6],
+            mat: { tex: texFloorImage, texTiling: [4, 4] },
+          },
+        },
+      };
+
+      scene.onkeyup = (key) => {
+        if (key === Keys.Space) {
+          if (lastAnimation) {
+            if (lastAnimation.isPaused) {
+              lastAnimation.play();
+            } else {
+              lastAnimation.pause();
+            }
+          }
+        }
+      };
+
+      scene.load(manifest);
+    
+      scene.mainCamera.fieldOfView = 70;
+
+      const modelViewer = new ModelViewer(scene);
+      modelViewer.viewer.angle.x = 10;
+      modelViewer.minRotateX = -10;
+      modelViewer.maxRotateX = 80;
+      modelViewer.enableDragAcceleration = true;
+      // const objectController = new ObjectViewController(scene)
+      // objectController.targetObject = scene.findObjectByName('floor');
+
+
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Click on the cubes to see animtions.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

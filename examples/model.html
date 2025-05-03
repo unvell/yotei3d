@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Model - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+      
+    import { Renderer, Keys, SceneObject, Shapes, PointLight, ObjectViewController, ImageCubeBox } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backgroundImage: "/textures/bg-gray-gradient.jpg",
+        showDebugPanel: false,
+        enableLighting: true,
+        enablePostprocess: true,
+        enableAntialias: true,
+        enableEnvmap: true,
+        enableShadow: true,
+        shadowQuality: {
+          scale: 2,
+          viewDepth: 1.5,
+          resolution: 512,
+        },
+        bloomEffect: {
+          enabled: true,
+          threshold: 0.1,
+          gamma: 1.4,
+        },
+        renderingImage: {
+          gamma: 1.4,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+    
+      const models = [
+        { path: "/models/chair_adv_01.toba" },
+        { path: "/models/chair_jati.toba" },
+      ];
+
+      const ground = scene.createObjectFromManifest({
+        mesh: new Shapes.PlaneMesh(3, 3),
+        mat: {
+          color: [1.5, 1.5, 1.5],
+          tex: "/textures/bg-gray-gradient.jpg"
+        },
+        angle: [0, 30, 0],
+      })
+      scene.add(ground)
+
+      const holder = new SceneObject();
+      scene.add(holder);
+
+      scene.onkeydown = function(key) {
+        if (key >= Keys.D1
+          && key <= Keys.D9) {
+          switchTo(key - Keys.D1);
+        }
+      };
+
+      let firstObject = true;
+      let currentIndex = -1;
+
+      for (const [i, mod] of models.entries()) {
+        scene.createObjectFromURL(mod.path, obj => {
+          mod.obj = obj;
+          
+          obj.scale.set(0, 0, 0);
+          obj.opacity = 0;
+          
+          obj.eachChild(child => {
+            if (child.mat) {
+              if (child.mat.glossy > 0) {
+                child.mat.roughness = 1 - child.mat.glossy;
+              }
+            }
+          });
+
+          ground.add(obj);
+
+          if (firstObject) {
+            switchTo(i);
+            firstObject = false;
+          }
+        });
+      }
+
+      function switchTo(idx) {
+        if (idx === currentIndex) return;
+        
+        if (currentIndex !== -1) {
+          const mod = models[currentIndex];
+          if (mod) {
+            const prevObj = models[currentIndex].obj;
+            scene.animate({duration: 0.3}, t => {
+              prevObj.scale.set(1 - t, 1 - t, 1 - t);
+              prevObj.opacity = 1 - t;
+            }, _ => prevObj.visible = false);
+          }
+        }
+
+        currentIndex = idx;
+
+        const mod = models[currentIndex];
+        if (mod && mod.obj) {
+          const nextObj = mod.obj;
+          if (mod.color) {
+            if (!nextObj.mat) nextObj.mat = {}
+            nextObj.mat.color = mod.color;
+          }
+          if (mod.scale) {
+            nextObj.scale.set(mod.scale[0], mod.scale[1], mod.scale[2]);
+          }
+          window.obj = nextObj;
+          if (window.refmap) window.setObjectRefmap(window.obj);
+            
+          nextObj.visible = true;
+          scene.animate({ effect: "fadein", duration: 0.3 }, t => {
+            nextObj.scale.set(t, t, t);
+            nextObj.opacity = t;
+          });
+          scene.animate({ effect: "fadeout" }, t => {
+            // nextObj.angle.y = -(1 - t) * 500 + 25;
+          });
+        }
+      }
+
+      scene.mainCamera.fieldOfView = 50;
+      scene.mainCamera.location.set(0, 0.7, 1.4);
+      scene.mainCamera.angle.set(-10, 0, 0);
+      
+      // light sources
+      const lights = new SceneObject();
+
+      const light1 = new PointLight();
+      light1.location.set(-3, 4, 2);
+      light1.mat.emission = 2;
+      lights.add(light1);
+        
+      const light2 = new PointLight();
+      light2.location.set(5, 7, 10);
+      light2.mat.emission = 20;
+      lights.add(light2);
+
+      const light3 = new PointLight();
+      light3.location.set(2, 4, -5);
+      light3.mat.emission = 1;
+      lights.add(light3);
+
+      const light4 = new PointLight();
+      light4.location.set(-3, -6, 4);
+      light4.mat.emission = 5;
+      lights.add(light4);
+
+      scene.add(lights);
+
+      const objController = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+        minVerticalRotateAngle: -10,
+        maxVerticalRotateAngle: 50,
+      });
+      objController.targetObject = ground;
+
+      const cubebox = new ImageCubeBox(renderer, [
+        "/textures/cubemap/office-256/px.jpg",
+        "/textures/cubemap/office-256/nx.jpg",
+        "/textures/cubemap/office-256/py.jpg",
+        "/textures/cubemap/office-256/ny.jpg",
+        "/textures/cubemap/office-256/pz.jpg",
+        "/textures/cubemap/office-256/nz.jpg",
+      ]);
+        
+      window.setObjectRefmap = (obj) => {
+        obj.eachChild(c => {
+          if (c.meshes.length > 0) c.meshes[0]._refmap = window.refmap;
+        });
+      };
+
+      cubebox.on('load', _ => {
+        window.refmap = cubebox.cubemap;
+        if (window.obj) {
+          window.setObjectRefmap(window.obj);
+          ground.meshes[0]._refmap = window.refmap;
+        }
+      });
+
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Press 1 or 2 to switch model. Drag and scroll to adjust the view.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

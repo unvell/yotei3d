@@ -1,0 +1,13 @@
+.DS_Store
+
+.vscode
+.cache
+.env.development
+
+/dist
+/site-dist
+node_modules
+
+# yotei3d-*.tgz
+# yotei3d-min.js
+# yotei3d-single.js

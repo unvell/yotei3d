@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Floor Walkthrough - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, SkyBox, ImageCubeBox, FloorViewController, CollisionModes } from '@'
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        enableLighting: false,
+        backColor: [0.96, .98, 1],
+        
+        enablePostprocess: true,
+        enableAntialias: true,
+        enableShadow: true,
+        shadowQuality: {
+          scale: 10,
+          viewDepth: 4,
+          resolution: 1024,
+          intensity: 0.25,
+          enableCache: false,
+        },
+        bloomEffect: {
+          threshold: 0.3,
+          gamma: 1.4,
+        },
+        renderingImage: {
+          gamma: 1.2,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+      
+      let rootObj, refCubebox;
+
+      const setObjectRefmap = (obj) => {
+        obj.eachChild(c => {
+          if (c.meshes.length > 0) c.meshes[0]._refmap = refCubebox.cubemap;
+          if (typeof c.mat === 'object' && !c.mat.glossy) {
+            c.mat.glossy = 0.1;
+          }
+        });
+      };
+
+      scene.createObjectFromURL("/models/floor.toba", obj => {
+        const floorObj = obj.findObjectByName("floor");
+      
+        if (floorObj) {
+          floorViewController.targetObject = floorObj;
+          scene.mainCamera.collisionMode = CollisionModes.NavMesh;
+          scene.mainCamera.collisionTarget = floorObj;
+        }
+
+        const wall = obj.findObjectByName("wall");
+        if (wall) wall.mat.color = [1, 1, 1];
+
+        obj.eachChild(child => {
+          child.receiveShadow = child.name && child.name.startsWith("floor");
+        });
+        
+        scene.add(obj);
+
+        obj.scale.set(0.00001, 0.00001, 0.00001);
+
+        rootObj = obj;
+
+        if (refCubebox) {
+          setObjectRefmap(obj);
+        }
+
+        setTimeout(() => {
+          scene.animate({ duration: 0.7 }, t => {
+            const s = Math.sin(t * 2);
+            obj.scale.set(s, s, s);
+          }, _ => {
+            renderer.options.shadowQuality.enableCache = true;
+          });
+        }, 500);
+      });
+
+      let baseurl = "/textures/cubemap/city/"
+
+      scene.skybox = new SkyBox(renderer, [
+        baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
+        baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
+      ]);
+
+      scene.skybox.mat = { color: [1.7, 1.6, 1.5] };
+      scene.skybox.visible = false;
+
+      baseurl = "/textures/cubemap/office-256-blur/"
+
+      refCubebox = new ImageCubeBox(renderer, [
+        baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
+        baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
+      ]);
+
+      refCubebox.on('load', _ => {
+        if (rootObj) {
+          setObjectRefmap(rootObj);
+        }
+      });
+
+      const floorViewController = new FloorViewController(scene);
+      
+      floorViewController.on("beginChangeMode", _ => {
+        if (floorViewController.topViewStatus.topViewMode) {
+          if (scene.skybox) {
+            scene.skybox.visible = false;
+          }
+        }
+      });
+      
+      floorViewController.on("modeChanged", _ => {
+        if (!floorViewController.topViewStatus.topViewMode) {
+          if (scene.skybox) {
+            scene.skybox.visible = true;
+          }
+        }
+
+        // cache the shadowmap on first time the mode changed
+        renderer.options.shadowQuality.enableCache = true;
+      });
+
+      scene.sun.location.set(0, 10, 0);
+      scene.sun.mat.color = [1.2, 1.2, 1.2];
+
+      scene.show();
+    });
+
+
+  </script>
+</head>
+<body>
+  <div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center bg-gray-800/50 text-white">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Space key to switch view mode. Drag to rotate, scroll to move forward.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

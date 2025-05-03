@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Panorama Look - Yotei3D Example</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+  import { Renderer, SkyBox, TouchController } from '@';
+
+  window.addEventListener('load', function() {
+
+    const renderer = new Renderer({
+      enableLighting: false,
+      enablePostprocess: false,
+    });
+
+    const scene = renderer.createScene();
+    window._scene = scene;
+    
+    // Download outlook images from Google Street View API
+    // const baseurl = "https://maps.googleapis.com/maps/api/streetview?size=512x512&location=43.064000,141.357363&fov=90&"
+    // const key = `&key=${process.env.GOOGLE_MAP_API_KEY}`;
+    // const skyImageUrls = [
+    //   baseurl + "heading=90&pitch=0" + key,
+    //   baseurl + "heading=-90&pitch=0" + key,
+    //   baseurl + "heading=0&pitch=90" + key,
+    //   baseurl + "heading=0&pitch=-90" + key,
+    //   baseurl + "heading=0&pitch=0" + key,
+    //   baseurl + "heading=180&pitch=0" + key,
+    //   ];
+
+    const baseurl = "/textures/cubemap/landscape/"
+    const skyImageUrls = [
+      baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
+      baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
+    ];
+
+    const skybox = new SkyBox(renderer, skyImageUrls);
+
+    // scene can has only one sky box
+    scene.skybox = skybox;
+
+    new TouchController(scene);
+
+    scene.mainCamera.fieldOfView = 75;
+
+    scene.show();
+  });
+
+  </script>
+</head>
+<body>
+  <div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div class="text-center">Use SkyBox to create a 360° panoramic environment.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

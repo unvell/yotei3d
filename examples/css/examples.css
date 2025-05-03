@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+html, body {
+  font-family:'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+  color: #999999;
+  @apply w-full h-full;
+}
+
+.examples h1 {
+  @apply text-center text-2xl py-4 uppercase tracking-widest;
+}
+
+.examples h2 {
+  @apply text-base py-2 text-white;
+}
+
+.examples .feature-cards {
+  @apply text-base;
+}
+
+.examples #canvas-container {
+  @apply w-full h-full;
+}
+
+.examples .separator {
+  @apply h-1 border-t border-gray-700 my-10;
+}
+
+.examples code {
+  @apply p-4;
+}

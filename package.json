@@ -1,0 +1,43 @@
+{
+  "name": "@unvell/yotei3d",
+  "version": "1.7.8",
+  "description": "Optimized WebGL engine for showcase application",
+  "type": "module",
+  "main": "dist/js/yotei3d.js",
+  "files": [
+    "/dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "UNVELL Inc.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/unvell/yotei3d.git"
+  },
+  "dependencies": {
+    "@jingwood/graphics-math": "^1.1.18",
+    "pako": "^2.1.0",
+    "vue": "^3.5.13",
+    "vue-router": "4"
+  },
+  "resolutions": {
+    "node-forge": "0.10.0"
+  },
+  "bugs": {
+    "url": "https://github.com/unvell/yotei3d/issues"
+  },
+  "homepage": "https://unvell.com",
+  "packageManager": "yarn@4.9.1",
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.4",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "tailwindcss": "^4.1.4",
+    "vite": "^6.3.2",
+    "vite-plugin-string": "^1.2.3"
+  }
+}
