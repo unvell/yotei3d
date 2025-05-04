@@ -7,12 +7,15 @@ import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import fs from 'fs';
 
-const isLib = process.env.BUILD_LIB === 'true';
+const isExampleSite = process.env.BUILD_EXAMPLES_SITE === 'true';
 
 export default defineConfig({
-  root: isLib ? '.' : 'examples',
+  root: isExampleSite ? 'examples' : '.',
 
-  build: isLib ? {
+  build: isExampleSite ? {
+    outDir: '../examples-dist',
+    emptyOutDir: true
+  }: {
     outDir: 'dist',
     lib: {
       entry: 'src/js/index.js',
@@ -28,9 +31,6 @@ export default defineConfig({
         }
       }
     }
-  } : {
-    outDir: '../site-dist',
-    emptyOutDir: true
   },
 
   resolve: {

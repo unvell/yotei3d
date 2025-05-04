@@ -5,7 +5,7 @@
 .env.development
 
 /dist
-/site-dist
+/examples-dist
 node_modules
 
 # yotei3d-*.tgz
