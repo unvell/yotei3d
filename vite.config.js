@@ -45,5 +45,6 @@ export default defineConfig({
       include: ['**/*.vert', '**/*.frag'],
     }),
     vue(),
+    tailwindcss(),
   ]
 });
