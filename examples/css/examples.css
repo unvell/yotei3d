@@ -18,14 +18,14 @@ html, body {
   @apply text-base;
 }
 
-.examples #canvas-container {
-  @apply w-full h-full;
-}
-
 .examples .separator {
   @apply h-1 border-t border-gray-700 my-10;
 }
 
 .examples code {
   @apply p-4;
+}
+
+#canvas-container {
+  @apply w-full h-full;
 }

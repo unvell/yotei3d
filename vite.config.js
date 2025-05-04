@@ -5,7 +5,6 @@ import string from 'vite-plugin-string';
 import path from 'path';
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
-import fs from 'fs';
 
 const isExampleSite = process.env.BUILD_EXAMPLES_SITE === 'true';
 
@@ -13,8 +12,12 @@ export default defineConfig({
   root: isExampleSite ? 'examples' : '.',
 
   build: isExampleSite ? {
-    outDir: '../examples-dist',
-    emptyOutDir: true
+    outDir: 'examples-dist',
+    emptyOutDir: true,
+    plugins: [
+      vue(),
+      tailwindcss(),
+    ]
   }: {
     outDir: 'dist',
     lib: {
