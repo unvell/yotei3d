@@ -4,6 +4,13 @@ A lightweight WebGL-based 3D rendering engine designed with simplicity and ease 
 
 ---
 
+## Examples
+
+![Hello World Example](./examples/helloworld.html)
+
+---
+
+
 ### Beginner-Friendly Design
 
   Yotei3D allows you to start building interactive 3D scenes with just a few lines of code. Perfect for developers with limited 3D knowledge.
@@ -58,4 +65,14 @@ Yotei3D handles camera control, rendering setup, and interaction for you—so yo
 
 ## 🗺️ Demo Examples
 
-Visit the `/examples/` folder or open `helloworld.html` to explore how easily you can create interactive 3D scenes.
+Run `yarn dev` locally to view the examples.
+
+```
+http://localhost:{port}/
+```
+
+Visit `/helloworld.html` to see how easily you can create interactive 3D scenes.
+
+Or check out the live demo at https://yotei.unvell.com/
+
+

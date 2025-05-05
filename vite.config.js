@@ -9,16 +9,19 @@ import vue from '@vitejs/plugin-vue'
 const isExampleSite = process.env.BUILD_EXAMPLES_SITE === 'true';
 
 export default defineConfig({
-  root: isExampleSite ? 'examples' : '.',
+  root: isExampleSite ? 'examples' : 'examples',
 
-  build: isExampleSite ? {
+  build: isExampleSite ?
+  {
+    // examples site
     outDir: 'examples-dist',
     emptyOutDir: true,
     plugins: [
       vue(),
       tailwindcss(),
-    ]
+    ],
   }: {
+    // js library
     outDir: 'dist',
     lib: {
       entry: 'src/js/index.js',
