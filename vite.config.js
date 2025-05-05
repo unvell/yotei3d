@@ -17,7 +17,6 @@ export default defineConfig({
     outDir: '../examples-dist',
     emptyOutDir: true,
     plugins: [
-      vue(),
       tailwindcss(),
     ],
   }: {
