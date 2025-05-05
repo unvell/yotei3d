@@ -14,7 +14,7 @@ export default defineConfig({
   build: isExampleSite ?
   {
     // examples site
-    outDir: 'examples-dist',
+    outDir: '../examples-dist',
     emptyOutDir: true,
     plugins: [
       vue(),
@@ -22,9 +22,9 @@ export default defineConfig({
     ],
   }: {
     // js library
-    outDir: 'dist',
+    outDir: '../dist',
     lib: {
-      entry: 'src/js/index.js',
+      entry: '../src/js/index.js',
       name: 'Yotei3D',
       fileName: 'yotei3d',
       formats: ['es', 'umd']
