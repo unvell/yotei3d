@@ -46,7 +46,7 @@
     <section id="example-app" class="">
       <h1>Examples</h1>
 
-      <div class="flex flex-col items-center gap-y-12 py-4">
+      <div class="grid grid-cols-1 gap-y-10 py-6">
         <div v-for="item of exampleItems" :key="item.title" 
           class="flex flex-row gap-x-2 transition-colors duration-300 cursor-pointer"
           :class="{'bg-gray-800': item.isHover, 'bg-black': !item.isHover}"
