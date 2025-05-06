@@ -6,7 +6,7 @@ A lightweight WebGL-based 3D rendering engine designed with simplicity and ease 
 
 ## Examples
 
-![Hello World Example](./examples/helloworld.html)
+![Hello World Example](https://github.com/unvell/yotei3d/blob/main/examples/public/img/examples/helloworld.png)
 
 ---
 
@@ -73,6 +73,6 @@ http://localhost:{port}/
 
 Visit `/helloworld.html` to see how easily you can create interactive 3D scenes.
 
-Or check out the live demo at https://yotei.unvell.com/
+Or check out the live demo at https://yotei3d.unvell.com/
 
 
