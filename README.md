@@ -2,11 +2,7 @@
 
 A lightweight WebGL-based 3D rendering engine designed with simplicity and ease of use in mind—even for users with minimal 3D programming experience.
 
----
-
-## Examples
-
-![Hello World Example](https://github.com/unvell/yotei3d/blob/main/examples/public/img/examples/helloworld.png)
+![Examples](https://github.com/unvell/yotei3d/blob/main/examples/public/img/examples.jpg)
 
 ---
 

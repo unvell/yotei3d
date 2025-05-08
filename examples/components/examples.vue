@@ -1,5 +1,5 @@
 <template>
-	<header class="w-full flex flex-col items-center py-2">
+	<header class="w-full flex flex-col items-center px-4 py-2">
 		<div><img src="/img/logo.png"></img></div>
 		<!-- <div>A lightweight 3D engine designed for ease of use</div> -->
     <div class="max-w-2xl mx-auto py-2 text-center">
@@ -7,14 +7,14 @@
     </div>
 	</header>
 
-  <main class="max-w-2xl mx-auto examples">
+  <main class="max-w-2xl mx-auto examples px-4">
     
     <div class="separator"></div>
 
     <section>
       <h1>Features</h1>
 
-      <div class="grid grid-cols-2 gap-8 feature-cards">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 feature-cards">
         <div>
           <h2>Beginner-Friendly Design</h2>
           <p>Yotei3D allows you to start building interactive 3D scenes with just a few lines of code. Perfect for developers with limited 3D knowledge.</p>
@@ -54,7 +54,7 @@
           @mouseleave.stop="item.isHover = false"
           @click="gotoExample(item)">
           <div class="w-2/5 h-48 overflow-clip">
-              <img class="object-cover transition-transform duration-300" :class="{'scale-105': item.isHover}" :src="item.thumbnail">
+              <img class="object-cover transition-transform duration-300 w-full h-full" :class="{'scale-105': item.isHover}" :src="item.thumbnail">
           </div>
           <div class="w-3/5 p-4">
             <div class="font-bold pb-4 text-white text-lg">{{ item.title }}</div>

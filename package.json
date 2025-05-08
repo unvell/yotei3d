@@ -1,19 +1,37 @@
 {
   "name": "@unvell/yotei3d",
-  "version": "1.7.8",
-  "description": "Optimized WebGL engine for showcase application",
+  "version": "1.0.2",
+  "description": "A lightweight WebGL-based 3D rendering engine designed with simplicity and ease of use in mind—even for users with minimal 3D programming experience.",
   "type": "module",
-  "main": "dist/js/yotei3d.js",
+  "main": "dist/yotei3d.umd.cjs",
+  "module": "dist/yotei3d.js",
+  "exports": {
+    "import": "./dist/yotei3d.js",
+    "require": "./dist/yotei3d.umd.cjs"
+  },
   "files": [
     "/dist"
   ],
+  "unpkg": "dist/yotei3d.umd.cjs",
+  "jsdelivr": "dist/yotei3d.umd.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build-examples": "BUILD_EXAMPLES_SITE=true yarn build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "publish": "yarn build && npm publish --access public"
   },
-  "keywords": [],
+  "keywords": [
+    "webgl",
+    "3d",
+    "rendering",
+    "javascript",
+    "graphics",
+    "lightweight",
+    "engine",
+    "library",
+    "yotei3d"
+  ],
   "author": "UNVELL Inc.",
   "license": "MIT",
   "repository": {
@@ -30,7 +48,7 @@
   "bugs": {
     "url": "https://github.com/unvell/yotei3d/issues"
   },
-  "homepage": "https://unvell.com",
+  "homepage": "https://yotei3d.unvell.com",
   "packageManager": "yarn@4.9.1",
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.4",
