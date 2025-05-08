@@ -1,6 +1,6 @@
 {
   "name": "@unvell/yotei3d",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "A lightweight WebGL-based 3D rendering engine designed with simplicity and ease of use in mind—even for users with minimal 3D programming experience.",
   "type": "module",
   "main": "dist/yotei3d.umd.cjs",
