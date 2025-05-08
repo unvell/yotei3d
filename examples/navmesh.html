@@ -81,12 +81,15 @@
       scene.sun.location.set(0, 5, 0);
       
       let dirx = 0, diry = 0;
-      scene.onmousemove = function() {
-        dirx += renderer.viewer.mouse.movement.x * 0.001;
-        diry += renderer.viewer.mouse.movement.y * 0.001;
+      scene.onmousemove = function(e) {
+        dirx += e.movement.x * 0.001;
+        diry += e.movement.y * 0.001;
 
         dirx = MathFunctions.clamp(dirx, -0.1, 0.1);
         diry = MathFunctions.clamp(diry, -0.1, 0.1);
+
+        modelViewer.viewer.angle.x = -(renderer.renderSize.height * 0.5 - e.position.y) * 0.02;
+        modelViewer.viewer.angle.z = (renderer.renderSize.width * 0.5 - e.position.x) * 0.01;
       };
 
       setInterval(function() {
@@ -116,10 +119,6 @@
       modelViewer.minRotateX = -40;
       modelViewer.maxRotateX = 40;
       modelViewer.enabled = false;
-      scene.on('mousemove', e => {
-        modelViewer.viewer.angle.x = -(renderer.renderSize.height * 0.5 - e.y) * 0.02;
-        modelViewer.viewer.angle.z = (renderer.renderSize.width * 0.5 - e.x) * 0.01;
-      })
 
       scene.animation = true;
       scene.show();

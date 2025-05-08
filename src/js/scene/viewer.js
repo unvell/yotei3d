@@ -173,8 +173,8 @@ export class Viewer {
 					mouse.position.y = client.y;
 
 					if (scene) {
-						scene.mousemove(mouse.position);
-					}
+						scene.mousemove({position:mouse.position, movement: mouse.movement});
+          }
 
 					// FIXME: integrated 2D 3D event system
 					if (this.renderer.current2DScene) {
