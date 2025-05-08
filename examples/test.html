@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Helloworld - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+  
+    import { Renderer, Shapes } from '@';
+
+    window.addEventListener("load", function() {
+      // create renderer and scene
+      const renderer = new Renderer({
+        enablePostprocess: false,
+        // enableObjectHover: true,
+      });
+
+      // create scene
+      const scene = renderer.createScene();
+
+      const camera = scene.mainCamera;
+      camera.location.set(0, 1, 5);
+
+      // create a cube object
+      const cube1 = new Shapes.Cube();
+      cube1.location.set(-2, 0, 0);
+      cube1.scale.set(1, 3, 1);
+      cube1.angle.y = 30;
+      cube1.opacity = 0;
+      scene.animate(cube1, (t) => cube1.opacity = t, { duration: 5000 });
+      
+      scene.onmousemove = (e) => {
+        scene.mainCamera.location.x = ((renderer.renderSize.width * 0.5) - e.position.x) * 0.0001;
+        scene.requireUpdateFrame();
+      };
+
+      scene.add(cube1);
+      scene.show();
+
+    });
+
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Drag and rotate the cube in 3D world.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
