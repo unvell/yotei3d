@@ -209,8 +209,8 @@ vec3 lighter2(vec3 a, vec3 b, float factor) {
 }
 
 vec3 darker(vec3 a, vec3 b, float factor) {
-	// vec3 d = min(b - a, 1.0);
-	return a;// a + b * 1.0;
+	// b は遮蔽度（1=遮蔽なし、0=完全遮蔽）。factor で強度を補間。
+	return a * mix(vec3(1.0), b, factor);
 }
 
 void main(void) {

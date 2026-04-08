@@ -14,7 +14,12 @@
 
     window.addEventListener("load", (e) => {
       const renderer = new Renderer({
-        enableShadow: true,
+        // enableShadow: true,
+        enableSSAO: true,
+        pipelinePreview: true,
+        ssao: { 
+          intensity: 0,
+        },
         backColor: [.15, .15, .15],
       });
       const scene = renderer.createScene();

@@ -67,11 +67,9 @@ export class SSAOShader extends Shader {
 		this.radiusUniform.set(this.radius || 0.5);
 		this.biasUniform.set(this.bias || 0.025);
 
-    const projectionMatrix = this.renderer.viewMatrix.mul(this.renderer.cameraMatrix).mul(this.renderer.projectionMatrix)
-
-		this.uProjectionUniform.set(projectionMatrix);
-    const invProj = projectionMatrix.inverse();
-    this.uInvProjectionUniform.set(invProj);
+		this.uProjectionUniform.set(this.renderer.projectionMatrix);
+    // inverse() は破壊的なので clone してから呼ぶ
+    this.uInvProjectionUniform.set(this.renderer.projectionMatrix.clone().inverse());
 
     this.gl.depthMask(false);
 		this.gl.enable(this.gl.BLEND);

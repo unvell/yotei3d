@@ -520,13 +520,15 @@ export class Renderer {
 					tex2Filter: "darker",
 					tex2Intensity: this.options.ssao.intensity || 0.2,
 				});
+				ssaoEffectRenderer.gammaFactor = 1.0;
 				ssaoEffectRenderer.input = sceneImageRenderer;
 				ssaoEffectRenderer.tex2Input = ssaoBlurNode;
 
 				previewRenderer.addPreview(sceneImageRenderer);
 				previewRenderer.addPreview(depthMapRenderer);
-				previewRenderer.addPreview(normalMapRenderer);
+				// previewRenderer.addPreview(normalMapRenderer);
 				previewRenderer.addPreview(ssaoRenderer);
+				previewRenderer.addPreview(ssaoEffectRenderer);
 			} else {
 				ssaoEffectRenderer = sceneImageRenderer;
 

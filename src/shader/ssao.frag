@@ -18,23 +18,30 @@ vec3 getViewPos(vec2 uv, float depth) {
   return viewPos.xyz / viewPos.w;
 }
 
+// 疑似ランダム回転ベクトル（normal と直交化される前の接線方向）
+vec3 hashRandomVec(vec2 uv) {
+  float a = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
+  float b = fract(sin(dot(uv, vec2(39.3468, 11.1357))) * 24634.6345);
+  return vec3(a * 2.0 - 1.0, b * 2.0 - 1.0, 0.0);
+}
+
 void main() {
 
   float depth = texture2D(depthMap, texcoord).r;
   vec3 pos = getViewPos(texcoord, depth);
   vec3 normal = normalize(texture2D(normalMap, texcoord).xyz * 2.0 - 1.0);
 
+  // ピクセルごとに 1 回だけ TBN を構築する
+  vec3 randomVec = hashRandomVec(texcoord);
+  vec3 tangent   = normalize(randomVec - normal * dot(randomVec, normal));
+  vec3 bitangent = cross(normal, tangent);
+  mat3 TBN       = mat3(tangent, bitangent, normal);
+
   float occlusion = 0.0;
   const int sampleCount = 16;
 
   for (int i = 0; i < sampleCount; i++) {
-    vec3 sampleVec = uSamples[i];
-
-    vec3 tangent = normalize(sampleVec - normal * dot(sampleVec, normal));
-    vec3 bitangent = normalize(cross(normal, tangent));
-    mat3 TBN = mat3(tangent, bitangent, normal);
-
-    vec3 samplePos = pos + TBN * sampleVec * radius;
+    vec3 samplePos = pos + (TBN * uSamples[i]) * radius;
 
     vec4 offset = uProjection * vec4(samplePos, 1.0);
     offset.xyz /= offset.w;
