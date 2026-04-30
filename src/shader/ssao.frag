@@ -1,24 +1,32 @@
-precision mediump float;
+precision highp float;
 
 uniform sampler2D depthMap;
 uniform sampler2D normalMap;
 
 uniform mat4 uProjection;
-uniform mat4 uInvProjection;
+uniform float uNear;
+uniform float uFar;
 uniform vec3 uSamples[16];
 uniform float radius;
 uniform float bias;
 
 varying vec2 texcoord;
 
-vec3 getViewPos(vec2 uv, float depth) {
-  float z = depth * 2.0 - 1.0;
-  vec4 clipPos = vec4(uv * 2.0 - 1.0, z, 1.0);
-  vec4 viewPos = uInvProjection * clipPos;
-  return viewPos.xyz / viewPos.w;
+float unpackDepth(vec4 enc) {
+  return dot(enc, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0));
 }
 
-// 疑似ランダム回転ベクトル（normal と直交化される前の接線方向）
+vec3 getViewPos(vec2 uv, float linearDepth) {
+  // linearDepth: 0 at near, 1 at far. View-space Z is negative in front of camera.
+  float viewZ = -(uNear + linearDepth * (uFar - uNear));
+  vec2 ndc = uv * 2.0 - 1.0;
+  return vec3(
+    ndc.x * (-viewZ) / uProjection[0][0],
+    ndc.y * (-viewZ) / uProjection[1][1],
+    viewZ
+  );
+}
+
 vec3 hashRandomVec(vec2 uv) {
   float a = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
   float b = fract(sin(dot(uv, vec2(39.3468, 11.1357))) * 24634.6345);
@@ -26,12 +34,17 @@ vec3 hashRandomVec(vec2 uv) {
 }
 
 void main() {
+  float linearDepth = unpackDepth(texture2D(depthMap, texcoord));
 
-  float depth = texture2D(depthMap, texcoord).r;
-  vec3 pos = getViewPos(texcoord, depth);
+  // Skip background (depth at far plane).
+  if (linearDepth >= 0.9999) {
+    gl_FragColor = vec4(1.0);
+    return;
+  }
+
+  vec3 pos = getViewPos(texcoord, linearDepth);
   vec3 normal = normalize(texture2D(normalMap, texcoord).xyz * 2.0 - 1.0);
 
-  // ピクセルごとに 1 回だけ TBN を構築する
   vec3 randomVec = hashRandomVec(texcoord);
   vec3 tangent   = normalize(randomVec - normal * dot(randomVec, normal));
   vec3 bitangent = cross(normal, tangent);
@@ -47,15 +60,14 @@ void main() {
     offset.xyz /= offset.w;
     vec2 sampleUV = offset.xy * 0.5 + 0.5;
 
-    // skip out-of-bound samples
     if (sampleUV.x < 0.0 || sampleUV.x > 1.0 || sampleUV.y < 0.0 || sampleUV.y > 1.0)
       continue;
 
-    float sampleDepth = texture2D(depthMap, sampleUV).r;
-    vec3 sampleViewPos = getViewPos(sampleUV, sampleDepth);
+    float sampleLinearDepth = unpackDepth(texture2D(depthMap, sampleUV));
+    vec3 sampleViewPos = getViewPos(sampleUV, sampleLinearDepth);
     float rangeCheck = smoothstep(0.0, 1.0, radius / abs(pos.z - sampleViewPos.z));
 
-    if ((sampleViewPos.z) > (samplePos.z + bias)) {
+    if (sampleViewPos.z > samplePos.z + bias) {
       occlusion += rangeCheck;
     }
   }

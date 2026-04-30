@@ -7,25 +7,31 @@ export class AttributeShader extends Shader {
 
 		this.vertexPositionAttribute = this.findAttribute('vertexPosition');
     this.vertexNormalAttribute = this.findAttribute("vertexNormal");
-    
-		this.projectionViewMatrixUniform = this.bindUniform("projectionViewMatrix", "mat4");
+
+		this.modelViewMatrixUniform = this.bindUniform("modelViewMatrix", "mat4");
+		this.projectionMatrixUniform = this.bindUniform("projectionMatrix", "mat4");
 		this.normalMatrixUniform = this.bindUniform("normalMatrix", "mat4");
     this.typeUniform = this.bindUniform("type", "int");
-    
+    this.uNearUniform = this.bindUniform("uNear", "float");
+    this.uFarUniform = this.bindUniform("uFar", "float");
+
     this.type = 0;
 	}
 
 	beginScene(scene) {
     this.typeUniform.set(this.type);
+    this.uNearUniform.set(this.renderer.options.perspective.near);
+    this.uFarUniform.set(this.renderer.options.perspective.far);
+    this.projectionMatrixUniform.set(this.renderer.projectionMatrix);
 	}
 
 	beginObject(obj) {
     super.beginObject(obj);
 
     const modelViewMatrix = obj._transform.mul(this.renderer.viewMatrix).mul(this.renderer.cameraMatrix);
-		this.projectionViewMatrixUniform.set(modelViewMatrix.mul(this.renderer.projectionMatrix));
+    this.modelViewMatrixUniform.set(modelViewMatrix);
 
-    const normalMatrix = modelViewMatrix.inverse().transpose()
+    const normalMatrix = modelViewMatrix.inverse().transpose();
     this.normalMatrixUniform.set(normalMatrix);
 	}
 }

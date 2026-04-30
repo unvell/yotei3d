@@ -40,7 +40,6 @@ export class SSAOShader extends Shader {
 
 		this.projectViewMatrixUniform = this.bindUniform("projectViewMatrix", "mat4");
 		this.uProjectionUniform = this.bindUniform("uProjection", "mat4");
-		this.uInvProjectionUniform = this.bindUniform("uInvProjection", "mat4");
 
 		this.depthMapUniform = this.bindUniform("depthMap", "tex", 0);
 		this.normalMapUniform = this.bindUniform("normalMap", "tex", 1);
@@ -48,6 +47,8 @@ export class SSAOShader extends Shader {
 		this.uSamplesUniform = this.bindUniformArray("uSamples", "vec3", 16);
 		this.radiusUniform = this.bindUniform("radius", "float");
 		this.biasUniform = this.bindUniform("bias", "float");
+		this.uNearUniform = this.bindUniform("uNear", "float");
+		this.uFarUniform = this.bindUniform("uFar", "float");
 
     this.sampleVectors = generateSSAOSamples(16);
     this.projectionMatrix = new Matrix4().ortho(-1, 1, -1, 1, -1, 1);
@@ -68,8 +69,8 @@ export class SSAOShader extends Shader {
 		this.biasUniform.set(this.bias || 0.025);
 
 		this.uProjectionUniform.set(this.renderer.projectionMatrix);
-    // inverse() は破壊的なので clone してから呼ぶ
-    this.uInvProjectionUniform.set(this.renderer.projectionMatrix.clone().inverse());
+		this.uNearUniform.set(this.renderer.options.perspective.near);
+		this.uFarUniform.set(this.renderer.options.perspective.far);
 
     this.gl.depthMask(false);
 		this.gl.enable(this.gl.BLEND);
