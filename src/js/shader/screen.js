@@ -20,6 +20,7 @@ export class ScreenShader extends Shader {
 		this.alphaUniform = this.bindUniform("alpha", "float");
 		this.resolutionUniform = this.bindUniform("resolution", "vec2");
 		this.resStrideUniform = this.bindUniform("resStride", "vec2");
+		this.tex2IntensityUniform = this.bindUniform("tex2Intensity", "float");
 		
 		this.samplingWeightUniform = this.bindUniform("samplingWeight", "float[]");
 		this.samplingWeightUniform.set([0.114357, 0.109813, 0.097238, 0.079397, 0.059781, 0.041506, 0.026573, 0.015687, 0.00854, 0.004287]);
@@ -62,9 +63,11 @@ export class ScreenShader extends Shader {
 		if (this.tex2) {
 			this.texture2Uniform.set(this.tex2);
 			this.hasTex2Uniform.set(true);
+			this.tex2IntensityUniform.set(typeof this.tex2Intensity === "number" ? this.tex2Intensity : 1.0);
 		} else {
 			this.texture2Uniform.set(Shader.emptyTexture);
 			this.hasTex2Uniform.set(false);
+			this.tex2IntensityUniform.set(0.0);
 		}
 
 		this.gl.depthMask(false);

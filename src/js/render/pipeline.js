@@ -193,6 +193,7 @@ export class ImageToScreenRenderer extends PipelineNode {
       if (this.tex2Input) {
         this.tex2Input.process();
         imageShader.tex2 = this.tex2Input.output;
+        imageShader.tex2Intensity = (typeof this.tex2Intensity === "number") ? this.tex2Intensity : 1.0;
       } else {
         imageShader.tex2 = null;
       }

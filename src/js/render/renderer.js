@@ -53,11 +53,12 @@ export class Renderer {
 				enabled: true,
 				threshold: 0.1,
 				gamma: 2.0,
+				intensity: 0.35,
 			},
 			ssao: { /* experimental */
 				enabled: false,
 				resolutionRatio: 0.5,
-				intensity: 0.2,
+				intensity: 0.5,
 			},
 			debugMode: false,
 			showDebugPanel: false,
@@ -518,7 +519,7 @@ export class Renderer {
 					height: renderImageHeight,
 					filter: "linear-interp",
 					tex2Filter: "darker",
-					tex2Intensity: this.options.ssao.intensity || 0.2,
+					tex2Intensity: (typeof this.options.ssao.intensity === "number") ? this.options.ssao.intensity : 0.5,
 				});
 				ssaoEffectRenderer.gammaFactor = 1.0;
 				ssaoEffectRenderer.input = sceneImageRenderer;
@@ -528,7 +529,8 @@ export class Renderer {
 				previewRenderer.addPreview(depthMapRenderer);
 				// previewRenderer.addPreview(normalMapRenderer);
 				previewRenderer.addPreview(ssaoRenderer);
-				previewRenderer.addPreview(ssaoEffectRenderer);
+				// 4th preview slot (top-right) is reserved for the final composite,
+				// which is added in the pipelinePreview branch below.
 			} else {
 				ssaoEffectRenderer = sceneImageRenderer;
 
@@ -538,6 +540,9 @@ export class Renderer {
 			}
 
 
+			const bloomIntensity = (this.options.bloomEffect && typeof this.options.bloomEffect.intensity === "number")
+				? this.options.bloomEffect.intensity : 0.35;
+
 			// final render
 			if (this.options.pipelinePreview) {
 
@@ -546,13 +551,14 @@ export class Renderer {
 					height: renderImageHeight,
 					filter: "linear-interp",
 					tex2Filter: "lighter",
+					tex2Intensity: bloomIntensity,
 				});
 				finalImagePreviewRenderer.input = ssaoEffectRenderer;
 				finalImagePreviewRenderer.tex2Input = bloomBlurNode;
 				finalImagePreviewRenderer.gammaFactor = this.options.renderingImage.gamma;
 				finalImagePreviewRenderer.enableAntialias = this.options.enableAntialias;
 
-				// previewRenderer.addPreview(finalImagePreviewRenderer);
+				previewRenderer.addPreview(finalImagePreviewRenderer);
 				previewRenderer.enableAntialias = true;
 				this.pipelineNodes.push(previewRenderer);
 
@@ -566,6 +572,7 @@ export class Renderer {
 				finalScreenRenderer.name = "final-screen-pipeline";
 				finalScreenRenderer.input = ssaoEffectRenderer;
 				finalScreenRenderer.tex2Input = bloomBlurNode;
+				finalScreenRenderer.tex2Intensity = bloomIntensity;
 				finalScreenRenderer.gammaFactor = this.options.renderingImage.gamma;
 				finalScreenRenderer.enableAntialias = this.options.enableAntialias;
 				this.pipelineNodes.push(finalScreenRenderer);

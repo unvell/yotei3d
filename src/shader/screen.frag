@@ -12,6 +12,7 @@ uniform float gammaFactor;
 
 uniform bool enableAntialias;
 uniform bool hasTex2;
+uniform float tex2Intensity;
 
 
 #define BLUR_SAMPLINGS 10
@@ -157,7 +158,7 @@ void main(void) {
 	
 	if (hasTex2) {
 		t2c = sample(tex2).rgb;
-		t2c = lighter(fc.rgb, t2c, 1.0);
+		t2c = lighter(fc.rgb, t2c, tex2Intensity);
 		fc.rgb = t2c.rgb;
 	}
 
