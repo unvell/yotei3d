@@ -557,13 +557,24 @@ export class SSAORenderer extends PipelineNode {
     this.buffer.disuse();
   }
 
+  clear() {
+    super.clear();
+
+    if (this.depthMapInput) {
+      this.depthMapInput.clear();
+    }
+    if (this.normalMapInput) {
+      this.normalMapInput.clear();
+    }
+  }
+
   get output() {
     return this.buffer.texture;
   }
 
-  destroy() {    
+  destroy() {
     this.input = null;
-    
+
     if (this.buffer) {
       this.buffer.destroy();
     }
