@@ -307,7 +307,7 @@ export class ImageFilterRenderer extends PipelineNode {
       if (this.tex2Input) {
         this.tex2Input.process();
         imageShader.tex2 = this.tex2Input.output;
-        imageShader.tex2Intensity = this.options.tex2Intensity || 1.0;
+        imageShader.tex2Intensity = (typeof this.options.tex2Intensity === "number") ? this.options.tex2Intensity : 1.0;
       } else {
         imageShader.tex2 = null;
       }

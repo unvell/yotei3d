@@ -51,7 +51,8 @@ export class Renderer {
 			},
 			bloomEffect: {
 				enabled: true,
-				resolutionScale: 0.5,
+				threshold: 0.1,
+				gamma: 2.0,
 				intensity: 0.35,
 			},
 			ssao: { /* experimental */
@@ -464,46 +465,43 @@ export class Renderer {
 			sceneImageRenderer.shadowMap2DInput = shadowMapCacheNode;
 
 
-			// bloom: extract bright pixels (light-pass) -> downsample -> separable gauss blur
+			// bloom
 
 			let bloomBlurNode;
 
 			if (this.options.enablePostprocess !== false
 				&& (!this.options.bloomEffect || this.options.bloomEffect.enabled !== false)
 			) {
-				const bloomScale = (typeof this.options.bloomEffect.resolutionScale === "number")
-					? this.options.bloomEffect.resolutionScale
-					: 0.5;
-
-				const bloomLightPassNode = new ImageFilterRenderer(this, {
-					width: width * bloomScale,
-					height: height * bloomScale,
+				const bloomSmallImageNode = new ImageFilterRenderer(this, {
+					width: width * (this.options.bloomEffect.threshold || 0.1),
+					height: height * (this.options.bloomEffect.threshold || 0.1),
 					flipTexcoordY: true,
-					filter: "light-pass",
+					filter: "blur3",
 				});
-				bloomLightPassNode.input = sceneImageRenderer;
+				bloomSmallImageNode.gammaFactor = (this.options.bloomEffect.gamma || 1.4);
+				bloomSmallImageNode.input = sceneImageRenderer;
 
 				bloomBlurNode = new BlurRenderer(this, {
-					width: bloomLightPassNode.width,
-					height: bloomLightPassNode.height,
+					width: bloomSmallImageNode.width,
+					height: bloomSmallImageNode.height,
 				});
-				bloomBlurNode.input = bloomLightPassNode;
+				bloomBlurNode.input = bloomSmallImageNode;
 			}
 
 			const previewRenderer = new MultipleImagePreviewRenderer(this);
 
 			// ssao (experimental)
 
-			let sceneWithSSAONode, ssaoBlurNode, depthMapRenderer, ssaoRenderer;
+			let ssaoEffectRenderer, ssaoBlurNode;
 
 			if (this.options.enableSSAO) {
-				depthMapRenderer = new AttributeRenderer(this, {
+				const depthMapRenderer = new AttributeRenderer(this, {
 					type: 0 // depth
 				});
 				const normalMapRenderer = new AttributeRenderer(this, {
 					type: 1 // normal
 				});
-				ssaoRenderer = new SSAORenderer(this, {
+				const ssaoRenderer = new SSAORenderer(this, {
 					width: this.renderPhysicalSize.width * (this.options.ssao.resolutionRatio || 1.0),
 					height: this.renderPhysicalSize.height * (this.options.ssao.resolutionRatio || 1.0),
 				});
@@ -516,71 +514,65 @@ export class Renderer {
 				});
 				ssaoBlurNode.input = ssaoRenderer;
 
-				const ssaoIntensity = (typeof this.options.ssao.intensity === "number")
-					? this.options.ssao.intensity : 0.5;
-
-				// Multiplicative SSAO darken: scene * mix(1, occlusion, intensity).
-				// "filter: none" keeps the scene crisp (no preliminary box blur).
-				sceneWithSSAONode = new ImageFilterRenderer(this, {
+				ssaoEffectRenderer = new ImageFilterRenderer(this, {
 					width: renderImageWidth,
 					height: renderImageHeight,
-					filter: "none",
+					filter: "linear-interp",
 					tex2Filter: "darker",
-					tex2Intensity: ssaoIntensity,
+					tex2Intensity: (typeof this.options.ssao.intensity === "number") ? this.options.ssao.intensity : 0.5,
 				});
-				sceneWithSSAONode.gammaFactor = 1.0;
-				sceneWithSSAONode.input = sceneImageRenderer;
-				sceneWithSSAONode.tex2Input = ssaoBlurNode;
+				ssaoEffectRenderer.gammaFactor = 1.0;
+				ssaoEffectRenderer.input = sceneImageRenderer;
+				ssaoEffectRenderer.tex2Input = ssaoBlurNode;
+
+				previewRenderer.addPreview(sceneImageRenderer);
+				previewRenderer.addPreview(depthMapRenderer);
+				// previewRenderer.addPreview(normalMapRenderer);
+				previewRenderer.addPreview(ssaoRenderer);
+				previewRenderer.addPreview(ssaoEffectRenderer);
 			} else {
-				sceneWithSSAONode = sceneImageRenderer;
+				ssaoEffectRenderer = sceneImageRenderer;
+
+				previewRenderer.addPreview(sceneImageRenderer);
+				previewRenderer.addPreview(shadowMapCacheNode);
+				previewRenderer.addPreview(bloomBlurNode);
 			}
 
 
 			const bloomIntensity = (this.options.bloomEffect && typeof this.options.bloomEffect.intensity === "number")
 				? this.options.bloomEffect.intensity : 0.35;
 
-			// Final composite: additive bloom on top of (scene + SSAO).
-			// Done in an offscreen buffer so the on-screen pass can stay a plain blit.
-			let finalCompositeNode;
-			if (bloomBlurNode) {
-				finalCompositeNode = new ImageFilterRenderer(this, {
-					width: renderImageWidth,
-					height: renderImageHeight,
-					filter: "none",
-					tex2Filter: "add",
-					tex2Intensity: bloomIntensity,
-				});
-				finalCompositeNode.gammaFactor = this.options.renderingImage.gamma;
-				finalCompositeNode.input = sceneWithSSAONode;
-				finalCompositeNode.tex2Input = bloomBlurNode;
-			} else {
-				finalCompositeNode = sceneWithSSAONode;
-			}
-
-			// preview cells
-			if (this.options.enableSSAO) {
-				previewRenderer.addPreview(sceneImageRenderer);
-				previewRenderer.addPreview(depthMapRenderer);
-				previewRenderer.addPreview(ssaoRenderer);
-				previewRenderer.addPreview(finalCompositeNode);
-			} else {
-				previewRenderer.addPreview(sceneImageRenderer);
-				if (shadowMapCacheNode) previewRenderer.addPreview(shadowMapCacheNode);
-				if (bloomBlurNode) previewRenderer.addPreview(bloomBlurNode);
-				previewRenderer.addPreview(finalCompositeNode);
-			}
-
 			// final render
 			if (this.options.pipelinePreview) {
+
+				const finalImagePreviewRenderer = new ImageFilterRenderer(this, {
+					width: renderImageWidth,
+					height: renderImageHeight,
+					filter: "linear-interp",
+					tex2Filter: "lighter",
+					tex2Intensity: bloomIntensity,
+				});
+				finalImagePreviewRenderer.input = ssaoEffectRenderer;
+				finalImagePreviewRenderer.tex2Input = bloomBlurNode;
+				finalImagePreviewRenderer.gammaFactor = this.options.renderingImage.gamma;
+				finalImagePreviewRenderer.enableAntialias = this.options.enableAntialias;
+
+				// previewRenderer.addPreview(finalImagePreviewRenderer);
 				previewRenderer.enableAntialias = true;
 				this.pipelineNodes.push(previewRenderer);
+
 			} else {
 				const finalScreenRenderer = new ImageToScreenRenderer(this, {
 					width: this.renderPhysicalSize.width,
 					height: this.renderPhysicalSize.height,
+					filter: "linear-interp",
+					tex2Filter: "lighter",
 				});
 				finalScreenRenderer.name = "final-screen-pipeline";
-				finalScreenRenderer.input = finalCompositeNode;
+				finalScreenRenderer.input = ssaoEffectRenderer;
+				finalScreenRenderer.tex2Input = bloomBlurNode;
+				finalScreenRenderer.tex2Intensity = bloomIntensity;
+				finalScreenRenderer.gammaFactor = this.options.renderingImage.gamma;
 				finalScreenRenderer.enableAntialias = this.options.enableAntialias;
 				this.pipelineNodes.push(finalScreenRenderer);
 			}
