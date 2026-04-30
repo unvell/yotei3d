@@ -154,16 +154,10 @@ void main(void) {
 		fc = sample(texture);
 	}
 
-	vec3 t2c = vec3(0);
-	
-	if (hasTex2) {
-		t2c = sample(tex2).rgb;
-		t2c = lighter(fc.rgb, t2c, tex2Intensity);
-		fc.rgb = t2c.rgb;
-	}
-
+	// Final composite (SSAO darken + bloom add) is done upstream in an
+	// ImageFilterRenderer, so this pass is a plain blit + gamma + alpha.
 	fc.rgb = gamma(fc.rgb, gammaFactor);
-  fc.a = alpha;
- 
+	fc.a = alpha;
+
 	gl_FragColor = fc;
 }
