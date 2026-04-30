@@ -529,8 +529,7 @@ export class Renderer {
 				previewRenderer.addPreview(depthMapRenderer);
 				// previewRenderer.addPreview(normalMapRenderer);
 				previewRenderer.addPreview(ssaoRenderer);
-				// 4th preview slot (top-right) is reserved for the final composite,
-				// which is added in the pipelinePreview branch below.
+				previewRenderer.addPreview(ssaoEffectRenderer);
 			} else {
 				ssaoEffectRenderer = sceneImageRenderer;
 
@@ -558,7 +557,7 @@ export class Renderer {
 				finalImagePreviewRenderer.gammaFactor = this.options.renderingImage.gamma;
 				finalImagePreviewRenderer.enableAntialias = this.options.enableAntialias;
 
-				previewRenderer.addPreview(finalImagePreviewRenderer);
+				// previewRenderer.addPreview(finalImagePreviewRenderer);
 				previewRenderer.enableAntialias = true;
 				this.pipelineNodes.push(previewRenderer);
 
