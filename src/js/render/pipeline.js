@@ -552,6 +552,10 @@ export class SSAORenderer extends PipelineNode {
     this.shader.depthMap = this.depthMapInput.output;
     this.shader.normalMap = this.normalMapInput.output;
 
+    const ssaoOpt = this.renderer.options.ssao || {};
+    this.shader.radius = (typeof ssaoOpt.radius === "number") ? ssaoOpt.radius : 0.5;
+    this.shader.bias = (typeof ssaoOpt.bias === "number") ? ssaoOpt.bias : 0.025;
+
     this.renderer.useShader(this.shader);
     this.buffer.use();
     this.shader.beginScene(this.renderer.currentScene);
