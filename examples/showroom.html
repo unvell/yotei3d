@@ -13,13 +13,14 @@
       const renderer = new Renderer({
         enableLighting: true,
         backColor: [0.96, .98, 1, 1],
-        enableSSAO: true,
+        enableSSAO: false,
         enablePostprocess: true,
         renderingImage: {
           gamma: 1.2,
         },
         enableAntialias: true,
         enableShadow: false,
+        enableEnvmap: true,
         bloomEffect: {
           threshold: 0.05,
           gamma: 2.2,

@@ -10,6 +10,7 @@ import { ResourceManager } from '../utility/resourcemanager';
 import { Shader } from "../webgl/shader";
 import { ShaderSources } from "../shader/shadersources";
 import { ImageSource, ImageToScreenRenderer, DefaultRenderer, ShadowMapRenderer, ShadowMapBlurCacheRenderer, SceneToImageRenderer, ImageFilterRenderer, BlurRenderer } from "./pipeline"
+import { IBLBaker } from "./iblbaker";
 import { Viewer } from "../scene/viewer";
 import { Scene } from '../scene/scene';
 import { ObjectTypes, ParticleObject } from "../scene/object";
@@ -399,6 +400,7 @@ export class Renderer {
 
 				scene.requestedUpdateFrame = false;
 
+				this.updateIBL(scene);
 				this.prepareRenderMatrices();
 				this.renderPipeline();
 
@@ -610,6 +612,32 @@ export class Renderer {
 		if (scene) {
 			this.drawSceneFrame(scene);
 		}
+	}
+
+	// Bake the runtime image-based-lighting maps (diffuse irradiance cubemap)
+	// from the scene's skybox. Re-bakes only when the source environment
+	// cubemap changes, so this is effectively a one-time cost per skybox.
+	updateIBL(scene) {
+		if (!scene || !this.options.enableEnvmap) return;
+
+		const sky = scene.skybox;
+		const src = (sky && sky.loaded && sky.cubemap && sky.cubemap.loaded) ? sky.cubemap : null;
+
+		if (!src) return;
+		if (scene._iblBakedFor === src && scene._iblIrradianceMap) return;
+
+		if (!this._iblBaker) {
+			this._iblBaker = new IBLBaker(this);
+		}
+
+		scene._iblIrradianceMap = this._iblBaker.bakeIrradiance(src);
+		scene._iblEnvMap = src;
+
+		// max specular mip level from the environment cubemap face size
+		const faceSize = (src.images && src.images[0] && src.images[0].width)
+			|| src.width || 256;
+		scene._iblMaxLod = Math.max(0, Math.floor(Math.log2(faceSize)) - 1);
+		scene._iblBakedFor = src;
 	}
 
 	prepareRenderMatrices() {

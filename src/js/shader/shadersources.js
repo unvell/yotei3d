@@ -9,6 +9,7 @@ import { ScreenShader } from './screen';
 import { ShadowMapShader } from './shadowmap';
 import { AttributeShader } from './attrib';
 import { SSAOShader } from './ssao';
+import { IrradianceShader } from './ibl';
 
 // import viewerVert from '../../shader/viewer.vert';
 // import viewerFrag from '../../shader/viewer.frag';
@@ -40,6 +41,8 @@ import attribmapVert from '../../shader/attribmap.vert';
 import attribmapFrag from '../../shader/attribmap.frag';
 import ssaoVert from '../../shader/ssao.vert';
 import ssaoFrag from '../../shader/ssao.frag';
+import iblVert from '../../shader/ibl.vert';
+import irradianceFrag from '../../shader/irradiance.frag';
 
 export const ShaderSources = {
   // viewer: { vert: viewerVert, frag: viewerFrag, class: "ViewerShader" },
@@ -58,5 +61,6 @@ export const ShaderSources = {
   shadowmap: { vert: shadowmapVert, frag: shadowmapFrag, class: ShadowMapShader },
   attributemap: { vert: attribmapVert, frag: attribmapFrag, class: AttributeShader },
   ssao: { vert: ssaoVert, frag: ssaoFrag, class: SSAOShader },
-  
+  irradiance: { vert: iblVert, frag: irradianceFrag, class: IrradianceShader },
+
 }

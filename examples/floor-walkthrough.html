@@ -18,6 +18,7 @@
         enableAntialias: true,
         enableShadow: true,
         enableSSAO: true,
+        enableEnvmap: false,
         shadowQuality: {
           scale: 10,
           viewDepth: 4,
@@ -30,7 +31,7 @@
           gamma: 1.4,
         },
         renderingImage: {
-          gamma: 1.2,
+          gamma: 1.0,
           resolutionRatio: 1,
         },
       });
@@ -38,6 +39,11 @@
       const scene = renderer.createScene();
       window._scene = scene;
       
+      // used when enableEnvmap is true
+      // scene.iblIntensity = 2.5;
+      // scene.exposure = 1.5;
+      // scene.iblColor = [1.15, 1.0, 0.9];
+
       let rootObj, refCubebox;
 
       const setObjectRefmap = (obj) => {
@@ -130,7 +136,7 @@
       });
 
       scene.sun.location.set(0, 10, 0);
-      scene.sun.mat.color = [1.2, 1.2, 1.2];
+      scene.sun.mat.color = [1.0, 1.0, 1.0];
 
       scene.show();
     });

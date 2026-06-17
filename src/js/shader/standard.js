@@ -42,6 +42,7 @@ export class StandardShader extends Shader {
 		this.texTilingUniform = this.bindUniform("texTiling", "vec2");
 		this.glossyUniform = this.bindUniform("glossy", "float");
 		this.roughnessUniform = this.bindUniform("roughness", "float");
+		this.metallicUniform = this.bindUniform("metallic", "float");
 		this.emissionUniform = this.bindUniform("emission", "float");
 		this.refractionUniform = this.bindUniform("refraction", "float");
 		this.normalMipmapUniform = this.bindUniform("normalMipmap", "float");
@@ -54,6 +55,15 @@ export class StandardShader extends Shader {
 		this.normalMapUniform = this.bindUniform("normalMap", "tex", 1);
 		this.lightMapUniform = this.bindUniform("lightMap", "tex", 2);
 		this.refMapUniform = this.bindUniform("refMap", "texcube", 4);
+		this.irradianceMapUniform = this.bindUniform("irradianceMap", "texcube", 6);
+
+		// image-based lighting (IBL)
+		this.hasIBLUniform = this.bindUniform("hasIBL", "bool");
+		this.useDirectSunUniform = this.bindUniform("useDirectSun", "bool");
+		this.iblIntensityUniform = this.bindUniform("iblIntensity", "float");
+		this.maxEnvLodUniform = this.bindUniform("maxEnvLod", "float");
+		this.exposureUniform = this.bindUniform("exposure", "float");
+		this.iblColorUniform = this.bindUniform("iblColor", "color3");
 
 		// this.hasTextureUniform = this.bindUniform("hasTexture", "bool");
 		// this.hasLightMapUniform = this.bindUniform("hasLightMap", "bool");
@@ -95,6 +105,7 @@ export class StandardShader extends Shader {
 		this.emptyCubemap.createEmpty();
 
 		this.emptyBoundingBox = new BoundingBox3D();
+		this.defaultIBLColor = [1.0, 1.0, 1.0];
 	}
 
 	beginScene(scene) {
@@ -195,6 +206,27 @@ export class StandardShader extends Shader {
 				this.shadowMapTypeUniform.set(0);
 			}
 		}
+
+		// IBL: runtime-baked irradiance (diffuse) + environment cubemap (specular)
+		const iblActive = this.renderer.options.enableEnvmap
+			&& scene._iblIrradianceMap instanceof CubeMap && scene._iblIrradianceMap.loaded
+			&& scene._iblEnvMap instanceof CubeMap && scene._iblEnvMap.loaded;
+
+		this._iblActive = iblActive;
+		this._sceneEnvMap = iblActive ? scene._iblEnvMap : null;
+
+		if (iblActive) {
+			this.hasIBLUniform.set(true);
+			this.useDirectSunUniform.set(this.renderer.options.enableLighting !== false);
+			this.irradianceMapUniform.set(scene._iblIrradianceMap);
+			this.iblIntensityUniform.set(typeof scene.iblIntensity === "number" ? scene.iblIntensity : 1.0);
+			this.maxEnvLodUniform.set(typeof scene._iblMaxLod === "number" ? scene._iblMaxLod : 6.0);
+			this.exposureUniform.set(typeof scene.exposure === "number" ? scene.exposure : 1.0);
+			this.iblColorUniform.set(scene.iblColor || this.defaultIBLColor);
+		} else {
+			this.hasIBLUniform.set(false);
+			this.irradianceMapUniform.set(this.emptyCubemap);
+		}
 	}
 
 	beginObject(obj) {
@@ -222,6 +254,7 @@ export class StandardShader extends Shader {
 		this.textureUniform.set(Shader.emptyTexture);
 
 		let color = this.defaultColor;
+		let metallic = 0;
 
 		if (mat) {
 			// texture
@@ -269,7 +302,12 @@ export class StandardShader extends Shader {
 			} else {
 				this.roughnessUniform.set(0.5);
 			}
-		
+
+			// metallic
+			if (!isNaN(mat.metallic)) {
+				metallic = mat.metallic;
+			}
+
 			// glossy
 			if (mat.glossy) {
 				this.glossyUniform.set(mat.glossy);
@@ -286,8 +324,9 @@ export class StandardShader extends Shader {
 		}
 
 		this.colorUniform.set(color);
+		this.metallicUniform.set(metallic);
 
-		// normal-map	
+		// normal-map
 		if (this.renderer.options.enableNormalMap && this.useNormalmap) {
 			this.normalMapUniform.set(this.useNormalmap);
 			this.modelMatrix3x3Uniform.set(modelMatrix);
@@ -313,13 +352,18 @@ export class StandardShader extends Shader {
 			&& typeof obj.refmap && (obj.refmap instanceof CubeMap) && obj.refmap.loaded) {
 			this.refMapUniform.set(obj.refmap);
 			this.refMapTypeUniform.set(1);
-		
+
 			if (!obj.refmap.bbox) {
 				this.refmapBoxUniform.set(this.emptyBoundingBox);
 			} else {
 				this.refmapBoxUniform.set(obj.refmap.bbox);
 				this.refMapTypeUniform.set(2);
 			}
+		} else if (this._iblActive) {
+			// fall back to the scene environment cubemap for specular IBL
+			this.refMapUniform.set(this._sceneEnvMap);
+			this.refmapBoxUniform.set(this.emptyBoundingBox);
+			this.refMapTypeUniform.set(1);
 		} else {
 			this.refMapUniform.set(this.emptyCubemap);
 			this.refMapTypeUniform.set(0);
@@ -417,13 +461,18 @@ export class StandardShader extends Shader {
 			&& typeof mesh._refmap === "object" && mesh._refmap instanceof CubeMap && mesh._refmap.loaded) {
 			this.refMapUniform.set(mesh._refmap);
 			this.refMapTypeUniform.set(1);
-		
+
 			if (!mesh._refmap.bbox) {
 				this.refmapBoxUniform.set(this.emptyBoundingBox);
 			} else {
 				this.refmapBoxUniform.set(mesh._refmap.bbox);
 				this.refMapTypeUniform.set(2);
 			}
+		} else if (this._iblActive) {
+			// fall back to the scene environment cubemap for specular IBL
+			this.refMapUniform.set(this._sceneEnvMap);
+			this.refmapBoxUniform.set(this.emptyBoundingBox);
+			this.refMapTypeUniform.set(1);
 		} else {
 			this.refMapUniform.set(this.emptyCubemap);
 			this.refMapTypeUniform.set(0);

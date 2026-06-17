@@ -12,11 +12,11 @@
 
       const renderer = new Renderer({
         backgroundImage: "/textures/bg-gray-gradient.jpg",
-        showDebugPanel: false,
-        enableLighting: true,
+        // showDebugPanel: false,
+        // enableLighting: true,
         enablePostprocess: true,
-        enableAntialias: true,
-        enableEnvmap: true,
+        // enableAntialias: true,
+        // enableEnvmap: true,
         enableShadow: true,
         enableSSAO: true,
         shadowQuality: {
@@ -26,11 +26,11 @@
         },
         bloomEffect: {
           enabled: true,
-          threshold: 0.1,
+          threshold: 0.5,
           gamma: 1.4,
         },
         renderingImage: {
-          gamma: 1.4,
+          gamma: 1.1,
           resolutionRatio: 1,
         },
       });

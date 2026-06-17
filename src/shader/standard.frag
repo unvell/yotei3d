@@ -22,10 +22,20 @@ uniform float opacity;
 
 uniform float glossy;
 uniform float roughness;
+uniform float metallic;
 uniform float emission;
 uniform float refraction;
 uniform float normalMipmap;
 uniform float normalIntensity;
+
+// image-based lighting (IBL)
+uniform bool hasIBL;
+uniform bool useDirectSun;
+uniform float iblIntensity;
+uniform float maxEnvLod;
+uniform float exposure;
+uniform vec3 iblColor;       // white-balance tint for the diffuse ambient
+uniform samplerCube irradianceMap;
 
 uniform bool receiveLight;
 uniform bool hasNormalMap;
@@ -115,6 +125,28 @@ vec3 refract2(vec3 d, vec3 normal, float r) {
 	return normalize(d * r - normal * ((into ? 1.0 : -1.0) * (c * r + sqrt(t))));
 }
 
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
+	return F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+// Karis' analytic environment BRDF approximation (UE4 mobile). Replaces the
+// split-sum BRDF integration LUT: returns (scale, bias) so that the specular
+// term is prefiltered * (F0 * scale + bias).
+vec2 envBRDFApprox(float NoV, float rough) {
+	const vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+	const vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
+	vec4 r = rough * c0 + c1;
+	float a004 = min(r.x * r.x, exp2(-9.28 * NoV)) * r.x + r.y;
+	return vec2(-1.04, 1.04) * a004 + r.zw;
+}
+
+// Exposure-based exponential tone mapping. Near-identity for low values (so
+// dark scenes are preserved) and smoothly rolls HDR highlights down to 1.0
+// instead of hard-clipping them to white.
+vec3 tonemap(vec3 hdr) {
+	return vec3(1.0) - exp(-hdr * exposure);
+}
+
 void main(void) {
 
 	if (emission > 0.0) {
@@ -147,42 +179,89 @@ void main(void) {
 	vec3 lightmapColor = texture2D(lightMap, texcoord2).rgb;
 	finalColor *= lightmapColor;
 
-	//////////////// Lights ////////////////
+	vec3 albedo = finalColor;
 
-	if (receiveLight) {
-		if (lightCount > 0 || glossy > 0.0) {
-			finalColor += traceLight(vertexNormal, cameraNormal);
+	if (hasIBL) {
+
+		//////////////// IBL (split-sum approximation) ////////////////
+
+		vec3 N = vertexNormal;
+		vec3 viewDir = -cameraNormal;                  // fragment -> eye
+		float NdotV = max(dot(N, viewDir), 1.0e-4);
+
+		vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+		// direct lighting (additive). The analytic sun is only added when scene
+		// lighting is enabled; for IBL-only scenes the environment map already
+		// carries the key light, so adding it again would double-count.
+		vec3 direct = vec3(0.0);
+		if (receiveLight) {
+			if (useDirectSun) {
+				float NdotL = max(dot(N, sundir), 0.0);
+				direct += albedo * sunlight * NdotL;
+			}
+
+			if (lightCount > 0) {
+				direct += traceLight(N, cameraNormal);
+			}
 		}
 
-		float vtos = clamp(dot(vertexNormal, sundir), 0.0, 1.0);
-		finalColor = finalColor * 0.75 + finalColor * (vtos * 0.25);
-		finalColor *= sunlight;
+		// diffuse ambient from the baked irradiance map
+		vec3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
+		vec3 kD = (1.0 - F) * (1.0 - metallic);
+		vec3 irradiance = textureCube(irradianceMap, N).rgb * iblColor;
+		vec3 diffuseIBL = irradiance * albedo;
+
+		// specular ambient: environment cubemap sampled at a roughness-driven
+		// mip, weighted by the analytic environment BRDF
+		vec3 R = reflect(cameraNormal, N);
+		if (refMapType == 2) {
+			R = normalize(correctBoundingBoxIntersect(refMapBox, R));
+		}
+		vec3 prefiltered = textureCube(refMap, R, roughness * maxEnvLod).rgb;
+		vec2 ab = envBRDFApprox(NdotV, roughness);
+		vec3 specularIBL = prefiltered * (F0 * ab.x + ab.y);
+
+		vec3 ambient = (kD * diffuseIBL + specularIBL) * iblIntensity;
+
+		finalColor = direct + ambient;
+
+	} else {
+
+		//////////////// Lights (legacy non-IBL path) ////////////////
+
+		if (receiveLight) {
+			if (lightCount > 0 || glossy > 0.0) {
+				finalColor += traceLight(vertexNormal, cameraNormal);
+			}
+
+			float vtos = clamp(dot(vertexNormal, sundir), 0.0, 1.0);
+			finalColor = finalColor * 0.75 + finalColor * (vtos * 0.25);
+			finalColor *= sunlight;
+		}
+
+		//////////////// RefMap ////////////////
+		float roughdelta = pow(roughness, 10.0);
+
+		vec3 refmapLookup = reflect(cameraNormal, vertexNormal);
+
+		if (refMapType == 2) {
+			refmapLookup = normalize(correctBoundingBoxIntersect(refMapBox, refmapLookup));
+		}
+
+		if (glossy > 0.0) {
+			vec3 refColor = textureCube(refMap, refmapLookup, roughdelta).rgb;
+			finalColor = finalColor * (1.0 - glossy) + finalColor * refColor * glossy;
+		}
+
+		//////////////// RefraMap ////////////////
+
+		if (refraction > 0.0) {
+			vec3 refraLookup = refract2(vec3(-cameraNormal.x, cameraNormal.y, cameraNormal.z), vertexNormal, 1.05);
+			vec3 refraColor = textureCube(refMap, refraLookup, roughdelta).rgb;
+			finalColor = finalColor * (1.0 - refraction) + finalColor * refraColor * refraction;
+		}
 	}
-
-	//////////////// RefMap ////////////////
-	float roughdelta = pow(roughness, 10.0);
-
-	vec3 refmapLookup = reflect(cameraNormal, vertexNormal);
-
-	if (refMapType == 2) {
-		refmapLookup = normalize(correctBoundingBoxIntersect(refMapBox, refmapLookup));
-	}
-
-  if (glossy > 0.0) {
-    vec3 refColor = textureCube(refMap, refmapLookup, roughdelta).rgb;
-    // refColor = clamp(pow(refColor, vec3(pow(glossy, 1.0))), 0.0, 1.0);
-		// float gdelta = pow(clamp(glossy, 0.0, 1.0), 2.0);
-    finalColor = finalColor * (1.0 - glossy) + finalColor * refColor * glossy;
-  }
-
-	//////////////// RefraMap ////////////////
-
-  if (refraction > 0.0) {
-    vec3 refraLookup = refract2(vec3(-cameraNormal.x, cameraNormal.y, cameraNormal.z), vertexNormal, 1.05);
-    vec3 refraColor = textureCube(refMap, refraLookup, roughdelta).rgb;
-		// float rdelta = pow(clamp(refraction, 0.0, 1.0), 2.0);
-    finalColor = finalColor * (1.0 - refraction) + finalColor * refraColor * refraction;
-  }
 
 	// //////////////// ShadowMap ////////////////
 
@@ -207,6 +286,10 @@ void main(void) {
 			shadowBlock *= max(dot(normal, sundir), 0.0);
 			finalColor += vec3(1.0, 1.0, 0.9) * shadowBlock;
 		}
+	}
+
+	if (hasIBL) {
+		finalColor = tonemap(finalColor);
 	}
 
 	gl_FragColor = vec4(finalColor, alpha);
