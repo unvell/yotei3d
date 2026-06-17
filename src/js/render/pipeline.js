@@ -302,8 +302,11 @@ export class ImageFilterRenderer extends PipelineNode {
   render() {
     if (this._input && this._input.output) {
       const imageShader = this.shader;
-      imageShader.texture = this._input.output;
-      
+
+      // NOTE: process tex2Input before binding tex1. tex2Input (e.g. a
+      // BlurRenderer) renders through the same shared image shader singleton
+      // and its endMesh resets the shader's `texture`, so tex1 must be set
+      // afterwards or it falls back to the white emptyTexture.
       if (this.tex2Input) {
         this.tex2Input.process();
         imageShader.tex2 = this.tex2Input.output;
@@ -311,6 +314,8 @@ export class ImageFilterRenderer extends PipelineNode {
       } else {
         imageShader.tex2 = null;
       }
+
+      imageShader.texture = this._input.output;
 
       if (typeof this.enableAntialias !== "undefined") {
         imageShader.enableAntialias = this.enableAntialias;
