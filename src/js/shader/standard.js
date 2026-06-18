@@ -65,6 +65,14 @@ export class StandardShader extends Shader {
 		this.exposureUniform = this.bindUniform("exposure", "float");
 		this.iblColorUniform = this.bindUniform("iblColor", "color3");
 
+		// light-probe irradiance volume (SH L1)
+		this.hasProbesUniform = this.bindUniform("hasProbes", "bool");
+		this.probeCountUniform = this.bindUniform("probeCount", "int");
+		this.probeCellUniform = this.bindUniform("probeCell", "vec3");
+		this.probeIntensityUniform = this.bindUniform("probeIntensity", "float");
+		this.probePosUniform = this.bindUniformArray("probePos", "vec3", 32);
+		this.probeSHUniform = this.bindUniformArray("probeSH", "vec3", 128);
+
 		// this.hasTextureUniform = this.bindUniform("hasTexture", "bool");
 		// this.hasLightMapUniform = this.bindUniform("hasLightMap", "bool");
 		this.refMapTypeUniform = this.bindUniform("refMapType", "int");
@@ -226,6 +234,33 @@ export class StandardShader extends Shader {
 		} else {
 			this.hasIBLUniform.set(false);
 			this.irradianceMapUniform.set(this.emptyCubemap);
+		}
+
+		// light probes / probe baking
+		if (this.renderer._probeBaking) {
+			// Capturing first-bounce radiance: render direct lighting only so the
+			// probes don't feed indirect light back into themselves.
+			this.hasIBLUniform.set(false);
+			this.irradianceMapUniform.set(this.emptyCubemap);
+			this.shadowMapTypeUniform.set(0);
+			this.hasProbesUniform.set(false);
+		} else if (this.renderer.options.enableLightProbes
+			&& scene._probeData && scene._probeData.count > 0) {
+
+			const pd = scene._probeData;
+			this.hasProbesUniform.set(true);
+			this.probeCountUniform.set(pd.count);
+			this.probeCellUniform.set(pd.cell);
+			this.probeIntensityUniform.set(typeof scene.probeIntensity === "number" ? scene.probeIntensity : 1.0);
+
+			for (let i = 0; i < pd.count; i++) {
+				this.probePosUniform[i].set([pd.positions[i * 3], pd.positions[i * 3 + 1], pd.positions[i * 3 + 2]]);
+			}
+			for (let i = 0; i < pd.count * 4; i++) {
+				this.probeSHUniform[i].set([pd.coeffs[i * 3], pd.coeffs[i * 3 + 1], pd.coeffs[i * 3 + 2]]);
+			}
+		} else {
+			this.hasProbesUniform.set(false);
 		}
 	}
 

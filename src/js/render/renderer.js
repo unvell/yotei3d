@@ -11,6 +11,7 @@ import { Shader } from "../webgl/shader";
 import { ShaderSources } from "../shader/shadersources";
 import { ImageSource, ImageToScreenRenderer, DefaultRenderer, ShadowMapRenderer, ShadowMapBlurCacheRenderer, SceneToImageRenderer, ImageFilterRenderer, BlurRenderer } from "./pipeline"
 import { IBLBaker } from "./iblbaker";
+import { ProbeBaker } from "./probebaker";
 import { Viewer } from "../scene/viewer";
 import { Scene } from '../scene/scene';
 import { ObjectTypes, ParticleObject } from "../scene/object";
@@ -37,6 +38,7 @@ export class Renderer {
 			enableNormalMap: true,
 			enableEnvmap: true,
 			enableHighlightSelectedChildren: true,
+			enableLightProbes: false,
 			enablePostprocess: true,
 			enableShadow: false,
 			shadowQuality: {
@@ -401,6 +403,7 @@ export class Renderer {
 				scene.requestedUpdateFrame = false;
 
 				this.updateIBL(scene);
+				this.updateProbes(scene);
 				this.prepareRenderMatrices();
 				this.renderPipeline();
 
@@ -638,6 +641,21 @@ export class Renderer {
 			|| src.width || 256;
 		scene._iblMaxLod = Math.max(0, Math.floor(Math.log2(faceSize)) - 1);
 		scene._iblBakedFor = src;
+	}
+
+	// Bake the light-probe irradiance volume from the scene. Runs once per
+	// volume (static bake); call scene.requestProbeBake() to force a re-bake
+	// after the scene's geometry or lighting changes.
+	updateProbes(scene) {
+		if (!scene || !this.options.enableLightProbes) return;
+		if (!scene._probeVolume || scene._probesBaked) return;
+
+		if (!this._probeBaker) {
+			this._probeBaker = new ProbeBaker(this);
+		}
+
+		scene._probeData = this._probeBaker.bake(scene, scene._probeVolume);
+		scene._probesBaked = true;
 	}
 
 	prepareRenderMatrices() {

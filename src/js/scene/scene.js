@@ -278,6 +278,21 @@ export class Scene {
     this.requestedUpdateFrame = true;
 	}
 
+	// Define a light-probe irradiance volume over an axis-aligned region.
+	// min/max are [x,y,z] world bounds; dims is [nx,ny,nz] probe counts per axis.
+	// The renderer bakes it once (requires renderer.options.enableLightProbes).
+	setLightProbeVolume(min, max, dims) {
+		this._probeVolume = { min, max, dims };
+		this._probesBaked = false;
+		this.requireUpdateFrame();
+	}
+
+	// Force the probe volume to be re-baked on the next frame.
+	requestProbeBake() {
+		this._probesBaked = false;
+		this.requireUpdateFrame();
+	}
+
 	loadMaterials(mats, loadingSession, bundle) {
 		for (const [mName, matDefine] of Object.entries(mats)) {
       const mat = new Material()

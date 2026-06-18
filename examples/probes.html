@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Light Probes (SH) - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<style>
+		#probe-panel {
+			position: fixed; left: 16px; bottom: 16px; z-index: 20;
+			background: rgba(0,0,0,.55); color: #fff; padding: 10px 14px;
+			border-radius: 8px; font: 13px/1.5 sans-serif; user-select: none;
+		}
+		#probe-panel label { display: block; cursor: pointer; }
+		#probe-panel input[type=range] { width: 160px; vertical-align: middle; }
+	</style>
+	<script type="module">
+
+		import { Renderer, Shapes, ModelViewer } from "@"
+
+		window.addEventListener("load", function () {
+
+			const renderer = new Renderer({
+				enableLighting: true,
+				backColor: [0.02, 0.02, 0.03, 1],
+				enablePostprocess: true,
+				enableAntialias: true,
+				enableShadow: true,
+				enableEnvmap: false,
+				enableLightProbes: true,
+				bloomEffect: { enabled: false },
+				renderingImage: { gamma: 1.0 },
+			});
+
+			const scene = renderer.createScene();
+			window._scene = scene;
+			window._renderer = renderer;
+			scene.probeIntensity = 0.7;
+
+			// --- Cornell-box-style room (interior 4×4×4, open toward +z) ---
+			function wall(loc, scale, color) {
+				const w = new Shapes.Cube();
+				w.location.set(...loc);
+				w.scale.set(...scale);
+				w.mat.color = color;
+				w.mat.roughness = 1.0;
+				w.mat.metallic = 0.0;
+				scene.add(w);
+				return w;
+			}
+
+			wall([0, 0, 0],  [4, 0.1, 4], [0.85, 0.85, 0.85]); // floor
+			wall([0, 4, 0],  [4, 0.1, 4], [0.85, 0.85, 0.85]); // ceiling
+			wall([0, 2, -2], [4, 4, 0.1], [0.85, 0.85, 0.85]); // back
+			wall([-2, 2, 0], [0.1, 4, 4], [0.85, 0.12, 0.12]); // left (red)
+			wall([2, 2, 0],  [0.1, 4, 4], [0.12, 0.7, 0.18]);  // right (green)
+
+			const tall = wall([-0.7, 1.2, -0.6], [1.1, 2.4, 1.1], [0.9, 0.9, 0.9]);
+			tall.angle.y = 20;
+			const short = wall([0.85, 0.6, 0.55], [1.1, 1.2, 1.1], [0.9, 0.9, 0.9]);
+			short.angle.y = -20;
+
+			scene.sun.location.set(0, 1, 0.15);
+			scene.sun.mat.color = [0.8, 0.8, 0.75];
+
+			scene.mainCamera.fieldOfView = 55;
+			scene.mainCamera.location.set(0, 2, 6.8);
+			scene.mainCamera.angle.set(-3, 0, 0);
+
+			// Probe volume inset inside the room so probes aren't buried in walls.
+			scene.setLightProbeVolume([-1.7, 0.4, -1.7], [1.7, 3.6, 1.7], [3, 3, 3]);
+
+			new ModelViewer(scene);
+			scene.show();
+
+			// --- comparison controls ---
+			const chk = document.getElementById("probe-toggle");
+			const intensitySlider = document.getElementById("probe-intensity");
+
+			chk.checked = true;
+			chk.addEventListener("change", () => {
+				renderer.options.enableLightProbes = chk.checked;
+				if (chk.checked) scene.requestProbeBake();
+				scene.requireUpdateFrame();
+			});
+			intensitySlider.addEventListener("input", () => {
+				scene.probeIntensity = parseFloat(intensitySlider.value);
+				scene.requireUpdateFrame();
+			});
+		});
+
+	</script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+		<div>Light-probe (SH) irradiance volume — toggle to compare. Drag to orbit.</div>
+		<div class="logo">
+			<img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="probe-panel">
+		<label><input type="checkbox" id="probe-toggle"> Light probes enabled</label>
+		<label>intensity <input type="range" id="probe-intensity" min="0" max="5" step="0.1" value="0.7"></label>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

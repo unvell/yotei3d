@@ -63,6 +63,43 @@ varying mat3 TBN;
 uniform int lightCount;
 uniform Light lights[MAX_LIGHT_COUNT];
 
+// light-probe irradiance volume (SH L1). probeSH holds 4 coefficients (RGB)
+// per probe; the shader trilinearly blends nearby probes by a tent kernel.
+#define MAX_PROBES 32
+uniform bool hasProbes;
+uniform int probeCount;
+uniform vec3 probePos[MAX_PROBES];
+uniform vec3 probeSH[MAX_PROBES * 4];
+uniform vec3 probeCell;       // grid spacing, for the tent blend weight
+uniform float probeIntensity;
+
+vec3 evalProbeIrradiance(vec3 N, vec3 wpos) {
+	vec4 shBasis = vec4(0.282095, 0.488603 * N.y, 0.488603 * N.z, 0.488603 * N.x);
+
+	vec3 acc = vec3(0.0);
+	float wsum = 0.0;
+
+	for (int i = 0; i < MAX_PROBES; i++) {
+		if (i >= probeCount) break;
+
+		vec3 dist = abs(wpos - probePos[i]) / probeCell;
+		vec3 tent = max(vec3(0.0), 1.0 - dist);
+		float w = tent.x * tent.y * tent.z;
+		if (w <= 0.0) continue;
+
+		vec3 e = probeSH[i * 4 + 0] * shBasis.x
+		       + probeSH[i * 4 + 1] * shBasis.y
+		       + probeSH[i * 4 + 2] * shBasis.z
+		       + probeSH[i * 4 + 3] * shBasis.w;
+
+		acc += max(e, vec3(0.0)) * w;
+		wsum += w;
+	}
+
+	if (wsum > 0.0) acc /= wsum;
+	return acc;
+}
+
 struct LightReturn {
 	vec3 diff;
 	vec3 spec;
@@ -261,6 +298,13 @@ void main(void) {
 			vec3 refraColor = textureCube(refMap, refraLookup, roughdelta).rgb;
 			finalColor = finalColor * (1.0 - refraction) + finalColor * refraColor * refraction;
 		}
+	}
+
+	// //////////////// Light-probe indirect diffuse ////////////////
+
+	if (hasProbes) {
+		vec3 probeIrradiance = evalProbeIrradiance(vertexNormal, vertex);
+		finalColor += albedo * probeIrradiance * probeIntensity;
 	}
 
 	// //////////////// ShadowMap ////////////////

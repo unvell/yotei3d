@@ -127,6 +127,12 @@ const exampleItems = ref([
     desc: 'Showcasing multiple objects in a room-like environment.',
   },
   {
+    title: 'Light Probes (SH)',
+    thumbnail: '/img/examples/showroom.png',
+    link: 'probes.html',
+    desc: 'Spherical-harmonic light-probe irradiance volume (toggle to compare).',
+  },
+  {
     title: 'Floor Walkthrough',
     thumbnail: '/img/examples/floor-walkthrough.png',
     link: 'floor-walkthrough.html',
