@@ -19,6 +19,7 @@
         enableShadow: true,
         enableSSAO: true,
         enableEnvmap: false,
+				enableLightProbes: true,
         shadowQuality: {
           scale: 10,
           viewDepth: 4,
@@ -38,7 +39,25 @@
 
       const scene = renderer.createScene();
       window._scene = scene;
-      
+      window._renderer = renderer;
+
+      // light-probe indirect-diffuse strength (kept modest; the office is
+      // already brightly lit by the glossy reflection cubemap + window sky)
+      scene.probeIntensity = 0.5;
+
+      // Place a probe volume over the loaded floor's world bounds and bake.
+      // Probes sit in two height layers covering the walk-through / furniture
+      // range; XZ is inset so probes don't end up buried inside the walls.
+      function bakeProbeVolume(obj) {
+        const b = obj.getBounds();
+        if (!b) return;
+        const sx = b.max.x - b.min.x, sy = b.max.y - b.min.y, sz = b.max.z - b.min.z;
+        const padXZ = 0.12;
+        const min = [b.min.x + sx * padXZ, b.min.y + sy * 0.25, b.min.z + sz * padXZ];
+        const max = [b.max.x - sx * padXZ, b.min.y + sy * 0.75, b.max.z - sz * padXZ];
+        scene.setLightProbeVolume(min, max, [4, 2, 4]); // 32 probes (= MAX_PROBES)
+      }
+
       // used when enableEnvmap is true
       // scene.iblIntensity = 2.5;
       // scene.exposure = 1.5;
@@ -87,6 +106,8 @@
             obj.scale.set(s, s, s);
           }, _ => {
             renderer.options.shadowQuality.enableCache = true;
+            // model is now at full scale — bake the light-probe volume
+            bakeProbeVolume(obj);
           });
         }, 500);
       });
@@ -139,6 +160,19 @@
       scene.sun.mat.color = [1.0, 1.0, 1.0];
 
       scene.show();
+
+      // --- light-probe comparison controls ---
+      const chk = document.getElementById("probe-toggle");
+      const intensitySlider = document.getElementById("probe-intensity");
+      chk.checked = true;
+      chk.addEventListener("change", () => {
+        renderer.options.enableLightProbes = chk.checked;
+        scene.requireUpdateFrame();
+      });
+      intensitySlider.addEventListener("input", () => {
+        scene.probeIntensity = parseFloat(intensitySlider.value);
+        scene.requireUpdateFrame();
+      });
     });
 
 
@@ -153,6 +187,11 @@
 		<div class="logo">
       <img src="/img/logo.svg">
 		</div>
+	</div>
+
+	<div id="probe-panel" style="position:fixed;left:16px;bottom:16px;z-index:20;background:rgba(0,0,0,.55);color:#fff;padding:10px 14px;border-radius:8px;font:13px/1.5 sans-serif;user-select:none">
+		<label style="display:block;cursor:pointer"><input type="checkbox" id="probe-toggle"> Light probes (GI)</label>
+		<label style="display:block">intensity <input type="range" id="probe-intensity" min="0" max="2" step="0.05" value="0.5" style="width:160px;vertical-align:middle"></label>
 	</div>
 
 	<div id="canvas-container">
