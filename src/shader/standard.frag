@@ -63,18 +63,29 @@ varying mat3 TBN;
 uniform int lightCount;
 uniform Light lights[MAX_LIGHT_COUNT];
 
-// light-probe irradiance volume (SH L1). probeSH holds 4 coefficients (RGB)
+// light-probe irradiance volume (SH L2). probeSH holds 9 coefficients (RGB)
 // per probe; the shader trilinearly blends nearby probes by a tent kernel.
 #define MAX_PROBES 32
+#define PROBE_SH_COUNT 9
 uniform bool hasProbes;
 uniform int probeCount;
 uniform vec3 probePos[MAX_PROBES];
-uniform vec3 probeSH[MAX_PROBES * 4];
+uniform vec3 probeSH[MAX_PROBES * PROBE_SH_COUNT];
 uniform vec3 probeCell;       // grid spacing, for the tent blend weight
 uniform float probeIntensity;
 
 vec3 evalProbeIrradiance(vec3 N, vec3 wpos) {
-	vec4 shBasis = vec4(0.282095, 0.488603 * N.y, 0.488603 * N.z, 0.488603 * N.x);
+	// 9 real SH L2 basis functions evaluated for the surface normal.
+	float b[PROBE_SH_COUNT];
+	b[0] = 0.282095;
+	b[1] = 0.488603 * N.y;
+	b[2] = 0.488603 * N.z;
+	b[3] = 0.488603 * N.x;
+	b[4] = 1.092548 * N.x * N.y;
+	b[5] = 1.092548 * N.y * N.z;
+	b[6] = 0.315392 * (3.0 * N.z * N.z - 1.0);
+	b[7] = 1.092548 * N.x * N.z;
+	b[8] = 0.546274 * (N.x * N.x - N.y * N.y);
 
 	vec3 acc = vec3(0.0);
 	float wsum = 0.0;
@@ -87,10 +98,10 @@ vec3 evalProbeIrradiance(vec3 N, vec3 wpos) {
 		float w = tent.x * tent.y * tent.z;
 		if (w <= 0.0) continue;
 
-		vec3 e = probeSH[i * 4 + 0] * shBasis.x
-		       + probeSH[i * 4 + 1] * shBasis.y
-		       + probeSH[i * 4 + 2] * shBasis.z
-		       + probeSH[i * 4 + 3] * shBasis.w;
+		vec3 e = vec3(0.0);
+		for (int k = 0; k < PROBE_SH_COUNT; k++) {
+			e += probeSH[i * PROBE_SH_COUNT + k] * b[k];
+		}
 
 		acc += max(e, vec3(0.0)) * w;
 		wsum += w;

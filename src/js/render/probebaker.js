@@ -16,16 +16,40 @@ const FACE_BASIS = [
 	{ forward: [ 0,  0, -1], right: [-1,  0,  0], up: [ 0, -1,  0] }, // -Z
 ];
 
-// SH band-0/band-1 normalization constants (real spherical harmonics).
+// SH band normalization constants (real spherical harmonics).
 const SH_Y0 = 0.282095;
 const SH_Y1 = 0.488603;
+const SH_Y2a = 1.092548;  // bands (2,-2) (2,-1) (2,1)
+const SH_Y2b = 0.315392;  // band  (2, 0)
+const SH_Y2c = 0.546274;  // band  (2, 2)
 
 // Cosine-lobe convolution coefficients (irradiance), per SH band.
 const SH_A0 = Math.PI;
 const SH_A1 = (2.0 * Math.PI) / 3.0;
+const SH_A2 = Math.PI / 4.0;
+
+// Per-coefficient cosine-convolution factor for the 9 SH L2 coefficients.
+const SH_A = [SH_A0, SH_A1, SH_A1, SH_A1, SH_A2, SH_A2, SH_A2, SH_A2, SH_A2];
+
+const SH_COEFFS = 9;
+
+// Evaluate the 9 real SH L2 basis functions for a unit direction.
+function shBasis(x, y, z) {
+	return [
+		SH_Y0,
+		SH_Y1 * y,
+		SH_Y1 * z,
+		SH_Y1 * x,
+		SH_Y2a * x * y,
+		SH_Y2a * y * z,
+		SH_Y2b * (3.0 * z * z - 1.0),
+		SH_Y2a * x * z,
+		SH_Y2c * (x * x - y * y),
+	];
+}
 
 // Bakes a light-probe volume by capturing the lit scene into a small cubemap at
-// each probe and projecting it to an SH L1 (4-coefficient) irradiance basis.
+// each probe and projecting it to an SH L2 (9-coefficient) irradiance basis.
 // The result is a spatially-varying indirect-diffuse field the standard shader
 // samples by trilinearly blending nearby probes — i.e. an irradiance volume.
 export class ProbeBaker {
@@ -38,14 +62,14 @@ export class ProbeBaker {
 	// volume = { min:[x,y,z], max:[x,y,z], dims:[nx,ny,nz] }
 	// returns { min, max, dims, count, cell:[cx,cy,cz],
 	//           positions:Float32Array(count*3),
-	//           coeffs:Float32Array(count*4*3) }  // 4 SH L1 coeffs (RGB) / probe
+	//           coeffs:Float32Array(count*9*3) }  // 9 SH L2 coeffs (RGB) / probe
 	bake(scene, volume) {
 		const { min, max, dims } = volume;
 		const [nx, ny, nz] = dims;
 		const count = nx * ny * nz;
 
 		const positions = new Float32Array(count * 3);
-		const coeffs = new Float32Array(count * 4 * 3);
+		const coeffs = new Float32Array(count * SH_COEFFS * 3);
 		const pixels = new Uint8Array(this.faceSize * this.faceSize * 4);
 
 		const cell = [
@@ -75,7 +99,7 @@ export class ProbeBaker {
 					positions[p * 3 + 1] = P.y;
 					positions[p * 3 + 2] = P.z;
 
-					this.bakeProbe(scene, P, pixels, coeffs, p * 4 * 3);
+					this.bakeProbe(scene, P, pixels, coeffs, p * SH_COEFFS * 3);
 					p++;
 				}
 			}
@@ -91,8 +115,9 @@ export class ProbeBaker {
 		const gl = this.renderer.gl;
 		const size = this.faceSize;
 
-		// SH L1 accumulators: 4 coefficients, each RGB.
-		const sh = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]];
+		// SH L2 accumulators: 9 coefficients, each RGB.
+		const sh = [];
+		for (let k = 0; k < SH_COEFFS; k++) sh.push([0, 0, 0]);
 		let weightSum = 0;
 
 		for (let f = 0; f < 6; f++) {
@@ -128,13 +153,9 @@ export class ProbeBaker {
 					const cg = pixels[idx + 1] / 255;
 					const cb = pixels[idx + 2] / 255;
 
-					const b0 = SH_Y0;
-					const b1 = SH_Y1 * dy;  // Y(1,-1)
-					const b2 = SH_Y1 * dz;  // Y(1, 0)
-					const b3 = SH_Y1 * dx;  // Y(1, 1)
-					const bb = [b0, b1, b2, b3];
+					const bb = shBasis(dx, dy, dz);
 
-					for (let k = 0; k < 4; k++) {
+					for (let k = 0; k < SH_COEFFS; k++) {
 						sh[k][0] += cr * bb[k] * w;
 						sh[k][1] += cg * bb[k] * w;
 						sh[k][2] += cb * bb[k] * w;
@@ -148,10 +169,9 @@ export class ProbeBaker {
 		// Lambertian irradiance term that the shader multiplies by albedo.
 		const norm = (4 * Math.PI) / weightSum;
 		const invPi = 1 / Math.PI;
-		const A = [SH_A0, SH_A1, SH_A1, SH_A1];
 
-		for (let k = 0; k < 4; k++) {
-			const a = A[k] * norm * invPi;
+		for (let k = 0; k < SH_COEFFS; k++) {
+			const a = SH_A[k] * norm * invPi;
 			outCoeffs[outOffset + k * 3] = sh[k][0] * a;
 			outCoeffs[outOffset + k * 3 + 1] = sh[k][1] * a;
 			outCoeffs[outOffset + k * 3 + 2] = sh[k][2] * a;

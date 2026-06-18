@@ -71,7 +71,7 @@ export class StandardShader extends Shader {
 		this.probeCellUniform = this.bindUniform("probeCell", "vec3");
 		this.probeIntensityUniform = this.bindUniform("probeIntensity", "float");
 		this.probePosUniform = this.bindUniformArray("probePos", "vec3", 32);
-		this.probeSHUniform = this.bindUniformArray("probeSH", "vec3", 128);
+		this.probeSHUniform = this.bindUniformArray("probeSH", "vec3", 32 * 9);
 
 		// this.hasTextureUniform = this.bindUniform("hasTexture", "bool");
 		// this.hasLightMapUniform = this.bindUniform("hasLightMap", "bool");
@@ -256,7 +256,7 @@ export class StandardShader extends Shader {
 			for (let i = 0; i < pd.count; i++) {
 				this.probePosUniform[i].set([pd.positions[i * 3], pd.positions[i * 3 + 1], pd.positions[i * 3 + 2]]);
 			}
-			for (let i = 0; i < pd.count * 4; i++) {
+			for (let i = 0; i < pd.count * 9; i++) {
 				this.probeSHUniform[i].set([pd.coeffs[i * 3], pd.coeffs[i * 3 + 1], pd.coeffs[i * 3 + 2]]);
 			}
 		} else {
