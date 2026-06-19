@@ -28,6 +28,15 @@ uniform float refraction;
 uniform float normalMipmap;
 uniform float normalIntensity;
 
+// PBR material maps (glTF metallic-roughness workflow)
+uniform bool hasMetalRoughMap;   // G = roughness, B = metallic
+uniform bool hasAOMap;           // R = ambient occlusion
+uniform bool hasEmissiveMap;
+uniform vec3 emissiveColor;      // emissiveFactor (black = disabled)
+uniform sampler2D metalRoughMap;
+uniform sampler2D aoMap;
+uniform sampler2D emissiveMap;
+
 // image-based lighting (IBL)
 uniform bool hasIBL;
 uniform bool useDirectSun;
@@ -177,6 +186,51 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float rough) {
 	return F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
+#define PI 3.14159265359
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+	return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+// GGX / Trowbridge-Reitz normal distribution
+float distributionGGX(float NdotH, float rough) {
+	float a = rough * rough;
+	float a2 = a * a;
+	float d = NdotH * NdotH * (a2 - 1.0) + 1.0;
+	return a2 / max(PI * d * d, 1.0e-7);
+}
+
+// Smith geometry with Schlick-GGX, direct-light k
+float geometrySmith(float NdotV, float NdotL, float rough) {
+	float r = rough + 1.0;
+	float k = (r * r) / 8.0;
+	float gV = NdotV / (NdotV * (1.0 - k) + k);
+	float gL = NdotL / (NdotL * (1.0 - k) + k);
+	return gV * gL;
+}
+
+// Cook-Torrance BRDF for a single analytic light. Returns outgoing radiance
+// (diffuse + specular) already weighted by N·L and incoming radiance.
+vec3 cookTorrance(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo,
+	float rough, float metal, vec3 F0) {
+	vec3 H = normalize(V + L);
+	float NdotV = max(dot(N, V), 1.0e-4);
+	float NdotL = max(dot(N, L), 0.0);
+	float NdotH = max(dot(N, H), 0.0);
+	float HdotV = max(dot(H, V), 0.0);
+
+	float D = distributionGGX(NdotH, rough);
+	float G = geometrySmith(NdotV, NdotL, rough);
+	vec3  F = fresnelSchlick(HdotV, F0);
+
+	vec3 specular = (D * G * F) / max(4.0 * NdotV * NdotL, 1.0e-4);
+
+	// energy conservation: diffuse only from non-reflected, non-metal light
+	vec3 kD = (vec3(1.0) - F) * (1.0 - metal);
+
+	return (kD * albedo / PI + specular) * radiance * NdotL;
+}
+
 // Karis' analytic environment BRDF approximation (UE4 mobile). Replaces the
 // split-sum BRDF integration LUT: returns (scale, bias) so that the specular
 // term is prefiltered * (F0 * scale + bias).
@@ -229,6 +283,22 @@ void main(void) {
 
 	vec3 albedo = finalColor;
 
+	//////////////// PBR material maps (metallic-roughness) ////////////////
+
+	float matRoughness = roughness;
+	float matMetallic = metallic;
+	if (hasMetalRoughMap) {
+		vec3 mr = texture2D(metalRoughMap, uv1).rgb;
+		matRoughness *= mr.g;
+		matMetallic *= mr.b;
+	}
+	matRoughness = clamp(matRoughness, 0.04, 1.0);
+
+	float ao = 1.0;
+	if (hasAOMap) {
+		ao = texture2D(aoMap, uv1).r;
+	}
+
 	if (hasIBL) {
 
 		//////////////// IBL (split-sum approximation) ////////////////
@@ -237,26 +307,31 @@ void main(void) {
 		vec3 viewDir = -cameraNormal;                  // fragment -> eye
 		float NdotV = max(dot(N, viewDir), 1.0e-4);
 
-		vec3 F0 = mix(vec3(0.04), albedo, metallic);
+		vec3 F0 = mix(vec3(0.04), albedo, matMetallic);
 
-		// direct lighting (additive). The analytic sun is only added when scene
-		// lighting is enabled; for IBL-only scenes the environment map already
-		// carries the key light, so adding it again would double-count.
+		// direct lighting (additive), evaluated with a full Cook-Torrance BRDF.
+		// The analytic sun is only added when scene lighting is enabled; for
+		// IBL-only scenes the environment map already carries the key light, so
+		// adding it again would double-count.
 		vec3 direct = vec3(0.0);
 		if (receiveLight) {
 			if (useDirectSun) {
-				float NdotL = max(dot(N, sundir), 0.0);
-				direct += albedo * sunlight * NdotL;
+				direct += cookTorrance(N, viewDir, sundir, sunlight, albedo, matRoughness, matMetallic, F0);
 			}
 
-			if (lightCount > 0) {
-				direct += traceLight(N, cameraNormal);
+			for (int i = 0; i < MAX_LIGHT_COUNT; i++) {
+				if (i >= lightCount) break;
+				vec3 lightRay = lights[i].pos - vertex;
+				float ld = length(lightRay);
+				vec3 L = lightRay / max(ld, 1.0e-4);
+				vec3 radiance = lights[i].color / (1.0 + ld * ld);  // inverse-square falloff
+				direct += cookTorrance(N, viewDir, L, radiance, albedo, matRoughness, matMetallic, F0);
 			}
 		}
 
 		// diffuse ambient from the baked irradiance map
-		vec3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
-		vec3 kD = (1.0 - F) * (1.0 - metallic);
+		vec3 F = fresnelSchlickRoughness(NdotV, F0, matRoughness);
+		vec3 kD = (1.0 - F) * (1.0 - matMetallic);
 		vec3 irradiance = textureCube(irradianceMap, N).rgb * iblColor;
 		vec3 diffuseIBL = irradiance * albedo;
 
@@ -266,11 +341,12 @@ void main(void) {
 		if (refMapType == 2) {
 			R = normalize(correctBoundingBoxIntersect(refMapBox, R));
 		}
-		vec3 prefiltered = textureCube(refMap, R, roughness * maxEnvLod).rgb;
-		vec2 ab = envBRDFApprox(NdotV, roughness);
+		vec3 prefiltered = textureCube(refMap, R, matRoughness * maxEnvLod).rgb;
+		vec2 ab = envBRDFApprox(NdotV, matRoughness);
 		vec3 specularIBL = prefiltered * (F0 * ab.x + ab.y);
 
-		vec3 ambient = (kD * diffuseIBL + specularIBL) * iblIntensity;
+		// ambient (indirect) light is what AO occludes; direct light is not
+		vec3 ambient = (kD * diffuseIBL + specularIBL) * iblIntensity * ao;
 
 		finalColor = direct + ambient;
 
@@ -315,7 +391,7 @@ void main(void) {
 
 	if (hasProbes) {
 		vec3 probeIrradiance = evalProbeIrradiance(vertexNormal, vertex);
-		finalColor += albedo * probeIrradiance * probeIntensity;
+		finalColor += albedo * probeIrradiance * probeIntensity * ao;
 	}
 
 	// //////////////// ShadowMap ////////////////
@@ -342,6 +418,14 @@ void main(void) {
 			finalColor += vec3(1.0, 1.0, 0.9) * shadowBlock;
 		}
 	}
+
+	//////////////// Emissive (PBR self-illumination) ////////////////
+
+	vec3 emissive = emissiveColor;
+	if (hasEmissiveMap) {
+		emissive *= texture2D(emissiveMap, uv1).rgb;
+	}
+	finalColor += emissive;
 
 	if (hasIBL) {
 		finalColor = tonemap(finalColor);

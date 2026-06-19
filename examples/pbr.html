@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>PBR - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject, SkyBox, ObjectViewController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backgroundImage: "/textures/bg-gray-gradient.jpg",
+        enablePostprocess: true,
+        enableEnvmap: true,    // drives runtime IBL baking from the skybox
+        enableShadow: true,
+        enableSSAO: true,
+        renderingImage: {
+          gamma: 1.1,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // image-based lighting source: a cubemap skybox. With enableEnvmap on,
+      // the renderer bakes a diffuse irradiance map + uses this for specular IBL.
+      const baseurl = "/textures/cubemap/office-256/";
+      scene.skybox = new SkyBox(renderer, [
+        baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
+        baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
+      ]);
+      scene.iblIntensity = 1.0;
+      scene.exposure = 1.2;
+
+      // ---- PBR test grid: metallic (rows) x roughness (columns) ----
+      // The canonical way to eyeball a PBR pipeline: dielectric->metal top to
+      // bottom, smooth->rough left to right, all under the same environment.
+      const grid = new SceneObject();
+      scene.add(grid);
+
+      const N = 6;
+      const spacing = 1.15;
+      for (let row = 0; row < N; row++) {
+        const metallic = row / (N - 1);
+        for (let col = 0; col < N; col++) {
+          const roughness = Math.max(0.05, col / (N - 1));
+
+          const sphere = new Shapes.Sphere(24, 48);
+          sphere.mat.color = [0.9, 0.25, 0.2];
+          sphere.mat.metallic = metallic;
+          sphere.mat.roughness = roughness;
+
+          sphere.location.set(
+            (col - (N - 1) / 2) * spacing,
+            (row - (N - 1) / 2) * spacing,
+            0
+          );
+          sphere.scale.set(0.5, 0.5, 0.5);
+          grid.add(sphere);
+        }
+      }
+
+      // ---- glTF model load (validates the revived loader + material mapping) ----
+      // Placed in the top-left corner and rotated so three faces are visible —
+      // distinct per-face shading confirms normals were unpacked correctly.
+      scene.createObjectFromURL("/models/cube.gltf", obj => {
+        if (!obj) return;
+        obj.location.set(-1.6, 1.7, 5);
+        obj.angle.set(20, 35, 0);
+        obj.scale.set(0.5, 0.5, 0.5);
+        scene.add(obj);
+      });
+
+      scene.sun.location.set(1, 1, 1);
+      scene.sun.mat.color = [1.1, 1.05, 1.0];
+
+      scene.mainCamera.fieldOfView = 50;
+      scene.mainCamera.location.set(0, 0, 9);
+      scene.mainCamera.angle.set(0, 0, 0);
+
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+      });
+      controller.targetObject = grid;
+
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>PBR: metallic (bottom&rarr;top) &times; roughness (left&rarr;right) under IBL. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
