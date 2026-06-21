@@ -20,9 +20,24 @@ declare module '@jingwood/graphics-math' {
     normalize(): Vec3;
     mulMat(m: Matrix4): Vec3;
     toArrayDigits(digits?: number): number[];
+    add(v: Vec3): Vec3;
+    sub(v: Vec3): Vec3;
+    mul(s: number): Vec3;
+    neg(): Vec3;
+    abs(): Vec3;
+    length(): number;
+    dot(v: Vec3): number;
+    cross(v: Vec3): Vec3;
+    lerp(v2: Vec3, t: number): Vec3;
+    offset(x: number | { x: number; y: number; z: number }, y?: number, z?: number): Vec3;
+    set(x: number | Vec3, y?: number, z?: number): Vec3;
     static get zero(): Vec3;
     static get one(): Vec3;
     static get One(): Vec3;
+    static up: Vec3;
+    static down: Vec3;
+    static forward: Vec3;
+    static back: Vec3;
     static add(a: Vec3, b: Vec3): Vec3;
     static sub(a: Vec3, b: Vec3): Vec3;
     static lerp(a: Vec3, b: Vec3, t: number): Vec3;
@@ -35,7 +50,7 @@ declare module '@jingwood/graphics-math' {
     y: number;
     z: number;
     w: number;
-    constructor(v?: Vec3 | number, w?: number);
+    constructor(x?: Vec3 | Vec4 | number, y?: number, z?: number, w?: number);
     readonly xyz: Vec3;
     clone(): Vec4;
     mulMat(m: Matrix4): Vec4;
@@ -62,7 +77,10 @@ declare module '@jingwood/graphics-math' {
     inverse(): Matrix4;
     transpose(): Matrix4;
     translate(x: number, y: number, z: number): Matrix4;
-    rotate(x: number, y: number, z: number, order?: string): Matrix4;
+    rotate(x: number | Vec3, y?: number, z?: number, order?: string): Matrix4;
+    rotateX(angle: number): Matrix4;
+    rotateY(angle: number): Matrix4;
+    rotateZ(angle: number): Matrix4;
     scale(x: number, y: number, z: number): Matrix4;
   }
 

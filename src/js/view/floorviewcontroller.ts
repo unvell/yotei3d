@@ -1,9 +1,6 @@
-import "./touchcontroller";
-import "../utility/event";
-
 import { Vec3, BoundingBox3D } from "@jingwood/graphics-math";
 import { EventDispatcher } from '../utility/event';
-import { TouchController } from '@'
+import { TouchController } from './touchcontroller';
 
 const ringTobaURL =
   `data:text/plain;base64,
@@ -24,11 +21,33 @@ const ringTobaURL =
   0f881UF7a/dL+0Z/3BG/k3qkveLem9Qv7Rvuu+de3FlPVnAvuaHnGcAKT4aQD+QG
   /ckfevaxqMcHcoOe5A89ySKyQud1EIvICnqSRWQFfehPVthMal/oTz6QG/Qnf+hD
   f959MoGe5A89yaI+/vTmlrPKu08mMC75w7hkEfnDuGQROaCzYgxhXPKHccki8odx
-  ySJygLGYwyD+WP+NReQP45JF5MD7e88sB/KHccki8odxySL2kbGYA/nDuGQR+cO4
+  ySLygLGYwyD+WP+NReQP45JF5MD7e88sB/KHccki8odxySL2kbGYA/nDuGQR+cO4
   ZBH5Q0+yiPyhJ1lEPtCTLCIr6JmzqP//qEpXutKVrnSlK13p/1vfAcVDMGE=`;
 
+interface TopViewStatus {
+  topViewMode: boolean;
+  topViewHeight: number;
+  lastCameraLoc?: any;
+  lastCameraRot?: any;
+  lastViewerAngleY?: number;
+  lastViewerAngleX?: number;
+}
+
 export class FloorViewController {
-  constructor(scene, options = {}) {
+  scene: any;
+  camera: any;
+  topViewStatus: TopViewStatus;
+  cameraFovWalk: number;
+  cameraFovTop: number;
+  _targetObject: any;
+  ring: any;
+  cameraController: TouchController;
+
+  // --- members injected by the EventDispatcher mixin (see bottom of file) ---
+  declare onbeginChangeMode: (...args: any[]) => any;
+  declare onmodeChanged: (...args: any[]) => any;
+
+  constructor(scene: any, options: any = {}) {
     this.scene = scene;
     this.camera = options.camera || scene.mainCamera;
 
@@ -46,7 +65,7 @@ export class FloorViewController {
 
     this.ring = options.cursorObject;
     if (!this.ring) {
-      this.scene.createObjectFromURL(ringTobaURL, obj => {
+      this.scene.createObjectFromURL(ringTobaURL, (obj: any) => {
         if (obj && obj.meshes.length > 0) {
           obj.visible = false;
           obj.opacity = 0.7;
@@ -60,7 +79,7 @@ export class FloorViewController {
     this.scene.on("mousemove", () => {
       if (this.ring) {
         const rs = this.scene.findObjectsByCurrentMousePosition({
-          filter: _obj => _obj === this.targetObject
+          filter: (_obj: any) => _obj === this.targetObject
         });
 
         if (rs.object) {
@@ -82,7 +101,7 @@ export class FloorViewController {
     this.scene.on("mouseup", () => {
       if (this.ring) {
         const rs = this.scene.findObjectsByCurrentMousePosition({
-          filter: _obj => _obj === this.targetObject
+          filter: (_obj: any) => _obj === this.targetObject
         })
 
         if (rs.object) {
@@ -96,7 +115,7 @@ export class FloorViewController {
             const targetPos = new Vec3(wpos.x, this.camera.location.y, wpos.z);
             const startPos = this.camera.location.clone();
 
-            this.scene.animate({}, t =>
+            this.scene.animate({}, (t: number) =>
               this.camera.location = startPos.lerp(targetPos, t)
             );
           }
@@ -120,7 +139,7 @@ export class FloorViewController {
       }
     });
 
-    scene.on("keyup", key => {
+    scene.on("keyup", (key: number) => {
       if (key === 32) {
         this.toggleTopView();
       }
@@ -141,16 +160,16 @@ export class FloorViewController {
     this.cameraController.enabled = false;
 
 
-    document.addEventListener("mousewheel", e => {
-      function onmousewheel(e) {
+    document.addEventListener("mousewheel", (e: any) => {
+      function onmousewheel(this: FloorViewController, e: any) {
         if (this.topViewStatus.topViewMode) {
           scene.mainCamera.location.y += e.deltaY / 200;
           if (scene.mainCamera.location.y < 9) scene.mainCamera.location.y = 9;
           else if (scene.mainCamera.location.y > 40) scene.mainCamera.location.y = 40;
-  
+
           scene.renderer.viewer.angle.y += (e.deltaX) / 10;
           scene.renderer.viewer.angle.y %= 360;
-  
+
           scene.requireUpdateFrame();
         }
       }
@@ -161,29 +180,29 @@ export class FloorViewController {
     }, { passive: false });
   }
 
-  get targetObject() {
+  get targetObject(): any {
     return this._targetObject;
   }
 
-  set targetObject(obj) {
+  set targetObject(obj: any) {
     this._targetObject = obj;
-    
+
     if (this.camera) {
       const bbox = new BoundingBox3D(obj.getBounds());
       const maxbsize = Math.max(bbox.size.x, bbox.size.y, bbox.size.z);
-      
+
       let topY = maxbsize / 1.5;
       if (topY < 10) topY = 10;
       else if (topY > 40) topY = 40;
 
       this.camera.location.set(0, topY, 3);
       this.camera.lookAt(bbox.origin, Vec3.forward);
-      
+
       this.topViewStatus.topViewHeight = this.camera.location.y;
     }
   }
 
-  toggleTopView(toPos) {
+  toggleTopView(toPos?: any): void {
     const tvs = this.topViewStatus;
     const camera = this.camera;
 
@@ -200,10 +219,10 @@ export class FloorViewController {
 
       this.onbeginChangeMode();
 
-      this.scene.animate({}, t => {
+      this.scene.animate({}, (t: number) => {
         camera.fieldOfView = this.cameraFovWalk + t * (this.cameraFovTop - this.cameraFovWalk);
-        this.scene.renderer.viewer.angle.y = tvs.lastViewerAngleY * t;
-        this.scene.renderer.viewer.angle.x = tvs.lastViewerAngleX * t;
+        this.scene.renderer.viewer.angle.y = tvs.lastViewerAngleY! * t;
+        this.scene.renderer.viewer.angle.x = tvs.lastViewerAngleX! * t;
       }, () => {
         camera.fieldOfView = this.cameraFovTop;
         this.onmodeChanged();
@@ -220,16 +239,16 @@ export class FloorViewController {
         lookdir: tvs.lastCameraRot.dir,
         lookup: tvs.lastCameraRot.up
       });
-        
+
       this.onbeginChangeMode();
 
-      this.scene.animate({}, t => {
+      this.scene.animate({}, (t: number) => {
         camera.fieldOfView = this.cameraFovTop - t * (this.cameraFovTop - this.cameraFovWalk);
-        this.scene.renderer.viewer.angle.y = tvs.lastViewerAngleY * (1 - t);
-        this.scene.renderer.viewer.angle.x = tvs.lastViewerAngleX * (1 - t);
+        this.scene.renderer.viewer.angle.y = tvs.lastViewerAngleY! * (1 - t);
+        this.scene.renderer.viewer.angle.x = tvs.lastViewerAngleX! * (1 - t);
       }, () => {
-          camera.fieldOfView = this.cameraFovWalk;
-          this.onmodeChanged();
+        camera.fieldOfView = this.cameraFovWalk;
+        this.onmodeChanged();
       });
 
       this.cameraController.enabled = true;
