@@ -1,4 +1,4 @@
-import { Vec3, BoundingBox3D } from "@jingwood/graphics-math";
+import { Vec3, BoundingBox3D } from "@/math";
 import { EventDispatcher } from '../utility/event';
 import { TouchController } from './touchcontroller';
 

@@ -1,4 +1,4 @@
-import { Color3 } from "@jingwood/graphics-math";
+import { Color3 } from "@/math";
 import { ParticleObject } from "../scene/object.js";
 import { ParticleMesh } from "../webgl/mesh.js";
 import { Material } from "../scene/material";

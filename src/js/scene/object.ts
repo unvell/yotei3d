@@ -1,7 +1,7 @@
 
-import { Vec3, Vec4, Color3, Matrix4 } from "@jingwood/graphics-math";
-import { MathFunctions as _mf3 } from "@jingwood/graphics-math";
-import { BoundingBox3D } from "@jingwood/graphics-math";
+import { Vec3, Vec4, Color3, Matrix4 } from "@/math";
+import { MathFunctions as _mf3 } from "@/math";
+import { BoundingBox3D } from "@/math";
 import { EventDispatcher } from '../utility/event';
 import { arrayRemove } from '../utility/utility';
 import { Material } from './material';

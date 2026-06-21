@@ -1,7 +1,7 @@
 
-import { Vec2, Vec3, Vec4, Matrix4 } from "@jingwood/graphics-math";
-import { MathFunctions as _mf, MathFunctions2 as _mf2, MathFunctions3 as _mf3 } from "@jingwood/graphics-math";
-import { BoundingBox3D } from "@jingwood/graphics-math";
+import { Vec2, Vec3, Vec4, Matrix4 } from "@/math";
+import { MathFunctions as _mf, MathFunctions2 as _mf2, MathFunctions3 as _mf3 } from "@/math";
+import { BoundingBox3D } from "@/math";
 import { WireframeShader } from "../shader/wireframe";
 
 export class Mesh {

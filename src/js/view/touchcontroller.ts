@@ -1,4 +1,4 @@
-import { Vec3, Matrix4 } from "@jingwood/graphics-math";
+import { Vec3, Matrix4 } from "@/math";
 import { Keys, MouseButtons } from '../scene/viewer';
 import { performMovementAccelerationAnimation, invokeIfExist } from "../utility/utility";
 

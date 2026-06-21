@@ -1,5 +1,5 @@
 
-import { Vec3, Matrix4 } from "@jingwood/graphics-math";
+import { Vec3, Matrix4 } from "@/math";
 import { Shader } from '../webgl/shader.js';
 
 export class ShadowMapShader extends Shader {

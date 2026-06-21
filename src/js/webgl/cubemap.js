@@ -1,5 +1,5 @@
 
-import { BoundingBox3D } from "@jingwood/graphics-math";
+import { BoundingBox3D } from "@/math";
 import { EventDispatcher, isPowerOf2, ResourceManager, ResourceTypes, Shapes } from '@';
 
 export class CubeMap {

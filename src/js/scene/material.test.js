@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Color3 } from '@jingwood/graphics-math';
+import { Color3 } from '@/math';
 import { Material } from './material';
 
 // Phase 0 smoke test: validates the toolchain (vitest + graphics-math + ESM)

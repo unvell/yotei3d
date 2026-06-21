@@ -1,6 +1,6 @@
 
-import { Vec2, Vec3, Vec4, Color3, Color4, Ray } from "@jingwood/graphics-math";
-import { BoundingBox3D } from "@jingwood/graphics-math";
+import { Vec2, Vec3, Vec4, Color3, Color4, Ray } from "@/math";
+import { BoundingBox3D } from "@/math";
 
 import { EventDispatcher } from '../utility/event';
 import { SceneObject, Sun, ObjectTypes } from './object';

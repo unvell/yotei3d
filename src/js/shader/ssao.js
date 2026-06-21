@@ -1,4 +1,4 @@
-import { Matrix4 } from "@jingwood/graphics-math";
+import { Matrix4 } from "@/math";
 import { Shader } from '../webgl/shader';
 
 function generateSSAOSamples(sampleCount = 16) {

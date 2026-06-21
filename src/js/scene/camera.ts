@@ -1,7 +1,7 @@
 
 ////////////////////////// Camera //////////////////////////
 
-import { Vec3, BoundingBox3D } from "@jingwood/graphics-math";
+import { Vec3, BoundingBox3D } from "@/math";
 import { EventDispatcher } from '../utility/event';
 import { Size } from '../render/draw2d';
 import { Mesh } from "../webgl/mesh";

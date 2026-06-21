@@ -1,4 +1,4 @@
-import { Color3 } from "@jingwood/graphics-math";
+import { Color3 } from "@/math";
 import { SceneObject } from "../scene/object.js";
 import { PlaneMesh } from "../scene/shapes.js";
 import { Material } from "../scene/material";

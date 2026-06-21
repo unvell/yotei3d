@@ -30,15 +30,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/runtime@npm:^7.9.2":
-  version: 7.27.0
-  resolution: "@babel/runtime@npm:7.27.0"
-  dependencies:
-    regenerator-runtime: "npm:^0.14.0"
-  checksum: 10c0/35091ea9de48bd7fd26fb177693d64f4d195eb58ab2b142b893b7f3fa0f1d7c677604d36499ae0621a3703f35ba0c6a8f6c572cc8f7dc0317213841e493cf663
-  languageName: node
-  linkType: hard
-
 "@babel/types@npm:^7.27.0":
   version: 7.27.0
   resolution: "@babel/types@npm:7.27.0"
@@ -300,15 +291,6 @@ __metadata:
   dependencies:
     minipass: "npm:^7.0.4"
   checksum: 10c0/c25b6dc1598790d5b55c0947a9b7d111cfa92594db5296c3b907e2f533c033666f692a3939eadac17b1c7c40d362d0b0635dc874cbfe3e70db7c2b07cc97a5d2
-  languageName: node
-  linkType: hard
-
-"@jingwood/graphics-math@npm:^1.1.18":
-  version: 1.1.19
-  resolution: "@jingwood/graphics-math@npm:1.1.19"
-  dependencies:
-    "@babel/runtime": "npm:^7.9.2"
-  checksum: 10c0/1e7484bcfda8911562d48eee7f63e31a94d537ffaa45f1e28033cd353ae2a911d349f391138504babc2f72155d4a361f10230ce962ef8cf429636681de70a022
   languageName: node
   linkType: hard
 
@@ -924,7 +906,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@unvell/yotei3d@workspace:."
   dependencies:
-    "@jingwood/graphics-math": "npm:^1.1.18"
     "@tailwindcss/vite": "npm:^4.1.4"
     "@vitejs/plugin-vue": "npm:^5.2.3"
     glob: "npm:^11.0.2"
@@ -2405,13 +2386,6 @@ __metadata:
   version: 0.2.11
   resolution: "quansync@npm:0.2.11"
   checksum: 10c0/cb9a1f8ebce074069f2f6a78578873ffedd9de9f6aa212039b44c0870955c04a71c3b1311b5d97f8ac2f2ec476de202d0a5c01160cb12bc0a11b7ef36d22ef56
-  languageName: node
-  linkType: hard
-
-"regenerator-runtime@npm:^0.14.0":
-  version: 0.14.1
-  resolution: "regenerator-runtime@npm:0.14.1"
-  checksum: 10c0/1b16eb2c4bceb1665c89de70dcb64126a22bc8eb958feef3cd68fe11ac6d2a4899b5cd1b80b0774c7c03591dc57d16631a7f69d2daa2ec98100e2f29f7ec4cc4
   languageName: node
   linkType: hard
 

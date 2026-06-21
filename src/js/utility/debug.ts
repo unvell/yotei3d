@@ -1,5 +1,5 @@
 
-import { BoundingBox3D } from "@jingwood/graphics-math";
+import { BoundingBox3D } from "@/math";
 import { toStringWithDigits } from './utility'
 import { Texture } from '../webgl/texture'
 import { CubeMap } from '../webgl/cubemap'

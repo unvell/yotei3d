@@ -3,8 +3,8 @@
 // Copyright(c) 2024-2025 Jingwood, All Rights Reserved.
 ////////////////////////////////////////////////////////////////////////////////
 
-import { Vec3, Vec4, Matrix4 } from "@jingwood/graphics-math";
-import { BoundingBox3D } from "@jingwood/graphics-math";
+import { Vec3, Vec4, Matrix4 } from "@/math";
+import { BoundingBox3D } from "@/math";
 import { invokeIfExist } from "../utility/utility";
 import { SceneObject } from "./object";
 import { ProjectionMethods } from "../render/renderer";

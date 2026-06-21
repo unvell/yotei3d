@@ -1,5 +1,5 @@
 
-import { Vec2, Matrix3 } from "@jingwood/graphics-math"
+import { Vec2, Matrix3 } from "@/math"
 
 ////////// Point //////////
 

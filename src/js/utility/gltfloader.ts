@@ -1,6 +1,6 @@
 
-import { Matrix4, Color3 } from "@jingwood/graphics-math";
-import { Quaternion } from "@jingwood/graphics-math";
+import { Matrix4, Color3 } from "@/math";
+import { Quaternion } from "@/math";
 
 import { SceneObject, JointObject } from '../scene/object.js';
 import { Material } from '../scene/material';

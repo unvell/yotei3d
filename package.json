@@ -42,7 +42,6 @@
     "url": "git+ssh://git@github.com/unvell/yotei3d.git"
   },
   "dependencies": {
-    "@jingwood/graphics-math": "^1.1.18",
     "pako": "^2.1.0"
   },
   "resolutions": {

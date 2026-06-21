@@ -1,5 +1,5 @@
 
-import { Vec3, MathFunctions } from "@jingwood/graphics-math";
+import { Vec3, MathFunctions } from "@/math";
 import { EventDispatcher } from '../utility/event';
 
 interface AnimationOptions {

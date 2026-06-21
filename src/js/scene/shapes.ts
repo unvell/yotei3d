@@ -1,5 +1,5 @@
-import { Vec3, Color4 } from "@jingwood/graphics-math";
-import { BoundingBox3D } from "@jingwood/graphics-math";
+import { Vec3, Color4 } from "@/math";
+import { BoundingBox3D } from "@/math";
 
 import { Mesh } from '../webgl/mesh';
 import { SceneObject } from "../scene/object";

@@ -1,5 +1,5 @@
 
-import { Color3 } from "@jingwood/graphics-math";
+import { Color3 } from "@/math";
 import { Shader } from '../webgl/shader.js';
 
 Shaders.ViewerShader = class extends Shader {

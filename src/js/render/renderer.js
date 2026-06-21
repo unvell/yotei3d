@@ -1,6 +1,6 @@
 
-import { Vec3, Vec4, Color4, Matrix4, Ray } from "@jingwood/graphics-math";
-import { MathFunctions as _mf, MathFunctions3 as _mf3 } from "@jingwood/graphics-math";
+import { Vec3, Vec4, Color4, Matrix4, Ray } from "@/math";
+import { MathFunctions as _mf, MathFunctions3 as _mf3 } from "@/math";
 import { initDOM } from "./dom";
 import { EventDispatcher } from '../utility/event';
 import { invokeIfExist, getImageDataURLFromTexture } from "../utility/utility";
