@@ -125,6 +125,7 @@ export class BoundingBox3D {
 	initTo(p) {
 		this._min.set(p);
 		this._max.set(p);
+		this.makeDirty();
 	}
 
 	expandTo(p) {
@@ -135,6 +136,8 @@ export class BoundingBox3D {
 		if (this._max.x < p.x) this._max.x = p.x;
 		if (this._max.y < p.y) this._max.y = p.y;
 		if (this._max.z < p.z) this._max.z = p.z;
+
+		this.makeDirty();
 	}
 
 	expandToBox(bbox) {

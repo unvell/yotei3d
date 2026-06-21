@@ -1,6 +1,6 @@
 
 import { Vec3, Vec4, Color3, Matrix4 } from "@/math";
-import { MathFunctions as _mf3 } from "@/math";
+import { MathFunctions3 as _mf3 } from "@/math";
 import { BoundingBox3D } from "@/math";
 import { EventDispatcher } from '../utility/event';
 import { arrayRemove } from '../utility/utility';
@@ -200,7 +200,9 @@ export class SceneObject {
       // NOTE!! Experimental quaternion support
       if (this._quaternion) {
         const tr = this._quaternion.toMatrix();
-        t = t.mul(tr);
+        // mul() returns a new matrix; write it back into _transform (which `t`
+        // aliases) so the rotation/scale below land on the stored transform.
+        t.copyFrom(t.mul(tr));
       } else {
         t.rotate(this._angle._x, this._angle._y, this._angle._z, this._angleOrder);
       }

@@ -247,7 +247,7 @@ class Animation {
   static PropertyChanger: typeof PropertyChanger;
 
   static isAnyAnimationPlaying(): boolean {
-    return !(Animation.RunningAnimations as any)._s3_isEmpty();
+    return Object.keys(Animation.RunningAnimations).length > 0;
   }
 
   static isAnimationPlaying(name: string): boolean {
@@ -264,7 +264,7 @@ class Animation {
   static getAvailableDefaultName(): string {
     let name: string | undefined;
     while (name === undefined || Animation.RunningAnimations.hasOwnProperty(name)) {
-      name = "__unnamed" + Date.now() + Math.floor(Math.random());
+      name = "__unnamed" + Date.now() + Math.floor(Math.random() * 0x100000000);
     }
     return name;
   }

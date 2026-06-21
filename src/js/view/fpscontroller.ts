@@ -33,7 +33,7 @@ export class FPSController {
     });
 
     scene.on("keyup", () => {
-      if (viewer.pressedKeys.length === 0) {
+      if (viewer.pressedKeys.size === 0) {
         clearInterval(movementDetectingTimer);
         movementDetectingTimer = null;
       }

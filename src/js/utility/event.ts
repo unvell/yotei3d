@@ -55,6 +55,11 @@ export class EventDispatcher {
     if (typeof proto.removeEventListener !== "function") {
       proto.removeEventListener = function (this: any, eventName: string, listener: any) {
 
+        if (typeof this._eventListeners !== "object") {
+          // nothing was ever registered on this object
+          return;
+        }
+
         if (!this._eventListeners.hasOwnProperty(eventName)) {
           if (!(function () {
             if (eventName.startsWith("on")) {

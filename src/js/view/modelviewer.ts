@@ -67,7 +67,7 @@ export class ModelViewer {
 
     if (this.sceneDragHandlerListener) {
       scene.removeEventListener("drag", this.sceneDragHandlerListener);
-      this.sceneMouseWheelHandlerListener = undefined;
+      this.sceneDragHandlerListener = undefined;
     }
 
     if (this.sceneMouseWheelHandlerListener) {
@@ -76,7 +76,7 @@ export class ModelViewer {
     }
 
     if (this.sceneMouseDragAccelerationHandler) {
-      scene.removeEventListener("enddrag", this.sceneMouseWheelHandlerListener);
+      scene.removeEventListener("enddrag", this.sceneMouseDragAccelerationHandler);
       this.sceneMouseDragAccelerationHandler = undefined;
     }
   }

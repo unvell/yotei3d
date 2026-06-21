@@ -111,7 +111,17 @@ export class Quaternion {
   z: number;
   w: number;
   constructor(x?: number, y?: number, z?: number, w?: number);
+  length(): number;
+  normalize(): Quaternion;
   toMatrix(): Matrix4;
+  toArray(): number[];
+  setFromEuler(euler: { x: number; y: number; z: number } | number[], order?: string): Quaternion;
+  setFromRotationMatrix(m: Matrix4): Quaternion;
+  static fromEuler(euler: { x: number; y: number; z: number } | number[], order?: string): Quaternion;
+  static fromRotationMatrix(m: Matrix4): Quaternion;
+  static slerp(q1: Quaternion, q2: Quaternion, t: number): Quaternion;
+  static multiply(a: Quaternion, b: Quaternion): Quaternion;
+  static zero: Quaternion;
 }
 
 export class Color3 {
