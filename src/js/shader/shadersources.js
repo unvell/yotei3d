@@ -4,6 +4,7 @@ import { PanoramaShader } from './panorama';
 import { StandardShader } from './standard';
 import { WireframeShader } from './wireframe';
 import { PointShader } from './point';
+import { RainShader } from './rain';
 import { ImageShader } from './image';
 import { ScreenShader } from './screen';
 import { ShadowMapShader } from './shadowmap';
@@ -29,6 +30,8 @@ import wireframeVert from '../../shader/wireframe.vert';
 import wireframeFrag from '../../shader/wireframe.frag';
 import pointVert from '../../shader/points.vert';
 import pointFrag from '../../shader/points.frag';
+import rainVert from '../../shader/rain.vert';
+import rainFrag from '../../shader/rain.frag';
 import imageVert from '../../shader/image.vert';
 import imageFrag from '../../shader/image.frag';
 // import blurVert from '../../shader/blur.vert';
@@ -55,6 +58,7 @@ export const ShaderSources = {
   standard: { vert: standardVert, frag: standardFrag, class: StandardShader },
   wireframe: { vert: wireframeVert, frag: wireframeFrag, class: WireframeShader },
   points: { vert: pointVert, frag: pointFrag, class: PointShader },
+  rain: { vert: rainVert, frag: rainFrag, class: RainShader },
   image: { vert: imageVert, frag: imageFrag, class: ImageShader },
   // blur: { vert: blurVert, frag: blurFrag, class: "ImageShader" },
   screen: { vert: screenVert, frag: screenFrag, class: ScreenShader },

@@ -165,6 +165,12 @@ const exampleItems = ref([
     desc: 'Visual effects with a simple particle system.',
   },
   {
+    title: 'Rain',
+    thumbnail: '/img/examples/rain.png',
+    link: 'rain.html',
+    desc: 'Real-time rainfall with slanted streak particles.',
+  },
+  {
     title: 'Panorama',
     thumbnail: '/img/examples/panorama.png',
     link: 'panorama.html',

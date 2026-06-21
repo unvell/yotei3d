@@ -1,0 +1,149 @@
+
+import { ParticleObject } from "../scene/object.js";
+import { ParticleMesh } from "../webgl/mesh.js";
+
+// Rain — a self-contained rainfall effect.
+//
+// A box-shaped volume of falling raindrops, rendered as slanted point-sprite
+// streaks by the "rain" shader. Drops fall along -Y, drift with the wind and
+// recycle to the top of the volume once they reach the bottom.
+//
+// Usage:
+//   const rain = new Rain({ count: 6000, wind: [4, 0] });
+//   scene.add(rain);                         // add after scene geometry
+//   scene.on("frame", () => rain.update());  // drive the simulation
+//   scene.animation = true;
+//
+export class Rain extends ParticleObject {
+	constructor(options = {}) {
+		super();
+
+		const opt = this.options = Object.assign({
+			count: 6000,        // number of raindrops
+			width: 40,          // volume size along X
+			depth: 40,          // volume size along Z
+			height: 30,         // volume size along Y (fall distance)
+			speed: 32,          // base fall speed, units per second
+			speedVariance: 0.4, // ± fraction of speed randomised per drop
+			wind: [3, 0],       // horizontal drift [x, z] in units per second
+			color: [0.62, 0.74, 0.95],
+			opacity: 0.5,       // overall rain alpha
+			lengthMin: 10,      // streak length in pixels (short / near vertical)
+			lengthMax: 22,      // streak length in pixels (long)
+			thickness: 0.13,    // streak half-width (fraction of the sprite)
+			slant: 0.16,        // screen-space shear, gives the wind-blown look
+			followTarget: null, // optional object/camera; volume tracks its x/z
+		}, options);
+
+		const n = this.count = opt.count;
+
+		// per-object uniforms read by RainShader
+		this.rainOpacity = opt.opacity;
+		this.streakWidth = opt.thickness;
+		this.slant = opt.slant;
+		this.shader = { name: "rain" };
+		this.mat.color = opt.color;
+
+		// raindrops must not cast shadows: the shadow pass ignores the per-object
+		// shader override and would otherwise splat the particle points into the
+		// shadow map, producing speckle in the scene's shadows (and wasted work).
+		this.castShadow = false;
+
+		// simulation state (typed arrays for speed)
+		this._px = new Float32Array(n);
+		this._py = new Float32Array(n);
+		this._pz = new Float32Array(n);
+		this._vy = new Float32Array(n);  // fall speed
+		this._len = new Float32Array(n); // streak length (px)
+		this._bri = new Float32Array(n); // per-drop brightness
+
+		this.mesh = new ParticleMesh(n);
+		this.addMesh(this.mesh);
+
+		this._lastTime = 0;
+
+		for (let i = 0; i < n; i++) {
+			this._spawn(i, true);
+		}
+		this._writeAll();
+	}
+
+	get halfW() { return this.options.width * 0.5; }
+	get halfD() { return this.options.depth * 0.5; }
+	get halfH() { return this.options.height * 0.5; }
+
+	_rand(a, b) { return a + Math.random() * (b - a); }
+
+	// (re)initialise a single raindrop. On the initial fill drops are spread
+	// through the whole volume; when recycled they reappear at the top.
+	_spawn(i, initial) {
+		const o = this.options;
+		this._px[i] = this._rand(-this.halfW, this.halfW);
+		this._pz[i] = this._rand(-this.halfD, this.halfD);
+		this._py[i] = initial ? this._rand(-this.halfH, this.halfH) : this.halfH;
+		this._vy[i] = o.speed * this._rand(1 - o.speedVariance, 1 + o.speedVariance);
+		this._len[i] = this._rand(o.lengthMin, o.lengthMax);
+		this._bri[i] = this._rand(0.5, 1.0);
+	}
+
+	_writeOne(i) {
+		const n = this.count;
+		const vb = this.mesh.vertexBuffer;
+		const c = this.mat.color;
+		const b = this._bri[i];
+		// ParticleMesh layout: [positions][colors][sizes]
+		vb._t_set(i * 3, this._px[i], this._py[i], this._pz[i]);
+		vb._t_set((n + i) * 3, c[0] * b, c[1] * b, c[2] * b);
+		vb._t_set(n * 6 + i, this._len[i]);
+	}
+
+	_writeAll() {
+		for (let i = 0; i < this.count; i++) this._writeOne(i);
+		this.mesh.update();
+	}
+
+	// Advance the simulation by one frame. Call once per rendered frame
+	// (e.g. from scene.on("frame", ...)).
+	update() {
+		const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+		// seconds since last frame, clamped so a backgrounded tab can't teleport drops
+		let dt = this._lastTime ? (now - this._lastTime) / 1000 : 0.016;
+		this._lastTime = now;
+		if (dt > 0.05) dt = 0.05;
+
+		const o = this.options;
+		const n = this.count;
+		const halfH = this.halfH, halfW = this.halfW, halfD = this.halfD;
+		const wx = o.wind[0] * dt, wz = o.wind[1] * dt;
+
+		// keep the rain volume centred on a moving target, if requested
+		const t = o.followTarget;
+		if (t && t.location) {
+			this.location.x = t.location.x;
+			this.location.z = t.location.z;
+		}
+
+		for (let i = 0; i < n; i++) {
+			const y = this._py[i] - this._vy[i] * dt;
+
+			if (y < -halfH) {
+				// reached the ground — recycle to the top with fresh parameters
+				this._spawn(i, false);
+				continue;
+			}
+
+			let x = this._px[i] + wx;
+			let z = this._pz[i] + wz;
+
+			// wrap horizontal drift so drops stay inside the volume
+			if (x > halfW) x -= o.width; else if (x < -halfW) x += o.width;
+			if (z > halfD) z -= o.depth; else if (z < -halfD) z += o.depth;
+
+			this._px[i] = x;
+			this._py[i] = y;
+			this._pz[i] = z;
+		}
+
+		this._writeAll();
+	}
+}

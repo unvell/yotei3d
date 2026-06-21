@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Rain - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Scene, Shapes, SceneObject, Rain, ObjectViewController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.06, 0.07, 0.09, 1.0],   // overcast, near-night sky
+        enablePostprocess: true,
+        enableLighting: true,
+        enableShadow: true,
+        renderingImage: {
+          gamma: 1.1,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // ---- a small wet "city block" to catch the rain ----
+      const ground = new Shapes.Plane();
+      ground.scale.set(60, 1, 60);
+      ground.mat.color = [0.12, 0.13, 0.16];
+      ground.mat.roughness = 0.4;          // damp asphalt: a little reflective
+      scene.add(ground);
+
+      const city = new SceneObject();
+      scene.add(city);
+
+      for (let i = 0; i < 24; i++) {
+        const box = new Shapes.Cube();
+        const h = 1 + Math.random() * 5;
+        const w = 0.8 + Math.random() * 1.6;
+        box.scale.set(w, h, w);
+        box.location.set(
+          (Math.random() - 0.5) * 26,
+          h / 2 - 0.5,
+          (Math.random() - 0.5) * 26
+        );
+        const g = 0.18 + Math.random() * 0.12;
+        box.mat.color = [g * 0.9, g, g * 1.1];
+        box.mat.roughness = 0.7;
+        city.add(box);
+      }
+
+      // ---- the rain ----
+      // Added after the geometry so the depth buffer already holds the scene;
+      // the rain shader tests (but doesn't write) depth, so buildings occlude drops.
+      const rain = new Rain({
+        count: 3000,
+        width: 60, depth: 60, height: 34,
+        speed: 30,
+        wind: [5, 1.5],
+        slant: 0.22,
+        opacity: 0.35,
+        color: [0.66, 0.76, 0.96],
+        thickness: 0.01,
+        lengthMin: 10,   // ← 短い雨筋（近い／細かい雨）
+        lengthMax: 100,   // ← 長い雨筋
+      });
+      rain.location.y = 7;   // lift the volume so drops fall from above the rooftops
+      scene.add(rain);
+
+      // drive the simulation every frame
+      scene.on("frame", () => rain.update());
+
+      // gloomy key light
+      scene.sun.location.set(0.6, 1, 0.4);
+      scene.sun.mat.color = [0.55, 0.6, 0.72];
+
+      scene.mainCamera.fieldOfView = 50;
+      scene.mainCamera.location.set(0, 6, 28);
+      scene.mainCamera.angle.set(-8, 0, 0);
+
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+      });
+      controller.targetObject = city;
+
+      scene.animation = true;   // continuous redraw for the falling rain
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Real-time rainfall with slanted streak particles. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
