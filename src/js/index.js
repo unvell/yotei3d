@@ -15,11 +15,11 @@ export * from './view/objectcontroller.js';
 export * from './view/touchcontroller.js';
 export * from './view/floorviewcontroller.js'
 export * from './webgl/cubemap.js';
-export * from './webgl/texture.js';
+export * from './webgl/texture';
 export * from './webgl/shader.js';
 export * from './webgl/mesh.js';
 export * from './utility/event';
-export * from './utility/resourcemanager.js';
+export * from './utility/resourcemanager';
 export * from './utility/archive.js';
 export * from './utility/gltfloader.js';
 export * from './utility/utility';

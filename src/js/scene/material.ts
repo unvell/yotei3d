@@ -1,5 +1,5 @@
 import { Color3, Vec2, Vec3, Vec4 } from '@jingwood/graphics-math';
-import { Texture } from '../webgl/texture.js';
+import { Texture } from '../webgl/texture';
 
 // Material follows the glTF 2.0 metallic-roughness workflow.
 //

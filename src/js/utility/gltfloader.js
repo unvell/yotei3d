@@ -5,7 +5,7 @@ import { Quaternion } from "@jingwood/graphics-math";
 import { SceneObject, JointObject } from '../scene/object.js';
 import { Material } from '../scene/material';
 import { Mesh } from '../webgl/mesh.js';
-import { Texture } from '../webgl/texture.js';
+import { Texture } from '../webgl/texture';
 import { ResourceManager, ResourceTypes } from '../utility/resourcemanager';
 
 function uriToBuffer(string) {

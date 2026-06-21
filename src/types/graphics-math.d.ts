@@ -19,6 +19,7 @@ declare module '@jingwood/graphics-math' {
     equals(x: number, y: number, z: number): boolean;
     normalize(): Vec3;
     mulMat(m: Matrix4): Vec3;
+    toArrayDigits(digits?: number): number[];
     static get zero(): Vec3;
     static get one(): Vec3;
     static get One(): Vec3;
@@ -96,7 +97,13 @@ declare module '@jingwood/graphics-math' {
   }
 
   export class BoundingBox3D {
-    constructor();
+    min: Vec3;
+    max: Vec3;
+    origin: Vec3;
+    size: Vec3;
+    constructor(a?: any, b?: any);
+    static findBoundingBoxOfBoundingBoxes(a: any, b: any): BoundingBox3D;
+    static transformBoundingBox(bbox: any, m: Matrix4): BoundingBox3D;
   }
 
   export class Ray {
