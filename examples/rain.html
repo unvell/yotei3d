@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Scene, Shapes, SceneObject, Rain, GroundFog, LightningFlash, ObjectViewController } from "@";
+    import { Renderer, Scene, Shapes, SceneObject, Rain, GroundFog, LightningFlash, TouchController } from "@";
 
     window.addEventListener("load", function() {
 
@@ -144,10 +144,7 @@
       scene.mainCamera.location.set(0, 6, 28);
       scene.mainCamera.angle.set(-8, 0, 0);
 
-      const controller = new ObjectViewController(scene, {
-        enableVerticalRotation: true,
-      });
-      controller.targetObject = city;
+      const controller = new TouchController(scene);
 
       scene.animation = true;   // continuous redraw for the falling rain
       scene.show();
