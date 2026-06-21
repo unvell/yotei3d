@@ -346,7 +346,7 @@ export class Mesh {
 			gl.bufferData(gl.ARRAY_BUFFER, this.jointWeightsBuffer, gl.STATIC_DRAW);
     }
     
-		var indexBufferLength = (!this.indexBuffer ? 0 : (this.indexBuffer.length * 2));
+		var indexBufferLength = (!this.indexBuffer ? 0 : (this.indexBuffer.length * (this.indexBuffer.BYTES_PER_ELEMENT || 2)));
 		
 		if (renderer.debugger) {
 			this._vertexMemorySize = !this.vertexBuffer ? 0 : (this.vertexBuffer.length * 4 + indexBufferLength);
@@ -541,7 +541,10 @@ export class Mesh {
 	
 			if (this.indexed) {
 				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.meta.indexBufferId);
-				gl.drawElements(glPrimitiveMode, meta.indexCount, gl.UNSIGNED_SHORT, 0);
+				// 32-bit indices for meshes with > 65535 vertices, else 16-bit
+				const indexType = (this.indexBuffer instanceof Uint32Array)
+					? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+				gl.drawElements(glPrimitiveMode, meta.indexCount, indexType, 0);
 			} else {
 				gl.drawArrays(glPrimitiveMode, 0, meta.vertexCount);
 			}

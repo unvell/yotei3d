@@ -113,6 +113,10 @@ export class Renderer {
 			return;
 		}
 
+		// 32-bit element indices (WebGL1) — required for meshes with > 65535
+		// vertices, e.g. detailed glTF models. Harmless if unsupported.
+		this._extElementIndexUint = gl.getExtension("OES_element_index_uint");
+
 		this.canvas.addEventListener('webglcontextlost', function (e) {
 			console.error(e);
 			console.error(gl.getError());

@@ -57,6 +57,15 @@ export class StandardShader extends Shader {
 		this.refMapUniform = this.bindUniform("refMap", "texcube", 4);
 		this.irradianceMapUniform = this.bindUniform("irradianceMap", "texcube", 6);
 
+		// PBR material maps (glTF metallic-roughness workflow)
+		this.metalRoughMapUniform = this.bindUniform("metalRoughMap", "tex", 7);
+		this.aoMapUniform = this.bindUniform("aoMap", "tex", 8);
+		this.emissiveMapUniform = this.bindUniform("emissiveMap", "tex", 9);
+		this.hasMetalRoughMapUniform = this.bindUniform("hasMetalRoughMap", "bool");
+		this.hasAOMapUniform = this.bindUniform("hasAOMap", "bool");
+		this.hasEmissiveMapUniform = this.bindUniform("hasEmissiveMap", "bool");
+		this.emissiveColorUniform = this.bindUniform("emissiveColor", "color3");
+
 		// image-based lighting (IBL)
 		this.hasIBLUniform = this.bindUniform("hasIBL", "bool");
 		this.useDirectSunUniform = this.bindUniform("useDirectSun", "bool");
@@ -114,6 +123,14 @@ export class StandardShader extends Shader {
 
 		this.emptyBoundingBox = new BoundingBox3D();
 		this.defaultIBLColor = [1.0, 1.0, 1.0];
+		this.defaultEmissive = [0, 0, 0];
+	}
+
+	// A texture is ready to bind once it has finished loading and its backing
+	// image is fully decoded.
+	static isTextureReady(tex) {
+		return tex && typeof tex === "object" && tex instanceof Texture
+			&& !tex.isLoading && tex.image && tex.image.complete;
 	}
 
 	beginScene(scene) {
@@ -291,6 +308,12 @@ export class StandardShader extends Shader {
 		let color = this.defaultColor;
 		let metallic = 0;
 
+		// PBR material maps (resolved below, applied after the mat block)
+		let metalRoughMap = null;
+		let aoMap = null;
+		let emissiveMap = null;
+		let emissiveColor = this.defaultEmissive;
+
 		if (mat) {
 			// texture
 			if (mat.tex && typeof mat.tex === "object" && mat.tex instanceof Texture
@@ -356,10 +379,56 @@ export class StandardShader extends Shader {
 			} else {
 				this.refractionUniform.set(0);
 			}
+
+			// metallic-roughness map (G=roughness, B=metallic)
+			if (StandardShader.isTextureReady(mat.metallicRoughnessMap)) {
+				metalRoughMap = mat.metallicRoughnessMap;
+			}
+
+			// ambient-occlusion map (R)
+			if (StandardShader.isTextureReady(mat.aoMap)) {
+				aoMap = mat.aoMap;
+			}
+
+			// emissive
+			if (mat.emissiveColor) {
+				emissiveColor = mat.emissiveColor;
+			}
+			if (StandardShader.isTextureReady(mat.emissiveMap)) {
+				emissiveMap = mat.emissiveMap;
+			}
 		}
 
 		this.colorUniform.set(color);
 		this.metallicUniform.set(metallic);
+		this.emissiveColorUniform.set(emissiveColor);
+
+		// metallic-roughness map
+		if (metalRoughMap) {
+			this.metalRoughMapUniform.set(metalRoughMap);
+			this.hasMetalRoughMapUniform.set(true);
+		} else {
+			this.metalRoughMapUniform.set(Shader.emptyTexture);
+			this.hasMetalRoughMapUniform.set(false);
+		}
+
+		// ambient-occlusion map
+		if (aoMap) {
+			this.aoMapUniform.set(aoMap);
+			this.hasAOMapUniform.set(true);
+		} else {
+			this.aoMapUniform.set(Shader.emptyTexture);
+			this.hasAOMapUniform.set(false);
+		}
+
+		// emissive map
+		if (emissiveMap) {
+			this.emissiveMapUniform.set(emissiveMap);
+			this.hasEmissiveMapUniform.set(true);
+		} else {
+			this.emissiveMapUniform.set(Shader.emptyTexture);
+			this.hasEmissiveMapUniform.set(false);
+		}
 
 		// normal-map
 		if (this.renderer.options.enableNormalMap && this.useNormalmap) {
@@ -523,6 +592,9 @@ export class StandardShader extends Shader {
 		this.lightMapUniform.unset();
 		this.refMapUniform.unset();
     this.normalMapUniform.unset();
+		this.metalRoughMapUniform.unset();
+		this.aoMapUniform.unset();
+		this.emissiveMapUniform.unset();
 
 		gl.disable(gl.BLEND);
     gl.enable(gl.DEPTH_TEST);

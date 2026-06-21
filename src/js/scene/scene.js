@@ -147,8 +147,8 @@ export class Scene {
       rm.load();
       return loadingSession;
     } else if (url.endsWith(".gltf")) {
-      const loader = new GLTFLoader();
-      loader.loadFromUrl(url, obj => finishCallback(obj));     
+      const loader = new GLTFLoader(this);
+      loader.loadFromUrl(url, obj => finishCallback(obj));
     } else {
     const rm = new ResourceManager();
       const loadingSession = new LoadingSession(rm);

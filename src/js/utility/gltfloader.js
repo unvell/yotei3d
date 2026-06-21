@@ -1,8 +1,11 @@
 
-import { Vec3, Matrix4, BoundingBox3D } from "@jingwood/graphics-math";
+import { Vec3, Matrix4, BoundingBox3D, Color3 } from "@jingwood/graphics-math";
 import { Quaternion } from "@jingwood/graphics-math";
 
-import { SceneObject } from '@'
+import { SceneObject, JointObject } from '../scene/object.js';
+import { Material } from '../scene/material.js';
+import { Mesh } from '../webgl/mesh.js';
+import { Texture } from '../webgl/texture.js';
 import { ResourceManager, ResourceTypes } from '../utility/resourcemanager';
 
 function uriToBuffer(string) {
@@ -45,7 +48,9 @@ function concatFloat32Array(first, second) {
 }
 
 export class GLTFLoader {
-  constructor() {
+  constructor(scene) {
+    // optional: lets newly-decoded textures request a redraw on on-demand renderers
+    this.scene = scene;
   }
 
   getBufferArray(accessor) {    
@@ -91,7 +96,10 @@ export class GLTFLoader {
         
           case 5123:
             return new Uint16Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count);
-        
+
+          case 5125:
+            return new Uint32Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count);
+
           case 5126:
             return new Float32Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count);
         }
@@ -99,28 +107,54 @@ export class GLTFLoader {
   }
 
 
+  // Resolve a glTF textures[] index to a Texture, following its .source image.
+  loadTextureByIndex(textureIndex) {
+    const { json } = this.session;
+
+    if (isNaN(textureIndex) || !Array.isArray(json.textures)
+      || textureIndex < 0 || textureIndex >= json.textures.length) {
+      return;
+    }
+
+    const sourceEntry = json.textures[textureIndex];
+    if (isNaN(sourceEntry.source)) return;
+
+    return this.loadTexture(sourceEntry.source);
+  }
+
   loadTexture(sourceId) {
     const { json } = this.session;
-   
+
     const imageEntry = json.images[sourceId];
     if (imageEntry._tex) {
       return imageEntry._tex;
     }
-  
-    const imgData = this.getBufferArray(imageEntry);
-        
-    const blob = new Blob([imgData], { type: "image/png" });
 
     const tex = new Texture();
     tex.isLoading = true;
 
     const img = new Image();
-    img.src = URL.createObjectURL(blob);
+
+    if (typeof imageEntry.uri === "string") {
+      // image referenced by URI (data: or external file relative to the model)
+      if (imageEntry.uri.startsWith("data:")) {
+        img.src = imageEntry.uri;
+      } else if (this.basePath) {
+        img.src = this.basePath.concat('/').concat(imageEntry.uri);
+      } else {
+        img.src = imageEntry.uri;
+      }
+    } else {
+      // image embedded in a buffer view
+      const imgData = this.getBufferArray(imageEntry);
+      const blob = new Blob([imgData], { type: imageEntry.mimeType || "image/png" });
+      img.src = URL.createObjectURL(blob);
+    }
 
     img.onload = _ => {
       tex.image = img;
       tex.isLoading = false;
-      _scene.requireUpdateFrame();
+      if (this.scene) this.scene.requireUpdateFrame();
     };
 
     imageEntry._tex = tex;
@@ -137,19 +171,61 @@ export class GLTFLoader {
     loadedMats[id] = mat;
 
     const matjson = json.materials[id];
-    if (matjson.pbrMetallicRoughness) {
-      const matrgh = matjson.pbrMetallicRoughness;
 
-      if (matrgh.baseColorTexture && !isNaN(matrgh.baseColorTexture.index)) {
-        if (Array.isArray(json.textures)
-          && matrgh.baseColorTexture.index >= 0
-          && matrgh.baseColorTexture.index < json.textures.length) {
-          const sourceEntry = json.textures[matrgh.baseColorTexture.index];
-          if (!isNaN(sourceEntry.source)) {
-            mat.tex = this.loadTexture(sourceEntry.source);
-          }
+    if (matjson.pbrMetallicRoughness) {
+      const pbr = matjson.pbrMetallicRoughness;
+
+      // base color factor (glTF default is opaque white)
+      if (Array.isArray(pbr.baseColorFactor)) {
+        mat.color = new Color3(pbr.baseColorFactor[0], pbr.baseColorFactor[1], pbr.baseColorFactor[2]);
+        const a = pbr.baseColorFactor[3];
+        if (typeof a === "number" && a < 1) {
+          mat.transparency = 1 - a;
         }
       }
+
+      // metallic / roughness factors (glTF default is 1.0 for both)
+      mat.metallic = (typeof pbr.metallicFactor === "number") ? pbr.metallicFactor : 1.0;
+      mat.roughness = (typeof pbr.roughnessFactor === "number") ? pbr.roughnessFactor : 1.0;
+
+      // base color (albedo) texture
+      if (pbr.baseColorTexture) {
+        const tex = this.loadTextureByIndex(pbr.baseColorTexture.index);
+        if (tex) mat.tex = tex;
+      }
+
+      // metallic-roughness texture (G = roughness, B = metallic)
+      if (pbr.metallicRoughnessTexture) {
+        const tex = this.loadTextureByIndex(pbr.metallicRoughnessTexture.index);
+        if (tex) mat.metallicRoughnessMap = tex;
+      }
+    }
+
+    // normal texture (+ scale)
+    if (matjson.normalTexture) {
+      const tex = this.loadTextureByIndex(matjson.normalTexture.index);
+      if (tex) {
+        mat.normalmap = tex;
+        if (typeof matjson.normalTexture.scale === "number") {
+          mat.normalIntensity = matjson.normalTexture.scale;
+        }
+      }
+    }
+
+    // occlusion (AO) texture — glTF packs it in the R channel
+    if (matjson.occlusionTexture) {
+      const tex = this.loadTextureByIndex(matjson.occlusionTexture.index);
+      if (tex) mat.aoMap = tex;
+    }
+
+    // emissive factor + texture
+    if (Array.isArray(matjson.emissiveFactor)) {
+      mat.emissiveColor = new Color3(matjson.emissiveFactor[0],
+        matjson.emissiveFactor[1], matjson.emissiveFactor[2]);
+    }
+    if (matjson.emissiveTexture) {
+      const tex = this.loadTextureByIndex(matjson.emissiveTexture.index);
+      if (tex) mat.emissiveMap = tex;
     }
 
     return mat;
@@ -167,6 +243,7 @@ export class GLTFLoader {
     const vertexBufferAccessor = json.accessors[meshPrimitives.attributes.POSITION];
     const normalBufferAccessor = json.accessors[meshPrimitives.attributes.NORMAL];
     const texcoord0BufferAccessor = json.accessors[meshPrimitives.attributes.TEXCOORD_0];
+    const tangentBufferAccessor = json.accessors[meshPrimitives.attributes.TANGENT];
   
     const jointBufferAccessor = json.accessors[meshPrimitives.attributes.JOINTS_0];
     const jointWeightsBufferAccessor = json.accessors[meshPrimitives.attributes.WEIGHTS_0];
@@ -185,8 +262,12 @@ export class GLTFLoader {
     // mesh.composeMode = Mesh.ComposeModes.TriangleStrip;
 
     if (normalBufferAccessor) {
-      mesh.meta.normalOffset = json.bufferViews[normalBufferAccessor.bufferView].byteOffset;
-      mesh.meta.normalStride = json.bufferViews[normalBufferAccessor.bufferView].byteStride ?? 0;
+      // Attributes are repacked into a tightly-packed block buffer (positions,
+      // then normals, then texcoords) and bound with stride 0, so offsets are
+      // cumulative byte offsets into that packed buffer — not the source
+      // glTF bufferView offsets.
+      mesh.meta.normalOffset = mesh.meta.vertexCount * 12;   // after positions (vec3 f32)
+      mesh.meta.normalStride = 0;
       mesh.meta.normalCount = normalBufferAccessor.count;
 
       if (mesh.vertexBuffer) {
@@ -200,15 +281,55 @@ export class GLTFLoader {
       const _tex0Buffer = this.getBufferArray(texcoord0BufferAccessor);
 
       if (_tex0Buffer) {
-        mesh.meta.texcoordOffset = json.bufferViews[texcoord0BufferAccessor.bufferView].byteOffset;
-        mesh.meta.texcoordStride = json.bufferViews[texcoord0BufferAccessor.bufferView].byteStride ?? 0;
+        // after positions (vec3) and normals (vec3), if present
+        mesh.meta.texcoordOffset = mesh.meta.vertexCount * 12
+          + (normalBufferAccessor ? mesh.meta.normalCount * 12 : 0);
+        mesh.meta.texcoordStride = 0;
         mesh.meta.texcoordCount = texcoord0BufferAccessor.count;
+        mesh.meta.uvCount = 1;
 
         if (mesh.vertexBuffer) {
           mesh.vertexBuffer = concatFloat32Array(mesh.vertexBuffer, _tex0Buffer);
         } else {
           mesh.vertexBuffer = texcoord0BufferAccessor;
         }
+      }
+    }
+
+    // Tangent basis for normal mapping. glTF stores TANGENT as vec4 (xyz + a
+    // handedness sign in w); the engine wants separate tangent/bitangent vec3
+    // blocks, so we derive bitangent = cross(normal, tangent) * w per vertex.
+    if (tangentBufferAccessor && normalBufferAccessor && mesh.vertexBuffer) {
+      const _tangent4 = this.getBufferArray(tangentBufferAccessor);
+      const _normal3 = this.getBufferArray(normalBufferAccessor);
+
+      if (_tangent4 && _normal3) {
+        const count = tangentBufferAccessor.count;
+        const tangents = new Float32Array(count * 3);
+        const bitangents = new Float32Array(count * 3);
+
+        for (let i = 0; i < count; i++) {
+          const tx = _tangent4[i * 4], ty = _tangent4[i * 4 + 1], tz = _tangent4[i * 4 + 2];
+          const w = _tangent4[i * 4 + 3];
+          const nx = _normal3[i * 3], ny = _normal3[i * 3 + 1], nz = _normal3[i * 3 + 2];
+
+          tangents[i * 3] = tx; tangents[i * 3 + 1] = ty; tangents[i * 3 + 2] = tz;
+
+          // bitangent = cross(normal, tangent) * handedness
+          bitangents[i * 3]     = (ny * tz - nz * ty) * w;
+          bitangents[i * 3 + 1] = (nz * tx - nx * tz) * w;
+          bitangents[i * 3 + 2] = (nx * ty - ny * tx) * w;
+        }
+
+        // packed layout so far: positions, normals, texcoords -> then tangents, bitangents
+        mesh.meta.tangentBasisCount = count;
+        mesh.meta.tangentBasisOffset = mesh.meta.vertexCount * 12
+          + (normalBufferAccessor ? mesh.meta.normalCount * 12 : 0)
+          + (mesh.meta.texcoordCount ? mesh.meta.texcoordCount * 8 : 0);
+        mesh.meta.bitangentBasisOffset = mesh.meta.tangentBasisOffset + count * 12;
+
+        mesh.vertexBuffer = concatFloat32Array(mesh.vertexBuffer, tangents);
+        mesh.vertexBuffer = concatFloat32Array(mesh.vertexBuffer, bitangents);
       }
     }
 

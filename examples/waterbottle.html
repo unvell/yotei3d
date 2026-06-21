@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>WaterBottle (glTF PBR) - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, SkyBox, SceneObject, ObjectViewController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backgroundImage: "/textures/bg-gray-gradient.jpg",
+        enablePostprocess: true,
+        enableEnvmap: true,    // drives runtime IBL baking from the skybox
+        enableShadow: true,
+        enableSSAO: true,
+        renderingImage: {
+          gamma: 1.1,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // image-based lighting source
+      const baseurl = "/textures/cubemap/office-256/";
+      scene.skybox = new SkyBox(renderer, [
+        baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
+        baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
+      ]);
+      scene.iblIntensity = 1.0;
+      scene.exposure = 1.2;
+
+      // holder lets the controller orbit a stable pivot while the model keeps
+      // its own authored offset/scale
+      const holder = new SceneObject();
+      scene.add(holder);
+
+      // Khronos WaterBottle: full PBR map set (baseColor + emissive + normal +
+      // packed occlusion-roughness-metallic) with a tangent basis.
+      scene.createObjectFromURL("/models/WaterBottle/WaterBottle.gltf", obj => {
+        if (!obj) return;
+        obj.scale.set(20, 20, 20);   // authored at real-world ~0.2m
+        holder.add(obj);
+        scene.requireUpdateFrame();
+      });
+
+      scene.sun.location.set(1, 1, 1);
+      scene.sun.mat.color = [1.1, 1.05, 1.0];
+
+      scene.mainCamera.fieldOfView = 50;
+      scene.mainCamera.location.set(0, 0, 6);
+      scene.mainCamera.angle.set(0, 0, 0);
+
+      // drag to rotate, scroll to zoom
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+      });
+      controller.targetObject = holder;
+
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>WaterBottle (glTF PBR). Drag to rotate, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
