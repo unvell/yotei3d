@@ -243,6 +243,7 @@ export class GLTFLoader {
     const vertexBufferAccessor = json.accessors[meshPrimitives.attributes.POSITION];
     const normalBufferAccessor = json.accessors[meshPrimitives.attributes.NORMAL];
     const texcoord0BufferAccessor = json.accessors[meshPrimitives.attributes.TEXCOORD_0];
+    const tangentBufferAccessor = json.accessors[meshPrimitives.attributes.TANGENT];
   
     const jointBufferAccessor = json.accessors[meshPrimitives.attributes.JOINTS_0];
     const jointWeightsBufferAccessor = json.accessors[meshPrimitives.attributes.WEIGHTS_0];
@@ -292,6 +293,43 @@ export class GLTFLoader {
         } else {
           mesh.vertexBuffer = texcoord0BufferAccessor;
         }
+      }
+    }
+
+    // Tangent basis for normal mapping. glTF stores TANGENT as vec4 (xyz + a
+    // handedness sign in w); the engine wants separate tangent/bitangent vec3
+    // blocks, so we derive bitangent = cross(normal, tangent) * w per vertex.
+    if (tangentBufferAccessor && normalBufferAccessor && mesh.vertexBuffer) {
+      const _tangent4 = this.getBufferArray(tangentBufferAccessor);
+      const _normal3 = this.getBufferArray(normalBufferAccessor);
+
+      if (_tangent4 && _normal3) {
+        const count = tangentBufferAccessor.count;
+        const tangents = new Float32Array(count * 3);
+        const bitangents = new Float32Array(count * 3);
+
+        for (let i = 0; i < count; i++) {
+          const tx = _tangent4[i * 4], ty = _tangent4[i * 4 + 1], tz = _tangent4[i * 4 + 2];
+          const w = _tangent4[i * 4 + 3];
+          const nx = _normal3[i * 3], ny = _normal3[i * 3 + 1], nz = _normal3[i * 3 + 2];
+
+          tangents[i * 3] = tx; tangents[i * 3 + 1] = ty; tangents[i * 3 + 2] = tz;
+
+          // bitangent = cross(normal, tangent) * handedness
+          bitangents[i * 3]     = (ny * tz - nz * ty) * w;
+          bitangents[i * 3 + 1] = (nz * tx - nx * tz) * w;
+          bitangents[i * 3 + 2] = (nx * ty - ny * tx) * w;
+        }
+
+        // packed layout so far: positions, normals, texcoords -> then tangents, bitangents
+        mesh.meta.tangentBasisCount = count;
+        mesh.meta.tangentBasisOffset = mesh.meta.vertexCount * 12
+          + (normalBufferAccessor ? mesh.meta.normalCount * 12 : 0)
+          + (mesh.meta.texcoordCount ? mesh.meta.texcoordCount * 8 : 0);
+        mesh.meta.bitangentBasisOffset = mesh.meta.tangentBasisOffset + count * 12;
+
+        mesh.vertexBuffer = concatFloat32Array(mesh.vertexBuffer, tangents);
+        mesh.vertexBuffer = concatFloat32Array(mesh.vertexBuffer, bitangents);
       }
     }
 
