@@ -7,6 +7,7 @@
 	<script type="module">
 
     import { Renderer, Terrain, PointLight, ObjectViewController } from "@";
+    import { Vec3 } from "@/math";
 
     window.addEventListener("load", function() {
 
@@ -18,11 +19,19 @@
         enableShadow: true,
         enableSSAO: true,
         enableEnvmap: true,
+        // The default far plane is only 50; this is a large open scene, so push
+        // it well out (otherwise the back of the terrain gets clipped to sky).
+        perspective: {
+          method: "persp",
+          angle: 55,
+          near: 1,
+          far: 400,
+        },
         shadowQuality: {
-          scale: 26,
-          viewDepth: 4,
+          scale: 42,
+          viewDepth: 6,
           resolution: 2048,
-          intensity: 0.32,
+          intensity: 0.3,
           enableCache: false,
         },
         bloomEffect: {
@@ -80,9 +89,11 @@
       scene.add(fill);
 
       // --- camera + orbit/zoom controller -----------------------------------
+      // Elevated 3/4 view framing the whole terrain; lookAt keeps the framing
+      // correct regardless of euler-angle sign conventions.
       scene.mainCamera.fieldOfView = 55;
-      scene.mainCamera.location.set(0, 26, 52);
-      scene.mainCamera.angle.set(-24, 0, 0);
+      scene.mainCamera.location.set(0, 38, 62);
+      scene.mainCamera.lookAt(new Vec3(0, 0, -2));
 
       const controller = new ObjectViewController(scene, {
         enableVerticalRotation: true,
