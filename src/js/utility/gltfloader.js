@@ -3,7 +3,7 @@ import { Vec3, Matrix4, BoundingBox3D, Color3 } from "@jingwood/graphics-math";
 import { Quaternion } from "@jingwood/graphics-math";
 
 import { SceneObject, JointObject } from '../scene/object.js';
-import { Material } from '../scene/material.js';
+import { Material } from '../scene/material';
 import { Mesh } from '../webgl/mesh.js';
 import { Texture } from '../webgl/texture.js';
 import { ResourceManager, ResourceTypes } from '../utility/resourcemanager';

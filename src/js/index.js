@@ -2,7 +2,7 @@ export * from './render/renderer.js';
 export * from './render/pipeline.js';
 export * from './scene/scene.js';
 export * from './scene/viewer.js';
-export * from './scene/material.js';
+export * from './scene/material';
 export * from './scene/camera.js';
 export * from './scene/object.js';
 export * from './scene/animation.js';

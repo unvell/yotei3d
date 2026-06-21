@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Color3 } from '@jingwood/graphics-math';
-import { Material } from './material.js';
+import { Material } from './material';
 
 // Phase 0 smoke test: validates the toolchain (vitest + graphics-math + ESM)
 // and pins the current Material data contract before the TS migration so the
@@ -44,5 +44,38 @@ describe('Material (baseline contract)', () => {
     expect(c).toBeInstanceOf(Material);
     expect(c.roughness).toBe(0.33);
     expect(c).not.toBe(src);
+  });
+
+  it('clone of a subclass returns the subclass type', () => {
+    class FancyMaterial extends Material {
+      get shaderName() { return 'fancy'; }
+    }
+    const c = new FancyMaterial().clone();
+    expect(c).toBeInstanceOf(FancyMaterial);
+    expect(c.shaderName).toBe('fancy');
+  });
+});
+
+describe('Material (render-method contract)', () => {
+  it('selects the standard shader by default', () => {
+    expect(new Material().shaderName).toBe('standard');
+  });
+
+  it('casts shadow by default', () => {
+    expect(new Material().castShadow).toBe(true);
+  });
+
+  it('lets a subclass override the shader selection', () => {
+    class RainishMaterial extends Material {
+      get shaderName() { return 'rain'; }
+      constructor() {
+        super();
+        this.castShadow = false;
+      }
+    }
+    const m = new RainishMaterial();
+    expect(m.shaderName).toBe('rain');
+    expect(m.castShadow).toBe(false);
+    expect(m).toBeInstanceOf(Material);
   });
 });
