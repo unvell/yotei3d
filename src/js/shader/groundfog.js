@@ -1,5 +1,5 @@
 
-import { Color3 } from "@jingwood/graphics-math";
+import { Color3 } from "@/math";
 import { Shader } from '../webgl/shader.js';
 
 // Renders a horizontal plane as procedural, drifting ground fog.
@@ -33,16 +33,22 @@ export class GroundFogShader extends Shader {
 		this.projectViewModelMatrixUniform.set(obj._transform.mul(this.renderer.projectionViewMatrix));
 		this.modelMatrixUniform.set(obj._transform);
 
+		// All fog parameters come from the GroundFogMaterial (obj.mat); the
+		// legacy per-object fields (obj.fogColor, obj._flow1, ...) are kept as a
+		// fallback for any caller not yet migrated to GroundFogMaterial.
+		const mat = obj.mat || {};
+
 		// tint
-		let color = obj.fogColor || this.defaultColor;
+		let color = mat.color || obj.fogColor || this.defaultColor;
 		if (color instanceof Color3) color = color.toArray();
 		this.colorUniform.set(color);
 
-		this.opacityUniform.set(typeof obj.fogOpacity === "number" ? obj.fogOpacity : 0.5);
-		this.densityUniform.set(typeof obj.density === "number" ? obj.density : 0.55);
-		this.noiseScaleUniform.set(typeof obj.noiseScale === "number" ? obj.noiseScale : 0.045);
-		this.flow1Uniform.set(obj._flow1 || [0, 0]);
-		this.flow2Uniform.set(obj._flow2 || [0, 0]);
+		const num = (a, b, d) => typeof a === "number" ? a : (typeof b === "number" ? b : d);
+		this.opacityUniform.set(num(mat.opacity, obj.fogOpacity, 0.5));
+		this.densityUniform.set(num(mat.density, obj.density, 0.55));
+		this.noiseScaleUniform.set(num(mat.noiseScale, obj.noiseScale, 0.045));
+		this.flow1Uniform.set(mat.flow1 || obj._flow1 || [0, 0]);
+		this.flow2Uniform.set(mat.flow2 || obj._flow2 || [0, 0]);
 
 		// translucent overlay: blend on, depth-test against the scene but don't
 		// write depth so layers don't occlude each other

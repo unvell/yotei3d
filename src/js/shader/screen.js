@@ -1,5 +1,5 @@
 
-import { Matrix4 } from "@jingwood/graphics-math";
+import { Matrix4 } from "@/math";
 import { Shader } from '../webgl/shader.js';
 
 export class ScreenShader extends Shader {

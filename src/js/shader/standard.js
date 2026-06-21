@@ -1,9 +1,9 @@
 
-import { Vec2, Vec3, Color3, Color4, Matrix4 } from "@jingwood/graphics-math";
-import { BoundingBox3D, MathFunctions } from "@jingwood/graphics-math";
+import { Vec2, Vec3, Color3, Color4, Matrix4 } from "@/math";
+import { BoundingBox3D, MathFunctions } from "@/math";
 
 import { Shader } from "../webgl/shader"
-import { Texture  } from "../webgl/texture.js";
+import { Texture  } from "../webgl/texture";
 import { CubeMap } from '../webgl/cubemap.js';
 import { ShaderSources } from './shadersources.js'
 

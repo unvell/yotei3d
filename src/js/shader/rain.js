@@ -1,5 +1,5 @@
 
-import { Color3 } from "@jingwood/graphics-math";
+import { Color3 } from "@/math";
 import { Shader } from '../webgl/shader.js';
 
 // Renders falling raindrops as slanted point-sprite streaks.
@@ -46,10 +46,18 @@ export class RainShader extends Shader {
 		}
 		this.colorUniform.set(color);
 
-		// streak appearance
-		this.opacityUniform.set(typeof obj.rainOpacity === "number" ? obj.rainOpacity : 0.5);
-		this.streakWidthUniform.set(typeof obj.streakWidth === "number" ? obj.streakWidth : 0.14);
-		this.slantUniform.set(typeof obj.slant === "number" ? obj.slant : 0.0);
+		// streak appearance — read from the RainMaterial. The legacy per-object
+		// fields (obj.rainOpacity, etc.) are kept as a fallback for any caller
+		// not yet migrated to RainMaterial.
+		const opacity = (mat && typeof mat.opacity === "number") ? mat.opacity
+			: (typeof obj.rainOpacity === "number" ? obj.rainOpacity : 0.5);
+		const streakWidth = (mat && typeof mat.streakWidth === "number") ? mat.streakWidth
+			: (typeof obj.streakWidth === "number" ? obj.streakWidth : 0.14);
+		const slant = (mat && typeof mat.slant === "number") ? mat.slant
+			: (typeof obj.slant === "number" ? obj.slant : 0.0);
+		this.opacityUniform.set(opacity);
+		this.streakWidthUniform.set(streakWidth);
+		this.slantUniform.set(slant);
 
 		// additive-friendly alpha blending; keep depth testing so geometry
 		// occludes the rain, but don't write depth so drops don't fight each other

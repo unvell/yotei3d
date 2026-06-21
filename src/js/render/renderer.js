@@ -1,6 +1,6 @@
 
-import { Vec3, Vec4, Color4, Matrix4, Ray } from "@jingwood/graphics-math";
-import { MathFunctions as _mf, MathFunctions3 as _mf3 } from "@jingwood/graphics-math";
+import { Vec3, Vec4, Color4, Matrix4, Ray } from "@/math";
+import { MathFunctions as _mf, MathFunctions3 as _mf3 } from "@/math";
 import { initDOM } from "./dom";
 import { EventDispatcher } from '../utility/event';
 import { invokeIfExist, getImageDataURLFromTexture } from "../utility/utility";
@@ -925,13 +925,28 @@ export class Renderer {
 			shaderPushed = true;
 		}
 
-		const objShader = obj.shader || null;
-		if (objShader) {
-			var objShaderName = objShader.name || null;
+		// Primary path: the Material selects which shader renders it.
+		// The base Material.shaderName is 'standard' — the default pass shader —
+		// so plain-material objects fall through here unchanged; only subclassed
+		// materials (e.g. effect materials) divert to their own shader.
+		if (!shaderPushed && obj.mat && typeof obj.mat.shaderName === "string"
+			&& obj.mat.shaderName !== "standard") {
+			this.useShader(obj.mat.shaderName);
+			shaderPushed = true;
+		}
 
-			if (objShaderName) {
-				this.useShader(objShaderName);
-				shaderPushed = true;
+		// Back-compat shim: legacy per-object shader override (obj.shader = { name }).
+		// Superseded by Material.shaderName; retained until all effects migrate
+		// to Material subclasses.
+		if (!shaderPushed) {
+			const objShader = obj.shader || null;
+			if (objShader) {
+				var objShaderName = objShader.name || null;
+
+				if (objShaderName) {
+					this.useShader(objShaderName);
+					shaderPushed = true;
+				}
 			}
 		}
 
@@ -1372,9 +1387,9 @@ export class Renderer {
 	};
 
 	releaseResources() {
-		this.cachedTextures._t_foreach((_, tex) => tex.destroy());
+		Object.values(this.cachedTextures).forEach(tex => tex.destroy());
 		this.cachedTextures = {};
-		this.cachedMeshes._t_foreach((_, mesh) => mesh.destroy());
+		Object.values(this.cachedMeshes).forEach(mesh => mesh.destroy());
 		this.cachedMeshes = {};
 	}
 

@@ -1,5 +1,5 @@
 
-import { Vec3, Matrix4 } from "@jingwood/graphics-math";
+import { Vec3, Matrix4 } from "@/math";
 import { FrameBuffer } from "../webgl/buffers";
 
 // Per-face camera basis, matching IBLBaker's GL cubemap convention

@@ -1,5 +1,5 @@
 
-import { Color3 } from "@jingwood/graphics-math";
+import { Color3 } from "@/math";
 import { Texture } from "../webgl/texture";
 
 export class Shader {

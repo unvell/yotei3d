@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, Snow, ObjectViewController } from "@";
+    import { Renderer, Shapes, SceneObject, Snow, TouchController } from "@";
 
     window.addEventListener("load", function() {
 
@@ -54,7 +54,7 @@
       // Added after the geometry so the depth buffer already holds the scene;
       // the snow shader tests (but doesn't write) depth, so props occlude flakes.
       const snow = new Snow({
-        count: 5000,
+        count: 10000,
         width: 60, depth: 60, height: 40,
         fallSpeed: 2.4,
         wind: [0.7, 0.25],
@@ -70,6 +70,10 @@
 
       scene.on("frame", () => snow.update());
 
+      // distance fog: far mounds and the horizon fade into the winter haze.
+      // Colour defaults to the background sky if omitted.
+      scene.fog = { near: 24, far: 64 };
+
       // soft cool daylight
       scene.sun.location.set(0.4, 1, 0.5);
       scene.sun.mat.color = [1.0, 1.0, 1.05];
@@ -78,10 +82,7 @@
       scene.mainCamera.location.set(0, 5, 26);
       scene.mainCamera.angle.set(-6, 0, 0);
 
-      const controller = new ObjectViewController(scene, {
-        enableVerticalRotation: true,
-      });
-      controller.targetObject = props;
+      const controller = new TouchController(scene);
 
       scene.animation = true;   // continuous redraw for the falling snow
       scene.show();

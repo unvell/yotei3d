@@ -31,9 +31,9 @@ Package manager is **Yarn 4.9.1** (Berry). No formal test suite exists — valid
 - **`utility/`** — Resource loading, glTF/OBJ model importers, EventDispatcher (pub/sub), binary archive support, debug panel.
 - **`effect/`** — Post-processing image filters.
 
-### Key Dependency
+### Math library (`math/`)
 
-`@jingwood/graphics-math` provides Vec3, Matrix4, Color4, and other math primitives used throughout.
+`src/js/math/` is the vendored graphics-math library (Vec2/3/4, Color3/4, Matrix3/4, Ray, BoundingBox3D, Quaternion, MathFunctions) — plain ES6 JS, originally `@jingwood/graphics-math` (github.com/jingwood/js-graphics-math), now maintained in-tree. Import it via the `@/math` alias. Types live in `src/js/math/index.d.ts` (the runtime `.js` is not type-checked; the adjacent `.d.ts` is the source of truth for TS, so e.g. Vec3.x/y/z stay declared as accessors).
 
 ### Build Configuration
 
