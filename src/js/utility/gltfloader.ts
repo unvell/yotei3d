@@ -1,5 +1,5 @@
 
-import { Vec3, Matrix4, BoundingBox3D, Color3 } from "@jingwood/graphics-math";
+import { Matrix4, Color3 } from "@jingwood/graphics-math";
 import { Quaternion } from "@jingwood/graphics-math";
 
 import { SceneObject, JointObject } from '../scene/object.js';
@@ -8,17 +8,17 @@ import { Mesh } from '../webgl/mesh.js';
 import { Texture } from '../webgl/texture';
 import { ResourceManager, ResourceTypes } from '../utility/resourcemanager';
 
-function uriToBuffer(string) {
-  // const regex = /^data:.+\/(.+);base64,(.*)/;
+interface GltfSession {
+  json?: any;
+  skinJointMats: { [id: string]: any };
+  loadedSkins: any[];
+  loadedJoints: { [id: number]: any };
+  loadedMats: { [id: number]: Material };
+  objTypeStack: any[];
+  skinnedObjects: { obj: any; skinId: number }[];
+}
 
-  // const matches = string.match(regex);
-  // if (matches.length > 2) {
-  //   // const type = matches[1];
-  //   const data = matches[2];
-
-  //   const buffer = _base64ToArrayBuffer(data);
-  //   return buffer;
-  // }
+function uriToBuffer(string: string): ArrayBuffer | undefined {
   if (string.startsWith('data:')) {
     const s = string.indexOf(';base64,');
     if (s > 0) {
@@ -28,7 +28,7 @@ function uriToBuffer(string) {
   }
 }
 
-function _base64ToArrayBuffer(base64) {
+function _base64ToArrayBuffer(base64: string): ArrayBuffer {
   const binary_string = window.atob(base64);
   const len = binary_string.length;
   const array = new Uint8Array(len);
@@ -38,8 +38,8 @@ function _base64ToArrayBuffer(base64) {
   return array.buffer;
 }
 
-function concatFloat32Array(first, second) {
-  let result = new Float32Array(first.length + second.length);
+function concatFloat32Array(first: Float32Array, second: Float32Array): Float32Array {
+  const result = new Float32Array(first.length + second.length);
 
   result.set(first);
   result.set(second, first.length);
@@ -48,12 +48,16 @@ function concatFloat32Array(first, second) {
 }
 
 export class GLTFLoader {
-  constructor(scene) {
+  scene: any;
+  basePath?: string;
+  session!: GltfSession;
+
+  constructor(scene?: any) {
     // optional: lets newly-decoded textures request a redraw on on-demand renderers
     this.scene = scene;
   }
 
-  getBufferArray(accessor) {    
+  getBufferArray(accessor: any): any {
     const { json } = this.session;
 
     if (!Array.isArray(json.buffers)) return;
@@ -78,13 +82,13 @@ export class GLTFLoader {
     switch (accessor.type) {
       case 'VEC2':
         return new Float32Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count * 2);
-     
+
       case 'VEC3':
         return new Float32Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count * 3);
-     
+
       case 'VEC4':
         return new Float32Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count * 4);
-      
+
       case 'MAT4':
         return new Float32Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count * 16);
 
@@ -93,7 +97,7 @@ export class GLTFLoader {
         switch (accessor.componentType) {
           default:
             return new Uint8Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count || bufferView.byteLength);
-        
+
           case 5123:
             return new Uint16Array(buffer._data, (accessor.byteOffset ?? 0) + (bufferView.byteOffset ?? 0), accessor.count);
 
@@ -108,7 +112,7 @@ export class GLTFLoader {
 
 
   // Resolve a glTF textures[] index to a Texture, following its .source image.
-  loadTextureByIndex(textureIndex) {
+  loadTextureByIndex(textureIndex: number): Texture | undefined {
     const { json } = this.session;
 
     if (isNaN(textureIndex) || !Array.isArray(json.textures)
@@ -122,7 +126,7 @@ export class GLTFLoader {
     return this.loadTexture(sourceEntry.source);
   }
 
-  loadTexture(sourceId) {
+  loadTexture(sourceId: number): Texture {
     const { json } = this.session;
 
     const imageEntry = json.images[sourceId];
@@ -151,7 +155,7 @@ export class GLTFLoader {
       img.src = URL.createObjectURL(blob);
     }
 
-    img.onload = _ => {
+    img.onload = () => {
       tex.image = img;
       tex.isLoading = false;
       if (this.scene) this.scene.requireUpdateFrame();
@@ -161,7 +165,7 @@ export class GLTFLoader {
     return tex;
   }
 
-  loadMaterial(id) {
+  loadMaterial(id: number): Material {
     const { json, loadedMats } = this.session;
 
     let mat = loadedMats[id];
@@ -231,7 +235,7 @@ export class GLTFLoader {
     return mat;
   }
 
-  loadMesh(gltfMesh) {
+  loadMesh(gltfMesh: any): Mesh | undefined {
     const { json } = this.session;
 
     if (!Array.isArray(json.accessors)) {
@@ -239,20 +243,22 @@ export class GLTFLoader {
     }
 
     const meshPrimitives = gltfMesh.primitives[0];
- 
+
     const vertexBufferAccessor = json.accessors[meshPrimitives.attributes.POSITION];
     const normalBufferAccessor = json.accessors[meshPrimitives.attributes.NORMAL];
     const texcoord0BufferAccessor = json.accessors[meshPrimitives.attributes.TEXCOORD_0];
     const tangentBufferAccessor = json.accessors[meshPrimitives.attributes.TANGENT];
-  
+
     const jointBufferAccessor = json.accessors[meshPrimitives.attributes.JOINTS_0];
     const jointWeightsBufferAccessor = json.accessors[meshPrimitives.attributes.WEIGHTS_0];
     const indicesBufferAccessor = json.accessors[meshPrimitives.indices];
 
-    const mesh = new Mesh();
+    // Mesh is still plain JS; its inferred `meta` union is too narrow for the
+    // fields the loader packs in. Treat as any until webgl/mesh is migrated.
+    const mesh: any = new Mesh();
     mesh.vertexBuffer = this.getBufferArray(vertexBufferAccessor);
     mesh.indexBuffer = this.getBufferArray(indicesBufferAccessor);
-  
+
     mesh.indexed = true;
     mesh.meta = {
       vertexCount: vertexBufferAccessor.count,
@@ -358,22 +364,22 @@ export class GLTFLoader {
     return mesh;
   }
 
-  loadSkin(skin) {
+  loadSkin(skin: any): any {
     const { json } = this.session;
 
     // let skinInfo = this.session.loadedSkins[skinId];
     // if (skinInfo) return skinInfo;
 
     const skinInfo = {
-      joints: [],
-      rootJoints: [],
-      inverseMatrices: [],
+      joints: [] as any[],
+      rootJoints: [] as any[],
+      inverseMatrices: [] as Matrix4[],
     };
-    
+
     if (Array.isArray(json.accessors)
       && skin.inverseBindMatrices >= 0 && skin.inverseBindMatrices < json.accessors.length) {
       const _im = this.getBufferArray(json.accessors[skin.inverseBindMatrices]);
-  
+
       for (let i = 0; i < _im.length; i += 16) {
         const mat2 = new Matrix4();
         mat2.a1 = _im[i + 0]; mat2.b1 = _im[i + 1]; mat2.c1 = _im[i + 2]; mat2.d1 = _im[i + 3];
@@ -406,7 +412,7 @@ export class GLTFLoader {
     return skinInfo;
   }
 
-  isJointNode(id) {
+  isJointNode(id: number): boolean {
     const { json } = this.session;
 
     if (Array.isArray(json.skins)) {
@@ -420,13 +426,12 @@ export class GLTFLoader {
     return false;
   }
 
-  loadNode(nodeId) {
+  loadNode(nodeId: number): any {
     const { json } = this.session;
     const node = json.nodes[nodeId];
-    const objTypeStack = this.session.objTypeStack;
 
     // const objType = objTypeStack[objTypeStack.length - 1];
-    let objType;
+    let objType: any;
 
     if (this.isJointNode(nodeId)) {
       objType = JointObject;
@@ -481,7 +486,7 @@ export class GLTFLoader {
     return obj;
   }
 
-  reset() {
+  reset(): void {
     this.session = {
       skinJointMats: {},
       loadedSkins: [],
@@ -492,23 +497,23 @@ export class GLTFLoader {
     };
   }
 
-  loadFromUrl(url, callback) {
+  loadFromUrl(url: string, callback: (obj: any) => void): void {
     const pathSplit = url.lastIndexOf('/');
     if (pathSplit >= 0) {
       this.basePath = url.substr(0, pathSplit);
     }
 
-    ResourceManager.download(url, ResourceTypes.JSON, json => {
+    ResourceManager.download(url, ResourceTypes.JSON, (json: any) => {
       this.load(json, obj => callback(obj));
     });
   }
 
-  load(json, callback) {
+  load(json: any, callback: (obj: any) => void): void {
     this.reset();
     this.session.json = json;
 
     if (Array.isArray(json.buffers)
-      && json.buffers.some(_b => _b.uri && !_b.uri.startsWith('data:application/'))) {
+      && json.buffers.some((_b: any) => _b.uri && !_b.uri.startsWith('data:application/'))) {
       const rm = new ResourceManager();
 
       for (const buffer of json.buffers) {
@@ -525,18 +530,18 @@ export class GLTFLoader {
           path = buffer.uri;
         }
 
-        rm.add(path, ResourceTypes.Binary, _data => {
+        rm.add(path, ResourceTypes.Binary, (_data: any) => {
           buffer._data = _data
         });
       }
 
-      rm.load(_ => callback(this.loadJson(json)));
+      rm.load(() => callback(this.loadJson(json)));
     } else {
       callback(this.loadJson(json));
     }
   }
 
-  loadJson(json) {
+  loadJson(json: any): any {
 
     const root = new SceneObject();
     root.mat = {};
@@ -562,5 +567,5 @@ export class GLTFLoader {
 
     return root;
   }
-    
+
 }

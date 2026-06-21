@@ -1,27 +1,59 @@
-import { Keys } from "@";
+import { Keys } from "../scene/viewer";
 import { performMovementAccelerationAnimation } from "../utility/utility";
 
+interface ObjectViewControllerOptions {
+  enableHorizontalRotation?: boolean;
+  enableVerticalRotation?: boolean;
+  enableScrollToScaleObject?: boolean;
+  minVerticalRotateAngle?: number;
+  maxVerticalRotateAngle?: number;
+  enableDragAcceleration?: boolean;
+  dragAccelerationAttenuation?: number;
+  dragAccelerationIntensity?: number;
+  targetObject?: any;
+}
+
 export class ObjectViewController {
-  constructor(scene, {
+  scene: any;
+  renderer: any;
+  viewer: any;
+  _enabled: boolean;
+  targetObject: any;
+
+  enableHorizontalRotation: boolean;
+  enableVerticalRotation: boolean;
+  enableScrollToScaleObject: boolean;
+  minVerticalRotateAngle: number;
+  maxVerticalRotateAngle: number;
+  enableDragAcceleration: boolean;
+  dragAccelerationAttenuation: number;
+  dragAccelerationIntensity: number;
+
+  sceneDragHandlerListener: any;
+  sceneMouseWheelHandlerListener: any;
+  sceneMouseDragAccelerationHandler: any;
+  startDragTime: number;
+
+  constructor(scene: any, {
     enableHorizontalRotation = true,
     enableVerticalRotation = true,
     enableScrollToScaleObject = true,
-  
+
     minVerticalRotateAngle = -90,
     maxVerticalRotateAngle = 90,
-  
+
     enableDragAcceleration = true,
     dragAccelerationAttenuation = 0.03,
     dragAccelerationIntensity = 5,
 
     targetObject,
-  } = {}) {
+  }: ObjectViewControllerOptions = {}) {
     this.scene = scene;
     this.renderer = scene.renderer;
     this.viewer = scene.renderer.viewer;
     this._enabled = true;
     this.targetObject = targetObject;
-    
+
     this.enableHorizontalRotation = enableHorizontalRotation;
     this.enableVerticalRotation = enableVerticalRotation;
     this.enableScrollToScaleObject = enableScrollToScaleObject;
@@ -31,27 +63,26 @@ export class ObjectViewController {
     this.dragAccelerationAttenuation = dragAccelerationAttenuation;
     this.dragAccelerationIntensity = dragAccelerationIntensity;
 
-    this.sceneDragHandlerListener = scene.on("drag", _ => this.sceneDragHandler());
-    this.sceneMouseWheelHandlerListener = scene.on("mousewheel", _ => this.sceneMouseWheelHandler());
-    this.sceneMouseDragAccelerationHandler = scene.on("enddrag", _ => this.dragAcceleration());
+    this.sceneDragHandlerListener = scene.on("drag", () => this.sceneDragHandler());
+    this.sceneMouseWheelHandlerListener = scene.on("mousewheel", () => this.sceneMouseWheelHandler());
+    this.sceneMouseDragAccelerationHandler = scene.on("enddrag", () => this.dragAcceleration());
 
     this.startDragTime = 0;
-    this.scene.on("begindrag", _ => {
+    this.scene.on("begindrag", () => {
       this.startDragTime = Date.now();
     });
   }
 
-  get enabled() {
-    return _enabled;
+  get enabled(): boolean {
+    return this._enabled;
   }
-  set enabled(v) {
+  set enabled(v: boolean) {
     this._enabled = v;
   }
 
-  sceneDragHandler() {
+  sceneDragHandler(): void {
     if (!this._enabled) return;
 
-    
     if (this.viewer.pressedKeys.has(Keys.Shift)) {
       this.panObjectByMouseMove();
     } else if (this.viewer.pressedKeys.has(Keys.Control)) {
@@ -61,13 +92,13 @@ export class ObjectViewController {
     }
   }
 
-  sceneMouseWheelHandler() {
+  sceneMouseWheelHandler(): void {
     if (!this._enabled) return;
 
     this.zoomViewByMouseWheel();
   }
 
-  zoomViewByMouseWheel() {
+  zoomViewByMouseWheel(): void {
     if (!this._enabled) return;
 
     let s = this.viewer.originDistance - this.viewer.mouse.wheeldelta / 3000;
@@ -76,7 +107,7 @@ export class ObjectViewController {
     this.scene.requireUpdateFrame();
   }
 
-  zoomViewByMouseButton() {
+  zoomViewByMouseButton(): void {
     if (!this._enabled) return;
 
     let s = this.viewer.originDistance - (this.viewer.mouse.movement.x + this.viewer.mouse.movement.y) / -100;
@@ -85,13 +116,13 @@ export class ObjectViewController {
     this.scene.requireUpdateFrame();
   }
 
-  panObjectByMouseMove() {
+  panObjectByMouseMove(): void {
     if (!this._enabled || !this.targetObject) return;
 
     this.targetObject.moveOffset(this.viewer.mouse.movement.x / 50, -this.viewer.mouse.movement.y / 50, 0);
   }
 
-  limitViewAngleScope() {
+  limitViewAngleScope(): void {
     if (!this.targetObject) return;
 
     if (this.targetObject.angle.x < this.minVerticalRotateAngle) this.targetObject.angle.x = this.minVerticalRotateAngle;
@@ -101,7 +132,7 @@ export class ObjectViewController {
     if (this.targetObject.angle.y > 360) this.targetObject.angle.y -= 360;
   }
 
-  dragToRotateObject() {
+  dragToRotateObject(): void {
     if (!this._enabled || !this.targetObject) return;
 
     const movement = this.viewer.mouse.movement;
@@ -117,7 +148,7 @@ export class ObjectViewController {
     this.scene.requireUpdateFrame();
   }
 
-  dragAcceleration() {
+  dragAcceleration(): void {
     if (!this._enabled || !this.targetObject) return;
     if (!this.enableDragAcceleration) return;
 
@@ -125,7 +156,7 @@ export class ObjectViewController {
 
     if ((Date.now() - this.startDragTime) < 300) {
       performMovementAccelerationAnimation(scene,
-        this.dragAccelerationIntensity, this.dragAccelerationAttenuation, (xdiff, ydiff) => {
+        this.dragAccelerationIntensity, this.dragAccelerationAttenuation, (xdiff: number, ydiff: number) => {
 
           if (this.enableHorizontalRotation) {
             this.targetObject.angle.y += xdiff;

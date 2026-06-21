@@ -11,23 +11,44 @@ declare module '@jingwood/graphics-math' {
   }
 
   export class Vec3 {
-    x: number;
-    y: number;
-    z: number;
-    constructor(x?: number, y?: number, z?: number);
+    // Declared as accessors so subclasses (e.g. ObjectVectorProperty) may
+    // override x/y/z with their own get/set without a property-vs-accessor clash.
+    get x(): number; set x(v: number);
+    get y(): number; set y(v: number);
+    get z(): number; set z(v: number);
+    constructor(x?: number | Vec3, y?: number, z?: number);
     clone(): Vec3;
     equals(x: number, y: number, z: number): boolean;
     normalize(): Vec3;
     mulMat(m: Matrix4): Vec3;
     toArrayDigits(digits?: number): number[];
+    add(v: Vec3): Vec3;
+    sub(v: Vec3): Vec3;
+    mul(s: number): Vec3;
+    neg(): Vec3;
+    abs(): Vec3;
+    length(): number;
+    dot(v: Vec3): number;
+    cross(v: Vec3): Vec3;
+    lerp(v2: Vec3, t: number): Vec3;
+    offset(x: number | { x: number; y: number; z: number }, y?: number, z?: number): Vec3;
+    set(x: number | Vec3 | number[], y?: number, z?: number): void;
     static get zero(): Vec3;
     static get one(): Vec3;
     static get One(): Vec3;
+    static up: Vec3;
+    static down: Vec3;
+    static forward: Vec3;
+    static back: Vec3;
     static add(a: Vec3, b: Vec3): Vec3;
     static sub(a: Vec3, b: Vec3): Vec3;
+    static mul(a: Vec3, s: number): Vec3;
+    static neg(a: Vec3): Vec3;
     static lerp(a: Vec3, b: Vec3, t: number): Vec3;
     static dot(a: Vec3, b: Vec3): number;
     static cross(a: Vec3, b: Vec3): Vec3;
+    static length(v: Vec3): number;
+    static normalize(v: Vec3): Vec3;
   }
 
   export class Vec4 {
@@ -35,7 +56,7 @@ declare module '@jingwood/graphics-math' {
     y: number;
     z: number;
     w: number;
-    constructor(v?: Vec3 | number, w?: number);
+    constructor(x?: Vec3 | Vec4 | number, y?: number, z?: number, w?: number);
     readonly xyz: Vec3;
     clone(): Vec4;
     mulMat(m: Matrix4): Vec4;
@@ -54,16 +75,28 @@ declare module '@jingwood/graphics-math' {
   }
 
   export class Matrix4 {
+    a1: number; a2: number; a3: number; a4: number;
+    b1: number; b2: number; b3: number; b4: number;
+    c1: number; c2: number; c3: number; c4: number;
+    d1: number; d2: number; d3: number; d4: number;
     constructor();
     loadIdentity(): Matrix4;
+    extractEulerAngles(): Vec3;
     copyFrom(m: Matrix4): Matrix4;
     clone(): Matrix4;
     mul(m: Matrix4): Matrix4;
     inverse(): Matrix4;
     transpose(): Matrix4;
     translate(x: number, y: number, z: number): Matrix4;
-    rotate(x: number, y: number, z: number, order?: string): Matrix4;
+    rotate(x: number | Vec3, y?: number, z?: number, order?: string): Matrix4;
+    rotateX(angle: number): Matrix4;
+    rotateY(angle: number): Matrix4;
+    rotateZ(angle: number): Matrix4;
     scale(x: number, y: number, z: number): Matrix4;
+    lookAt(location: Vec3, target: Vec3, up: Vec3): Matrix4;
+    extractLookAtVectors(): { dir: Vec3; up: Vec3 };
+    toArray(): number[];
+    static Identity: Matrix4;
   }
 
   export class Quaternion {
@@ -102,6 +135,7 @@ declare module '@jingwood/graphics-math' {
     origin: Vec3;
     size: Vec3;
     constructor(a?: any, b?: any);
+    expandTo(p: { x: number; y: number; z: number }): void;
     static findBoundingBoxOfBoundingBoxes(a: any, b: any): BoundingBox3D;
     static transformBoundingBox(bbox: any, m: Matrix4): BoundingBox3D;
   }

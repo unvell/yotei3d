@@ -1,11 +1,19 @@
 
 import { Vec3, BoundingBox3D } from "@jingwood/graphics-math";
-import { SceneObject, Mesh } from '@'
+import { SceneObject } from '../scene/object';
+import { Mesh } from '../webgl/mesh';
 
-const triangleIndexPattern = "\d+\/\d+\/\d+";
-const faceTrianglePattern = `^f\s+${ triangleIndexPattern }\s+`;
+interface ObjVertex { x: number; y: number; z: number; }
 
-function readLine(s, line) {
+interface ObjParseState {
+  vertices: ObjVertex[];
+  normals: ObjVertex[];
+  texcoords: ObjVertex[];
+  faces: number[][];
+  vertexBuffer: number[];
+}
+
+function readLine(s: ObjParseState, line: string): void {
   let matches;
 
   if ((matches = line.match(/^v\s+([\-\d\.]+)\s+([\-\d\.]+)\s+([\-\d\.]+)/))) {
@@ -20,17 +28,17 @@ function readLine(s, line) {
       matches[7], matches[8], matches[9]].map(e => Number.parseInt(e)));
   }
   else if ((matches = line.match(/^f\s+(\d+)\/\/(\d+)\s+(\d+)\/\/(\d+)\s+(\d+)\/\/(\d+)/))) {
-    s.faces.push([matches[1], 0, matches[2], matches[3], 0, matches[4], 
-      matches[5], 0, matches[6]].map(e => Number.parseInt(e)));
+    s.faces.push([matches[1], "0", matches[2], matches[3], "0", matches[4],
+      matches[5], "0", matches[6]].map(e => Number.parseInt(e)));
   }
 }
 
-function addVector(arr, x, y, z) {
+function addVector(arr: ObjVertex[], x: string, y: string, z: string): void {
   arr.push({ x: Number.parseFloat(x), y: Number.parseFloat(y), z: Number.parseFloat(z) });
 }
 
-export function loadObjFormat(text) {
-  const s = {
+export function loadObjFormat(text: string): SceneObject {
+  const s: ObjParseState = {
     vertices: [],
     normals: [],
     texcoords: [],
@@ -39,8 +47,10 @@ export function loadObjFormat(text) {
   };
 
   const arrayOfLines = text.match(/[^\r\n]+/g);
-  for (const line of arrayOfLines) {
-    readLine(s, line);
+  if (arrayOfLines) {
+    for (const line of arrayOfLines) {
+      readLine(s, line);
+    }
   }
 
   if (s.vertices.length <= 0) {
@@ -54,7 +64,7 @@ export function loadObjFormat(text) {
   }
 
   for (let i = 0; i < s.vertices.length; i++) {
-    s.vertices[i] = Vec3.sub(s.vertices[i], bbox.origin);
+    s.vertices[i] = Vec3.sub(s.vertices[i] as unknown as Vec3, bbox.origin);
   }
 
   for (const face of s.faces) {
@@ -73,13 +83,13 @@ export function loadObjFormat(text) {
 
   const mesh = new Mesh();
   mesh.vertexBuffer = new Float32Array(s.vertexBuffer);
+  // Partial meta — mesh.js infers a stricter union from its own assignments.
   mesh.meta = {
     vertexCount: s.faces.length * 3,
     normalCount: s.faces.length * 3,
-  };
+  } as any;
 
   obj.meshes.push(mesh);
-  
+
   return obj;
-};
-  
+}
