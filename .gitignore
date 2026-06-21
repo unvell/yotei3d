@@ -12,3 +12,4 @@ node_modules
 # yotei3d-min.js
 # yotei3d-single.js
 .yarn/install-state.gz
+.yarn/install-state.gz
