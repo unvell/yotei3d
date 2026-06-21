@@ -80,7 +80,10 @@ class Animation {
 
   get progressRate(): number {
     if (this._inDelay) return 0;
-    return this.elapsedTime / this._msDuration;
+    // _msDuration is only set in initialize(); fall back so this is 0, not NaN,
+    // when queried before play().
+    const ms = this._msDuration ?? this.duration * 1000;
+    return ms > 0 ? this.elapsedTime / ms : 0;
   }
 
   get isPlaying(): boolean {
@@ -92,7 +95,7 @@ class Animation {
   }
 
   get isFinished(): boolean {
-    return this.elapsedTime >= this._msDuration;
+    return this.elapsedTime >= (this._msDuration ?? this.duration * 1000);
   }
 
   initialize(): void {

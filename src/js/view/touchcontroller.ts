@@ -146,8 +146,8 @@ export class TouchController {
         if (viewer && camera) {
           if (viewer.mouse.pressedButtons.has(MouseButtons.Left)
             || viewer.touch.fingers === 1) {
-            camera.angle.x += viewer.mouse.movement.y * 200 / viewer.renderer.renderSize.width;
-            camera.angle.y += viewer.mouse.movement.x * 200 / viewer.renderer.renderSize.height;
+            camera.angle.x += viewer.mouse.movement.y * 200 / viewer.renderer.renderSize.height;
+            camera.angle.y += viewer.mouse.movement.x * 200 / viewer.renderer.renderSize.width;
 
             if (camera.angle.x < -80) camera.angle.x = -80;
             else if (camera.angle.x > 80) camera.angle.x = 80;

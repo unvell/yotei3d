@@ -40,3 +40,16 @@ describe('Animation registry helpers', () => {
     expect(Animation.RunningAnimations.hasOwnProperty(n2)).toBe(false);
   });
 });
+
+describe('Animation timing getters before initialize() (regression: NaN)', () => {
+  it('progressRate is 0, not NaN, before play()', () => {
+    const a = new (Animation as any)(null, { duration: 2 });
+    expect(Number.isNaN(a.progressRate)).toBe(false);
+    expect(a.progressRate).toBe(0);
+  });
+
+  it('isFinished is false before play()', () => {
+    const a = new (Animation as any)(null, { duration: 2 });
+    expect(a.isFinished).toBe(false);
+  });
+});

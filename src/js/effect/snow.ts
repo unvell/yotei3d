@@ -180,7 +180,8 @@ export class Snow extends ParticleObject {
   private _writeOne(i: number): void {
     const n = this.count;
     const vb: any = this.mesh.vertexBuffer;
-    const c = this.mat.color as number[];
+    const col: any = this.mat.color;
+    const c: number[] = Array.isArray(col) ? col : [col.r, col.g, col.b];
     const b = this._bri[i];
     const sway = Math.sin(this._phase[i]) * this._swayAmp[i];
     // ParticleMesh layout: [positions][colors][sizes]

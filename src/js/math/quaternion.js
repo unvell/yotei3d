@@ -59,7 +59,11 @@ export class Quaternion {
 		let len = this.length();
 
 		if (len < EPSILON) {
-			return Quaternion.zero;
+			// degenerate: collapse to the identity rotation in place. (Returning
+			// the shared Quaternion.zero singleton here would let a caller mutate
+			// the global constant.)
+			this.x = 0; this.y = 0; this.z = 0; this.w = 1;
+			return this;
 		}
 
 		len = 1 / len;
@@ -72,16 +76,27 @@ export class Quaternion {
 		return this;
 	}
 
+	// True inverse = conjugate / |q|^2 (identical to the conjugate for a unit
+	// quaternion, but correct for non-unit quaternions too).
 	inverse() {
-		this.x *= - 1;
-		this.y *= - 1;
-		this.z *= - 1;
+		const d = this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w;
+		if (d < EPSILON) return this;
+
+		const inv = 1 / d;
+		this.x *= -inv;
+		this.y *= -inv;
+		this.z *= -inv;
+		this.w *= inv;
 
 		return this;
 	}
 
 	static inverse(q) {
-		return new Quaternion(q.x * -1, q.y * -1, q.z * -1, q.w);
+		const d = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+		if (d < EPSILON) return new Quaternion(q.x, q.y, q.z, q.w);
+
+		const inv = 1 / d;
+		return new Quaternion(-q.x * inv, -q.y * inv, -q.z * inv, q.w * inv);
 	}
 
 	/*

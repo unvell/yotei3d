@@ -159,7 +159,8 @@ export class Rain extends ParticleObject {
   private _writeOne(i: number): void {
     const n = this.count;
     const vb: any = this.mesh.vertexBuffer;
-    const c = this.mat.color as number[];
+    const col: any = this.mat.color;
+    const c: number[] = Array.isArray(col) ? col : [col.r, col.g, col.b];
     const b = this._bri[i];
     // ParticleMesh layout: [positions][colors][sizes]
     arraySet(vb, i * 3, this._px[i], this._py[i], this._pz[i]);

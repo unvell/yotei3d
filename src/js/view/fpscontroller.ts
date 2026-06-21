@@ -73,8 +73,8 @@ export class FPSController {
     var viewer = this.renderer.viewer;
     var camera = this.scene.mainCamera;
 
-    camera.angle.x -= viewer.mouse.movement.y * 200 / viewer.renderer.renderSize.width;
-    camera.angle.y -= viewer.mouse.movement.x * 200 / viewer.renderer.renderSize.height;
+    camera.angle.x -= viewer.mouse.movement.y * 200 / viewer.renderer.renderSize.height;
+    camera.angle.y -= viewer.mouse.movement.x * 200 / viewer.renderer.renderSize.width;
 
     if (camera.angle.x < -80) camera.angle.x = -80;
     else if (camera.angle.x > 80) camera.angle.x = 80;
