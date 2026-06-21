@@ -28,8 +28,13 @@ export class Snow extends ParticleObject {
 			wind: [0.6, 0.2],   // gentle horizontal drift [x, z] in units per second
 			swayAmp: 0.5,       // horizontal flutter amplitude (world units)
 			swayFreq: 1.0,      // flutter speed
-			sizeMin: 3,         // flake size in pixels (small)
-			sizeMax: 8,         // flake size in pixels (large)
+			sizeMin: 3,         // base flake size in pixels at the reference depth
+			sizeMax: 8,         // base flake size in pixels at the reference depth
+			sizeScale: 20,      // reference depth: flakes here keep their base px size;
+			                    // nearer flakes grow, farther flakes shrink (perspective)
+			maxSize: 64,        // clamp so very near flakes don't explode
+			focusDist: 12,      // flakes closer than this start to blur (depth of field)
+			focusRange: 10,     // distance over which the near blur ramps in
 			color: [1.0, 1.0, 1.0],
 			opacity: 0.9,
 			followTarget: null, // optional object/camera; volume tracks its x/z
@@ -38,6 +43,11 @@ export class Snow extends ParticleObject {
 		const n = this.count = opt.count;
 
 		this.snowOpacity = opt.opacity;
+		// read by SnowShader for perspective sizing + near blur
+		this.sizeScale = opt.sizeScale;
+		this.maxSize = opt.maxSize;
+		this.focusDist = opt.focusDist;
+		this.focusRange = opt.focusRange;
 		this.shader = { name: "snow" };
 		this.mat.color = opt.color;
 		this.castShadow = false;   // flakes must not cast shadows (see Rain)

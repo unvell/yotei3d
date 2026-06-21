@@ -19,6 +19,12 @@ export class SnowShader extends Shader {
 		this.colorUniform = this.bindUniform("color", "vec3");
 		this.opacityUniform = this.bindUniform("opacity", "float");
 
+		// perspective size + near-blur (depth of field) controls
+		this.sizeScaleUniform = this.bindUniform("sizeScale", "float");
+		this.maxSizeUniform = this.bindUniform("maxSize", "float");
+		this.focusDistUniform = this.bindUniform("focusDist", "float");
+		this.focusRangeUniform = this.bindUniform("focusRange", "float");
+
 		this.defaultColor = [1.0, 1.0, 1.0];
 	}
 
@@ -41,6 +47,11 @@ export class SnowShader extends Shader {
 		this.colorUniform.set(color);
 
 		this.opacityUniform.set(typeof obj.snowOpacity === "number" ? obj.snowOpacity : 0.9);
+
+		this.sizeScaleUniform.set(typeof obj.sizeScale === "number" ? obj.sizeScale : 20);
+		this.maxSizeUniform.set(typeof obj.maxSize === "number" ? obj.maxSize : 64);
+		this.focusDistUniform.set(typeof obj.focusDist === "number" ? obj.focusDist : 12);
+		this.focusRangeUniform.set(typeof obj.focusRange === "number" ? obj.focusRange : 10);
 
 		// alpha blend; depth test on (geometry occludes flakes) but no depth
 		// write so flakes don't fight each other
