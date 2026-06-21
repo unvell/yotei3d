@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Scene, Shapes, SceneObject, Rain, GroundFog, ObjectViewController } from "@";
+    import { Renderer, Scene, Shapes, SceneObject, Rain, GroundFog, LightningFlash, ObjectViewController } from "@";
 
     window.addEventListener("load", function() {
 
@@ -90,6 +90,16 @@
       // gloomy key light
       scene.sun.location.set(0.6, 1, 0.4);
       scene.sun.mat.color = [0.55, 0.6, 0.72];
+
+      // ---- lightning ----
+      // Random flashes that briefly light up the sky and the whole scene.
+      // Created after the sun colour is set so it captures the correct base.
+      const lightning = new LightningFlash(scene, {
+        minInterval: 3,
+        maxInterval: 8,
+      });
+      window._lightning = lightning;
+      scene.on("frame", () => lightning.update());
 
       scene.mainCamera.fieldOfView = 50;
       scene.mainCamera.location.set(0, 6, 28);
