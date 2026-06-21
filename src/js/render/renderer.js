@@ -925,13 +925,28 @@ export class Renderer {
 			shaderPushed = true;
 		}
 
-		const objShader = obj.shader || null;
-		if (objShader) {
-			var objShaderName = objShader.name || null;
+		// Primary path: the Material selects which shader renders it.
+		// The base Material.shaderName is 'standard' — the default pass shader —
+		// so plain-material objects fall through here unchanged; only subclassed
+		// materials (e.g. effect materials) divert to their own shader.
+		if (!shaderPushed && obj.mat && typeof obj.mat.shaderName === "string"
+			&& obj.mat.shaderName !== "standard") {
+			this.useShader(obj.mat.shaderName);
+			shaderPushed = true;
+		}
 
-			if (objShaderName) {
-				this.useShader(objShaderName);
-				shaderPushed = true;
+		// Back-compat shim: legacy per-object shader override (obj.shader = { name }).
+		// Superseded by Material.shaderName; retained until all effects migrate
+		// to Material subclasses.
+		if (!shaderPushed) {
+			const objShader = obj.shader || null;
+			if (objShader) {
+				var objShaderName = objShader.name || null;
+
+				if (objShaderName) {
+					this.useShader(objShaderName);
+					shaderPushed = true;
+				}
 			}
 		}
 
