@@ -121,6 +121,20 @@ const exampleItems = ref([
     desc: 'A simple viewer to display 3D models.',
   },
   {
+    title: 'PBR Materials',
+    thumbnail: '/img/examples/pbr.png',
+    link: 'pbr.html',
+    desc: 'Physically based rendering: a metallic × roughness sphere grid and a textured glTF model under image-based lighting.',
+    isHover: false,
+  },
+  {
+    title: 'WaterBottle (glTF PBR)',
+    thumbnail: '/img/examples/waterbottle.png',
+    link: 'waterbottle.html',
+    desc: 'A textured glTF model with the full PBR map set. Drag to rotate, scroll to zoom.',
+    isHover: false,
+  },
+  {
     title: 'Showroom',
     thumbnail: '/img/examples/showroom.png',
     link: 'showroom.html',
