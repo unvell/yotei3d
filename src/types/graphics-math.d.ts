@@ -14,7 +14,7 @@ declare module '@jingwood/graphics-math' {
     x: number;
     y: number;
     z: number;
-    constructor(x?: number, y?: number, z?: number);
+    constructor(x?: number | Vec3, y?: number, z?: number);
     clone(): Vec3;
     equals(x: number, y: number, z: number): boolean;
     normalize(): Vec3;
@@ -102,6 +102,7 @@ declare module '@jingwood/graphics-math' {
     origin: Vec3;
     size: Vec3;
     constructor(a?: any, b?: any);
+    expandTo(p: { x: number; y: number; z: number }): void;
     static findBoundingBoxOfBoundingBoxes(a: any, b: any): BoundingBox3D;
     static transformBoundingBox(bbox: any, m: Matrix4): BoundingBox3D;
   }

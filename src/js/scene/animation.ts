@@ -2,9 +2,52 @@
 import { Vec3, MathFunctions } from "@jingwood/graphics-math";
 import { EventDispatcher } from '../utility/event';
 
+interface AnimationOptions {
+  name?: string;
+  effect?: string;
+  duration?: number;
+  delay?: number;
+  repeat?: number;
+}
+
+type FrameHandler = (t: number) => void;
+
 class Animation {
-	
-  constructor(scene, options, onframe, onfinish) {
+  scene: any;
+
+  startTime?: number;
+  endTime?: number;
+
+  duration: number;
+  delay: number;
+  repeat: number;
+
+  isPausedOrStop: boolean;
+  elapsedTime: number;
+  repeatCount: number;
+  initialized: boolean;
+  name: string;
+
+  /** Per-frame callback; required before play(). */
+  onframe?: FrameHandler;
+  /** Easing mode read by tick(); falls back to "smooth". */
+  effect?: string;
+
+  // internal timing state
+  private _msDuration!: number;
+  private _lastCheckedTime?: number;
+  private _inDelay!: boolean;
+
+  // --- members injected by the EventDispatcher mixin (see bottom of file) ---
+  declare on: (event: string, listener: (...args: any[]) => any) => any;
+  declare addEventListener: (event: string, listener: (...args: any[]) => any) => any;
+  declare removeEventListener: (event: string, listener: (...args: any[]) => any) => void;
+  declare onfinish: (...args: any[]) => any;
+  declare onpause: (...args: any[]) => any;
+  declare onplay: (...args: any[]) => any;
+  declare onstop: (...args: any[]) => any;
+
+  constructor(scene: any, options: AnimationOptions, onframe?: FrameHandler, onfinish?: (...args: any[]) => any) {
     this.scene = scene;
 
     this.startTime = undefined;
@@ -19,13 +62,13 @@ class Animation {
     this.elapsedTime = 0;
     this.repeatCount = 0;
     this.initialized = false;
-  
+
     if (typeof options.name === "string" && options.name.length > 0) {
       this.name = options.name;
     } else {
       this.name = Animation.getAvailableDefaultName();
     }
-  
+
     if (typeof onframe === "function") {
       this.onframe = onframe;
     }
@@ -35,24 +78,24 @@ class Animation {
     }
   }
 
-  get progressRate() {
+  get progressRate(): number {
     if (this._inDelay) return 0;
     return this.elapsedTime / this._msDuration;
   }
 
-  get isPlaying() {
+  get isPlaying(): boolean {
     return !this.isPausedOrStop && this.elapsedTime < this.duration * 1000;
   }
 
-  get isDuringDelay() {
+  get isDuringDelay(): boolean {
     return this._inDelay;
   }
 
-  get isFinished() {
+  get isFinished(): boolean {
     return this.elapsedTime >= this._msDuration;
   }
 
-  initialize() {
+  initialize(): void {
     this._msDuration = this.duration * 1000;
     this._lastCheckedTime = undefined;
 
@@ -60,13 +103,13 @@ class Animation {
 
     this.startTime = Date.now();
     this.endTime = this.startTime + this.duration * 1000;
-    
+
     this.initialized = true;
   }
 
-  play() {
+  play(): void {
     if (this.delay) {
-      setTimeout(_ => this.play(), this.delay * 1000);
+      setTimeout(() => this.play(), this.delay * 1000);
       this.delay = 0;
       return;
     }
@@ -78,7 +121,7 @@ class Animation {
     if (!this.initialized) {
       this.initialize();
     }
-    
+
     if (typeof this.name === "string" && this.name.length > 0) {
       Animation.cancelAnimationByName(this.name);
       Animation.RunningAnimations[this.name] = this;
@@ -89,16 +132,16 @@ class Animation {
     this._lastCheckedTime = Date.now();
 
     // this.createAnimationTimer();
-    requestAnimationFrame(_ => this.tick());
+    requestAnimationFrame(() => this.tick());
   }
 
-  tick() {
+  tick(): void {
     const now = Date.now();
-    const diff = now - this._lastCheckedTime;
+    const diff = now - this._lastCheckedTime!;
     this._lastCheckedTime = now;
 
     if (this.isPausedOrStop) return;
-    
+
     this.elapsedTime += diff;
 
     if (this._inDelay) {
@@ -109,10 +152,10 @@ class Animation {
         this.elapsedTime = 0;
       }
     }
-    
+
     if (this.elapsedTime < this._msDuration) {
       let t = this.elapsedTime / this._msDuration;
-    
+
       switch (this.effect) {
         default:
         case "smooth":
@@ -132,10 +175,10 @@ class Animation {
           break;
       }
 
-      this.onframe(t);
+      this.onframe!(t);
       if (this.scene) this.scene.requireUpdateFrame();
-			
-      requestAnimationFrame(_ => this.tick());
+
+      requestAnimationFrame(() => this.tick());
       return;
     }
 
@@ -151,26 +194,14 @@ class Animation {
       }
     }
 
-    this.onframe(1);
+    this.onframe!(1);
     if (this.scene) this.scene.requireUpdateFrame();
 
     this.removeAnimationTimer();
     this.onfinish();
   }
 
-  // createAnimationTimer() {
-  // 	if (!this.timer) {
-  // 		var _this = this;
-  // 		this.timer = setInterval(function() { _this.tick() }, Animation.Interval);
-  // 	}
-  // }
-
-  removeAnimationTimer() {
-    // if (this.timer) {
-    // 	clearInterval(this.timer);
-    // 	this.timer = undefined;
-    // }
-
+  removeAnimationTimer(): void {
     if (typeof this.name === "string" && this.name.length > 0) {
       const previousInstance = Animation.RunningAnimations[this.name];
       if (previousInstance) {
@@ -180,66 +211,97 @@ class Animation {
     }
   }
 
-  stop() {
+  stop(): void {
     this.removeAnimationTimer();
     this.onstop();
   }
 
-  pause() {
-    // if (this.timer) {
-    // 	clearInterval(this.timer);
-    // 	this.timer = undefined;
-    // }
+  pause(): void {
     this.isPausedOrStop = true;
-
     this.onpause();
   }
 
-  reset() {
+  reset(): void {
     this.elapsedTime = 0;
   }
-	
-  static isAnyAnimationPlaying() {
-    return !Animation.RunningAnimations._s3_isEmpty();
+
+  static DefaultOptions = {
+    effect: "smooth",
+    duration: 1,
+    delay: 0,
+    repeat: 0,
+  };
+
+  static Interval = 10;  // ms
+
+  static Effects = {
+    Normal: 0,
+    Smooth: 1,
+    Sharp: 2,
+    FadeIn: 3,
+    FadeOut: 4,
+  };
+
+  static RunningAnimations: { [name: string]: Animation } = {};
+
+  static PropertyChanger: typeof PropertyChanger;
+
+  static isAnyAnimationPlaying(): boolean {
+    return !(Animation.RunningAnimations as any)._s3_isEmpty();
   }
 
-  static isAnimationPlaying(name) {
+  static isAnimationPlaying(name: string): boolean {
     return Animation.RunningAnimations.hasOwnProperty(name);
   }
 
-  static cancelAnimationByName(name) {
-    var previousInstance = Animation.RunningAnimations[name];
+  static cancelAnimationByName(name: string): void {
+    const previousInstance = Animation.RunningAnimations[name];
     if (previousInstance) {
-      // if (previousInstance.timer) clearInterval(previousInstance.timer);
       delete Animation.RunningAnimations[name];
     }
   }
 
-  static getAvailableDefaultName() {
-    var name;
+  static getAvailableDefaultName(): string {
+    let name: string | undefined;
     while (name === undefined || Animation.RunningAnimations.hasOwnProperty(name)) {
       name = "__unnamed" + Date.now() + Math.floor(Math.random());
     }
     return name;
   }
-  
 }
 
-Animation.PropertyChanger = class {
-  constructor(define, options) {
+interface PropertyChangerDefine {
+  object: any;
+  property: string | (() => string);
+  start?: any;
+  end?: any;
+}
+
+class PropertyChanger {
+  define: PropertyChangerDefine;
+  options: any;
+
+  object: any;
+  property!: string;
+  value: any;
+  valueType?: string;
+  startValue: any;
+  endValue: any;
+
+  constructor(define: PropertyChangerDefine, options: any) {
     this.define = define;
     this.options = options;
   }
-  
-  start() {
+
+  start(): void {
     const define = this.define;
 
     this.object = typeof define.object === "function" ? define.object() : define.object;
     this.property = typeof define.property === "function" ? define.property() : define.property;
-    
+
     this.value = this.object[this.property];
     this.valueType = typeof this.value;
-    
+
     if (typeof define.start === "function") {
       this.startValue = define.start(this.value);
     } else if (typeof define.start !== "undefined") {
@@ -254,8 +316,8 @@ Animation.PropertyChanger = class {
 
     this.endValue = typeof define.end === "function" ? define.end(this.value) : define.end;
   }
-  
-  frame(t) {
+
+  frame(t: number): void {
     if (this.value instanceof Vec3) {
       this.object[this.property] = Vec3.lerp(this.startValue, this.endValue, t);
     } else if (this.valueType === "number") {
@@ -264,39 +326,31 @@ Animation.PropertyChanger = class {
   }
 }
 
-Object.assign(Animation, {
-	DefaultOptions: {
-		effect: "smooth",
-		duration: 1,
-		delay: 0,
-		repeat: 0,
-	},
-
-	Interval: 10,  // ms
-
-	Effects: {
-		Normal: 0,
-		Smooth: 1,
-		Sharp: 2,
-		FadeIn: 3,
-		FadeOut: 4,
-	},
-
-	RunningAnimations: {},
-});
+Animation.PropertyChanger = PropertyChanger;
 
 new EventDispatcher(Animation).registerEvents(
-	"finish", "pause", "play", "stop"
+  "finish", "pause", "play", "stop"
 );
 
 class Storyboard {
-  constructor(scene, timeline) {
+  scene: any;
+  keyframes: any[];
+  keyStep: number;
+  playing: boolean;
+  currentAnimation: any;
+
+  // --- members injected by the EventDispatcher mixin (see bottom of file) ---
+  declare onkeyframeBegin: (...args: any[]) => any;
+  declare onkeyframeEnd: (...args: any[]) => any;
+  declare onfinish: (...args: any[]) => any;
+
+  constructor(scene: any, timeline?: any[]) {
     this.scene = scene;
     this.keyframes = [];
     this.keyStep = 0;
     this.playing = false;
     this.currentAnimation = null;
-  
+
     if (Array.isArray(timeline)) {
       for (const keyframe of timeline) {
         this.add(keyframe);
@@ -304,18 +358,18 @@ class Storyboard {
     }
   }
 
-  add(keyframe) {
+  add(keyframe: any): void {
     this.keyframes.push(keyframe);
   }
 
-  play() {
+  play(): void {
     if (!this.playing) {
       this.playing = true;
       this.playNextKeyFrame();
     }
   }
 
-  stop() {
+  stop(): void {
     if (this.currentAnimation) {
       this.currentAnimation.stop();
     }
@@ -323,14 +377,14 @@ class Storyboard {
     this.playing = false;
   }
 
-  playNextKeyFrame() {
+  playNextKeyFrame(): void {
     const keyframe = this.keyframes[this.keyStep];
     keyframe.start();
     this.onkeyframeBegin(keyframe, this.keyStep);
 
-    this.currentAnimation = this.scene.animate(keyframe.options, t => {
+    this.currentAnimation = this.scene.animate(keyframe.options, (t: number) => {
       keyframe.frame(t, this.keyStep);
-    }, _ => {
+    }, () => {
       this.onkeyframeEnd(keyframe, this.keyStep);
 
       this.keyStep++;
@@ -345,10 +399,10 @@ class Storyboard {
       }
     });
   }
-};
+}
 
 new EventDispatcher(Storyboard).registerEvents(
-	"keyframeBegin", "keyframeEnd", "finish",
+  "keyframeBegin", "keyframeEnd", "finish",
 );
 
 export { Animation, Storyboard };
