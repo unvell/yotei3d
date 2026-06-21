@@ -29,7 +29,10 @@
         },
         shadowQuality: {
           scale: 42,
-          viewDepth: 6,
+          // depth slab must span the terrain along the light direction. With a
+          // 70×70 terrain lit from a corner this reaches ~±35, so a viewDepth of
+          // 6 left almost all of it outside the slab (false self-shadow band).
+          viewDepth: 40,
           resolution: 2048,
           intensity: 0.3,
           enableCache: false,

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Shadowmap Test - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes } from '@';
+
+    window.addEventListener("load", function() {
+      // Minimal shadow-map repro: a single flat panel, shadow enabled, nothing
+      // casting onto it. The panel should be fully lit — any shadow seen here
+      // is shadow-map self-shadowing (acne), not a real cast shadow.
+      const renderer = new Renderer({
+        backColor: [0.93, 0.93, 0.93],
+        enablePostprocess: false,
+        enableLighting: true,
+        enableShadow: true,
+        shadowQuality: {
+          scale: 5,
+          viewDepth: 5,
+          resolution: 1024,
+          intensity: 0.3,
+          enableCache: false,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+      window._renderer = renderer;
+
+      // a single panel lying flat on the XZ plane (normal +Y)
+      const panel = new Shapes.Plane(6, 6);
+      panel.mat.color = [0.55, 0.55, 0.55];
+      scene.add(panel);
+
+      // a low, grazing sun: the panel's depth then varies most across the
+      // shadow map, so 8-bit-depth self-shadow acne is most visible. Without a
+      // depth bias this single panel shadows itself (banding / a diagonal half
+      // in shadow); with the bias it stays evenly lit.
+      scene.sun.location.set(6, 1.2, 0);
+      scene.sun.mat.color = [1.0, 1.0, 1.0];
+
+      // look down at the panel
+      scene.mainCamera.location.set(0, 6, 6);
+      scene.mainCamera.lookAt(panel);
+
+      scene.show();
+    });
+
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Shadowmap test: a single flat panel. It should be evenly lit.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

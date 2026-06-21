@@ -405,15 +405,35 @@ void main(void) {
 	if (receiveShadow) {
 		if (shadowMapType == 1) {
 			float shadowDir = dot(vertexNormal, normalize(vec3(2.0, 10.0, 5.0)));
-			if (shadowDir > 0.0) {
 
-        //float bias = max(0.005 * (1.0 - dot(normal, sundir)), 0.0005);
-				// shadowMapDepth = decodeFloatRGBA(texture2D(shadowMap2D, shadowPosition.xy));
+			// Only fragments inside the shadow map's orthographic frustum have
+			// valid occluder data. Outside it (large grounds where the surface
+			// runs past the configured scale/viewDepth) shadowPosition leaves the
+			// [0,1] cube, and a naive compare reads "always in shadow" — painting a
+			// false diagonal half-shadow along the light's depth axis. Skip those.
+			bool inShadowFrustum =
+				shadowPosition.x >= 0.0 && shadowPosition.x <= 1.0 &&
+				shadowPosition.y >= 0.0 && shadowPosition.y <= 1.0 &&
+				shadowPosition.z >= 0.0 && shadowPosition.z <= 1.0;
+
+			if (shadowDir > 0.0 && inShadowFrustum) {
+
+				// Slope-scaled depth bias. The shadow map stores depth at only 8-bit
+				// precision, so without a bias a flat lit surface shadows itself
+				// ("acne") wherever its interpolated depth crosses a quantization
+				// step — which shows up as a diagonal half-shadow on a single panel.
+				// The bias grows at grazing sun angles, where the per-texel depth
+				// gradient (and thus the error) is largest.
+				float bias = max(0.008 * (1.0 - dot(vertexNormal, sundir)), 0.003);
+
 				float shadowMapDepth = texture2D(shadowMap2D, shadowPosition.xy).r;
 
-				//float shadowBlock = 1.0 - smoothstep(0.00001, 0.05, (shadowPosition.z - shadowMapDepth)) / 0.5;
-        float shadowBlock = 1.0 - smoothstep(0.0, 0.05, (shadowPosition.z - shadowMapDepth)) / 0.5;
-				finalColor = finalColor + finalColor * shadowBlock * shadowIntensity;
+				// 0 = lit, 1 = fully occluded. Shadows only ever *darken* the
+				// surface; lit fragments are left untouched so the shadow-frustum
+				// edge is seamless (no bright patch where the frustum ends). The
+				// darkening amount matches the previous formula's shadowed case.
+				float shadow = smoothstep(0.0, 0.05, shadowPosition.z - shadowMapDepth - bias);
+				finalColor *= (1.0 - shadow * shadowIntensity);
 			}
 		} else if (shadowMapType == 2) {
 			vec3 correctedVertexToSun = vec3(0.0);
