@@ -41,9 +41,15 @@ declare module '@jingwood/graphics-math' {
   }
 
   export class Matrix3 {
+    a1: number; a2: number; a3: number;
+    b1: number; b2: number; b3: number;
+    c1: number; c2: number; c3: number;
     constructor();
     loadIdentity(): Matrix3;
     clone(): Matrix3;
+    mul(m: Matrix3): Matrix3;
+    static makeTranslation(x: number, y: number): Matrix3;
+    static makeRotation(angle: number, x?: number, y?: number): Matrix3;
   }
 
   export class Matrix4 {
