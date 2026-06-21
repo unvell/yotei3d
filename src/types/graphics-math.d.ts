@@ -30,7 +30,7 @@ declare module '@jingwood/graphics-math' {
     cross(v: Vec3): Vec3;
     lerp(v2: Vec3, t: number): Vec3;
     offset(x: number | { x: number; y: number; z: number }, y?: number, z?: number): Vec3;
-    set(x: number | Vec3, y?: number, z?: number): Vec3;
+    set(x: number | Vec3 | number[], y?: number, z?: number): Vec3;
     static get zero(): Vec3;
     static get one(): Vec3;
     static get One(): Vec3;
@@ -69,8 +69,13 @@ declare module '@jingwood/graphics-math' {
   }
 
   export class Matrix4 {
+    a1: number; a2: number; a3: number; a4: number;
+    b1: number; b2: number; b3: number; b4: number;
+    c1: number; c2: number; c3: number; c4: number;
+    d1: number; d2: number; d3: number; d4: number;
     constructor();
     loadIdentity(): Matrix4;
+    extractEulerAngles(): Vec3;
     copyFrom(m: Matrix4): Matrix4;
     clone(): Matrix4;
     mul(m: Matrix4): Matrix4;
