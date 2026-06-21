@@ -134,7 +134,8 @@ export class Snow extends ParticleObject {
       focusRange: opt.focusRange,
     });
 
-    this.castShadow = false;   // flakes must not cast shadows (see Rain)
+    // flakes must not cast shadows — SnowMaterial declares castShadow=false and
+    // the shadow pass honours the material (no per-object flag needed).
 
     // simulation state
     this._px = new Float32Array(n);

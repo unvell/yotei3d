@@ -116,11 +116,9 @@ export class Rain extends ParticleObject {
       slant: opt.slant,
     });
 
-    // raindrops must not cast shadows: the shadow pass would otherwise splat the
-    // particle points into the shadow map, producing speckle in the scene's
-    // shadows (and wasted work). RainMaterial declares castShadow=false too; this
-    // SceneObject flag is what the shadow pass currently honours.
-    this.castShadow = false;
+    // Raindrops must not cast shadows (they would splat the particle points into
+    // the shadow map as speckle). RainMaterial declares castShadow=false and the
+    // shadow pass honours the material — no per-object flag needed.
 
     // simulation state (typed arrays for speed)
     this._px = new Float32Array(n);

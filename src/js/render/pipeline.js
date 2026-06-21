@@ -462,7 +462,12 @@ export class ShadowMapRenderer extends PipelineNode {
   }
 
   drawObject(obj) {
-    if (obj instanceof Camera || obj.castShadow === false) {
+    // Shadow casting is opted out per-object (obj.castShadow) or, preferably,
+    // declared by the Material (obj.mat.castShadow === false). The latter lets
+    // effect materials (rain/snow/fog) keep out of the shadow map without each
+    // effect having to set the object flag by hand.
+    if (obj instanceof Camera || obj.castShadow === false
+      || (obj.mat && obj.mat.castShadow === false)) {
       return;
     }
 
@@ -627,7 +632,9 @@ export class AttributeRenderer extends PipelineNode {
   }
 
   drawObject(obj) {
-    if (obj instanceof Camera) {
+    // Honour the same per-object / per-material shadow opt-out as the 2D pass.
+    if (obj instanceof Camera || obj.castShadow === false
+      || (obj.mat && obj.mat.castShadow === false)) {
       return;
     }
 

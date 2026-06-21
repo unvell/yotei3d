@@ -104,8 +104,8 @@ export class GroundFog extends SceneObject {
       followTarget: null,  // optional object/camera; sheet tracks its x/z
     }, options) as GroundFogOptions;
 
-    // like rain, fog must never cast shadows
-    this.castShadow = false;
+    // like rain, fog must never cast shadows — each layer's GroundFogMaterial
+    // declares castShadow=false and the shadow pass honours the material.
 
     this._layers = [];
     const n = opt.layers;
@@ -117,7 +117,6 @@ export class GroundFog extends SceneObject {
       layer.addMesh(new PlaneMesh(1, 1));
       layer.scale.set(opt.size, 1, opt.size);
       layer.location.y = opt.baseHeight + i * opt.layerGap;
-      layer.castShadow = false;
 
       // GroundFogMaterial selects the "groundfog" shader and carries the layer's
       // procedural-noise parameters. flow1/flow2 get randomised start offsets so
