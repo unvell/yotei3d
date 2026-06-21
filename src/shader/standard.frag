@@ -20,6 +20,12 @@ uniform vec3 color;
 uniform vec2 texTiling;
 uniform float opacity;
 
+// distance (depth) fog — blends distant geometry toward fogColor
+uniform bool hasFog;
+uniform vec3 fogColor;
+uniform float fogNear;   // distance at which fog begins
+uniform float fogFar;    // distance at which fog is fully opaque
+
 uniform float glossy;
 uniform float roughness;
 uniform float metallic;
@@ -429,6 +435,16 @@ void main(void) {
 
 	if (hasIBL) {
 		finalColor = tonemap(finalColor);
+	}
+
+	//////////////// Distance fog ////////////////
+	// applied last, in display space, so distant geometry fades into the
+	// background / sky colour
+
+	if (hasFog) {
+		float fogDist = length(cameraRay);
+		float fogAmount = clamp((fogDist - fogNear) / max(fogFar - fogNear, 1.0e-4), 0.0, 1.0);
+		finalColor = mix(finalColor, fogColor, fogAmount);
 	}
 
 	gl_FragColor = vec4(finalColor, alpha);

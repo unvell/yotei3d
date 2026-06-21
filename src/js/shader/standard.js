@@ -91,6 +91,12 @@ export class StandardShader extends Shader {
 
 		this.cameraLocUniform = this.bindUniform("cameraLoc", "vec3");
 
+		// distance fog
+		this.hasFogUniform = this.bindUniform("hasFog", "bool");
+		this.fogColorUniform = this.bindUniform("fogColor", "color3");
+		this.fogNearUniform = this.bindUniform("fogNear", "float");
+		this.fogFarUniform = this.bindUniform("fogFar", "float");
+
 		// light source
 		this.lightSources = [];
 		this.lightUniforms = [];
@@ -149,6 +155,24 @@ export class StandardShader extends Shader {
 		}
 
 		this.cameraLocUniform.set(cameraLocation);
+
+		// distance fog — opt-in via scene.fog = { near, far, color? }.
+		// Colour defaults to the background so geometry fades into the sky.
+		const fog = scene.fog;
+		if (fog && fog.enabled !== false) {
+			this.hasFogUniform.set(true);
+
+			let fogColor = fog.color;
+			if (!fogColor) {
+				const bc = this.renderer.options.backColor;
+				fogColor = bc ? [bc.r, bc.g, bc.b] : [0.8, 0.8, 0.8];
+			}
+			this.fogColorUniform.set(fogColor);
+			this.fogNearUniform.set(typeof fog.near === "number" ? fog.near : 10);
+			this.fogFarUniform.set(typeof fog.far === "number" ? fog.far : 100);
+		} else {
+			this.hasFogUniform.set(false);
+		}
 
 		// lights
 		let lightCount = 0;
