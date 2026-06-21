@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Snow - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject, Snow, ObjectViewController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.74, 0.79, 0.86, 1.0],   // soft overcast winter sky
+        enablePostprocess: true,
+        enableLighting: true,
+        enableShadow: true,
+        renderingImage: {
+          gamma: 1.05,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // ---- a calm snowy ground with a few rounded mounds ----
+      const ground = new Shapes.Plane();
+      ground.scale.set(60, 1, 60);
+      ground.mat.color = [0.92, 0.94, 0.97];   // fresh snow
+      ground.mat.roughness = 0.95;
+      scene.add(ground);
+
+      const props = new SceneObject();
+      scene.add(props);
+
+      // snow-covered spheres half-sunk into the ground, like drifts
+      for (let i = 0; i < 12; i++) {
+        const s = new Shapes.Sphere(20, 32);
+        const r = 0.8 + Math.random() * 2.2;
+        s.scale.set(r, r * 0.7, r);
+        s.location.set(
+          (Math.random() - 0.5) * 30,
+          -r * 0.35,
+          (Math.random() - 0.5) * 30
+        );
+        const w = 0.82 + Math.random() * 0.12;
+        s.mat.color = [w, w * 1.0, w * 1.02];
+        s.mat.roughness = 0.9;
+        props.add(s);
+      }
+
+      // ---- the snow ----
+      // Added after the geometry so the depth buffer already holds the scene;
+      // the snow shader tests (but doesn't write) depth, so props occlude flakes.
+      const snow = new Snow({
+        count: 5000,
+        width: 60, depth: 60, height: 40,
+        fallSpeed: 2.4,
+        wind: [0.7, 0.25],
+        swayAmp: 0.6,
+        swayFreq: 1.0,
+        sizeMin: 3,
+        sizeMax: 9,
+        color: [1.0, 1.0, 1.0],
+        opacity: 0.95,
+      });
+      snow.location.y = 6;   // lift the volume so flakes drift down from above
+      scene.add(snow);
+
+      scene.on("frame", () => snow.update());
+
+      // soft cool daylight
+      scene.sun.location.set(0.4, 1, 0.5);
+      scene.sun.mat.color = [1.0, 1.0, 1.05];
+
+      scene.mainCamera.fieldOfView = 50;
+      scene.mainCamera.location.set(0, 5, 26);
+      scene.mainCamera.angle.set(-6, 0, 0);
+
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+      });
+      controller.targetObject = props;
+
+      scene.animation = true;   // continuous redraw for the falling snow
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Gentle snowfall with soft fluttering flakes. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

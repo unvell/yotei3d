@@ -171,6 +171,12 @@ const exampleItems = ref([
     desc: 'Real-time rainfall with slanted streak particles.',
   },
   {
+    title: 'Snow',
+    thumbnail: '/img/examples/snow.jpg',
+    link: 'snow.html',
+    desc: 'Gentle snowfall with soft fluttering flakes.',
+  },
+  {
     title: 'Panorama',
     thumbnail: '/img/examples/panorama.png',
     link: 'panorama.html',

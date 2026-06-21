@@ -6,6 +6,7 @@ import { WireframeShader } from './wireframe';
 import { PointShader } from './point';
 import { RainShader } from './rain';
 import { GroundFogShader } from './groundfog';
+import { SnowShader } from './snow';
 import { ImageShader } from './image';
 import { ScreenShader } from './screen';
 import { ShadowMapShader } from './shadowmap';
@@ -35,6 +36,8 @@ import rainVert from '../../shader/rain.vert';
 import rainFrag from '../../shader/rain.frag';
 import groundfogVert from '../../shader/groundfog.vert';
 import groundfogFrag from '../../shader/groundfog.frag';
+import snowVert from '../../shader/snow.vert';
+import snowFrag from '../../shader/snow.frag';
 import imageVert from '../../shader/image.vert';
 import imageFrag from '../../shader/image.frag';
 // import blurVert from '../../shader/blur.vert';
@@ -63,6 +66,7 @@ export const ShaderSources = {
   points: { vert: pointVert, frag: pointFrag, class: PointShader },
   rain: { vert: rainVert, frag: rainFrag, class: RainShader },
   groundfog: { vert: groundfogVert, frag: groundfogFrag, class: GroundFogShader },
+  snow: { vert: snowVert, frag: snowFrag, class: SnowShader },
   image: { vert: imageVert, frag: imageFrag, class: ImageShader },
   // blur: { vert: blurVert, frag: blurFrag, class: "ImageShader" },
   screen: { vert: screenVert, frag: screenFrag, class: ScreenShader },
