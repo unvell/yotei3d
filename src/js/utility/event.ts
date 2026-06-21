@@ -1,6 +1,9 @@
 
 export class EventDispatcher {
-  constructor(cstor) {
+  owner: any;
+  events: { [name: string]: any };
+
+  constructor(cstor: any) {
     if (!cstor) {
       throw "Owner object to define events cannot be null or undefined";
     }
@@ -9,23 +12,23 @@ export class EventDispatcher {
     this.events = {};
   }
 
-  registerEvents() {
-    for (var i = 0; i < arguments.length; i++) {
-      var eventName = arguments[i];
+  registerEvents(...args: string[]): void {
+    for (let i = 0; i < args.length; i++) {
+      const eventName = args[i];
       this.events[eventName] = null;
       this.setupPrototypeEventDispatcher(this.owner, eventName);
-		}
+    }
   }
 
-  setupPrototypeEventDispatcher(cstor, name) {
-    var _this = this;
+  setupPrototypeEventDispatcher(cstor: any, name: string): void {
+    const _this = this;
 
-    var addEventListener = function(eventName, listener) {
-      var obj = this;
+    const addEventListener = function (this: any, eventName: string, listener: any) {
+      const obj = this;
 
       if (eventName.indexOf(" ") > 0) {
-        var eventNames = eventName.split(" ");
-        for (var i = 0; i < eventNames.length; i++) {
+        const eventNames = eventName.split(" ");
+        for (let i = 0; i < eventNames.length; i++) {
           _this.addEventListenerForObject(obj, eventNames[i], listener);
         }
       } else {
@@ -35,8 +38,8 @@ export class EventDispatcher {
       return listener;
     };
 
-    var proto = cstor.prototype;
-    
+    const proto = cstor.prototype;
+
     // addEventListener
     if (typeof proto.addEventListener !== "function") {
       proto.addEventListener = addEventListener;
@@ -48,12 +51,12 @@ export class EventDispatcher {
 
     // removeEventListener
     if (typeof proto.removeEventListener !== "function") {
-      proto.removeEventListener = function(eventName, listener) {
+      proto.removeEventListener = function (this: any, eventName: string, listener: any) {
 
         if (!this._eventListeners.hasOwnProperty(eventName)) {
-          if (!(function() {
+          if (!(function () {
             if (eventName.startsWith("on")) {
-              var eventNameWithoutOn = eventName.substr(2);
+              const eventNameWithoutOn = eventName.substr(2);
 
               if (_this.events.hasOwnProperty(eventNameWithoutOn)) {
                 console.warn("recommended to remove 'on' prefix for removing event listener: " + eventName);
@@ -73,24 +76,24 @@ export class EventDispatcher {
         this._eventListeners[eventName]._t_remove(listener);
       };
     }
-    
+
     // define event property
     Object.defineProperty(proto, "on" + name, {
-      get: function() {
-        
+      get: function (this: any) {
+
         // raise event
-        return function() {
+        return function (this: any) {
           if (typeof this._eventListeners !== "object"
             || !this._eventListeners.hasOwnProperty(name)) {
             return;
           }
-            
-          var listenerList = this._eventListeners[name];
 
-          var ret;
-            
-          for (var i = 0; i < listenerList.length; i++) {
-            var listener = listenerList[i];
+          const listenerList = this._eventListeners[name];
+
+          let ret;
+
+          for (let i = 0; i < listenerList.length; i++) {
+            const listener = listenerList[i];
             ret = listener.apply(this, arguments);
 
             if (ret === true) {
@@ -102,7 +105,7 @@ export class EventDispatcher {
         };
       },
 
-      set: function(listener) {
+      set: function (this: any, listener: any) {
         // if assign listener to an event, clear all current registered events
         if (typeof this._eventListeners === "undefined") {
           Object.defineProperty(this, "_eventListeners", {
@@ -118,12 +121,12 @@ export class EventDispatcher {
     });
   }
 
-  addEventListenerForObject(obj, eventName, listener) {
+  addEventListenerForObject(obj: any, eventName: string, listener: any): void {
     if (!this.events.hasOwnProperty(eventName)) {
 
-      if (!(function() {
+      if (!(function (this: EventDispatcher) {
         if (eventName.startsWith("on")) {
-          var eventNameWithoutOn = eventName.substr(2);
+          const eventNameWithoutOn = eventName.substr(2);
 
           if (this.events.hasOwnProperty(eventNameWithoutOn)) {
             console.warn("recommended to remove 'on' prefix for adding event listener: " + eventName);

@@ -8,7 +8,7 @@ export * from './scene/object.js';
 export * from './scene/animation.js';
 export * from './effect/rain';
 export * from './effect/fog';
-export * from './effect/lightning.js';
+export * from './effect/lightning';
 export * from './effect/snow';
 export * from './view/modelviewer.js';
 export * from './view/objectcontroller.js';
@@ -22,7 +22,7 @@ export * from './utility/event';
 export * from './utility/resourcemanager.js';
 export * from './utility/archive.js';
 export * from './utility/gltfloader.js';
-export * from './utility/utility.js';
+export * from './utility/utility';
 
 import * as Shapes from './scene/shapes.js';
 export { Shapes };

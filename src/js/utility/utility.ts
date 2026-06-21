@@ -1,38 +1,38 @@
 
-export function toStringWithDigits(num, digits) {
-			if (typeof digits === "undefined") {
-				digits = 6;
-			}
-			var delta = Math.pow(10, digits);
-			return Math.round(num * delta) / delta;
-		}
+export function toStringWithDigits(num: number, digits?: number): number {
+  if (typeof digits === "undefined") {
+    digits = 6;
+  }
+  const delta = Math.pow(10, digits);
+  return Math.round(num * delta) / delta;
+}
 
-export function roundDigits(num, digits) {
-			if (typeof digits === "undefined") {
-				digits = 6;
-			}
-			var delta = Math.pow(10, digits);
-			return Math.round(num * delta) / delta;
-		}
-  
+export function roundDigits(num: number, digits?: number): number {
+  if (typeof digits === "undefined") {
+    digits = 6;
+  }
+  const delta = Math.pow(10, digits);
+  return Math.round(num * delta) / delta;
+}
 
-export function stringReplaceAll(str, search, replacement) {
+
+export function stringReplaceAll(str: string, search: string, replacement: string): string {
   //return this.replace(new RegExp(search, 'g'), replacement); // need check illegal chars for regex
   return str.split(search).join(replacement);
 }
 
-export function objectForeach(obj, iterator) {
+export function objectForeach(obj: any, iterator: (key: string, value: any) => void): void {
   if (typeof iterator !== "function") return;
 
-  for (var key in obj) {
+  for (const key in obj) {
     if (obj.hasOwnProperty(key)) {
       iterator.call(obj, key, obj[key]);
     }
   }
 }
 
-export function objectIsEmpty(obj) {
-  for (var key in obj) {
+export function objectIsEmpty(obj: any): boolean {
+  for (const key in obj) {
     if (obj.hasOwnProperty(key)) {
       return false;
     }
@@ -40,18 +40,18 @@ export function objectIsEmpty(obj) {
   return true;
 }
 
-export function arrayRemove(arr, element) {
-  var index = arrayIndexOf(arr, element);
+export function arrayRemove(arr: any[], element: any): void {
+  const index = arr.indexOf(element);
   if (index > -1) arr.splice(index, 1);
 }
 
-export function arraySet(arr, i, ...values) {
+export function arraySet(arr: any[], i: number, ...values: any[]): void {
   for (let j = 0; j < values.length; j++) {
     arr[i++] = values[j];
   }
 }
 
-export function invokeIfExist(obj, method, ...args) {
+export function invokeIfExist(obj: any, method: string | Function, ...args: any[]): any {
   if (typeof method === "string") {
     if (typeof obj[method] !== "function") return;
     method = obj[method];
@@ -62,10 +62,10 @@ export function invokeIfExist(obj, method, ...args) {
   }
 }
 
-export function deprecate(oldStaffName, newStaff) {
+export function deprecate(oldStaffName: string, newStaff: any): (this: any, ...args: any[]) => any {
   let warningMessageDisplayed = false;
 
-  return function(...args) {
+  return function (this: any, ...args: any[]) {
     if (!warningMessageDisplayed) {
       console.warn(`${oldStaffName} is deprecated, use ${newStaff.name || 'the provided function'} instead`);
       warningMessageDisplayed = true;
@@ -79,7 +79,7 @@ export function deprecate(oldStaffName, newStaff) {
   };
 }
 
-export function getImageDataURLFromTexture(renderer, tex, imgformat = "image/png", imgQuality = 0.85) {
+export function getImageDataURLFromTexture(renderer: any, tex: any, imgformat = "image/png", imgQuality = 0.85): string | undefined {
   if (!renderer || !tex) return;
 
   const width = tex.width, height = tex.height;
@@ -116,7 +116,13 @@ export function getImageDataURLFromTexture(renderer, tex, imgformat = "image/png
   return canvas.toDataURL(imgformat, imgQuality);
 }
 
-export function performMovementAccelerationAnimation(scene, intensity, attenuation, onframe, onfinish) {
+export function performMovementAccelerationAnimation(
+  scene: any,
+  intensity: number,
+  attenuation: number,
+  onframe: (xvol: number, yvol: number) => void,
+  onfinish?: () => void
+): void {
   if (typeof onframe !== "function" || !scene) return;
 
   const renderer = scene.renderer;
@@ -152,7 +158,7 @@ export function performMovementAccelerationAnimation(scene, intensity, attenuati
   requestAnimationFrame(updateFrame);
 }
 
-export function byteArrayToBase64(input) {
+export function byteArrayToBase64(input: ArrayLike<number>): string {
   const keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
   let output = "";
   let chr1, chr2, chr3, enc1, enc2, enc3, enc4;
@@ -182,13 +188,13 @@ export function byteArrayToBase64(input) {
 }
 
 export const ImageToolkit = {
-  convertToImageData(image) {
+  convertToImageData(image: any) {
     // TODO: 実装する場合ここに
   }
 };
 
-export function byteToString(bytes) {
-  const uarr = new Uint8Array(bytes);
+export function byteToString(bytes: ArrayBuffer | ArrayLike<number>): string {
+  const uarr = new Uint8Array(bytes as ArrayBuffer);
   const carr = new Array(uarr.length);
   for (let i = 0; i < uarr.length; i++) {
     carr[i] = String.fromCharCode(uarr[i]);
@@ -197,46 +203,46 @@ export function byteToString(bytes) {
   return carr.join("");
 }
 
-export function isPowerOf2(value) {
+export function isPowerOf2(value: number): boolean {
   return (value & (value - 1)) === 0;
 }
 
 Object.defineProperties(Float32Array.prototype, {
-	_t_set: {
-		value: function(i) {
-			if (arguments.length > 1) {
-				for (var j = 0; j < arguments.length - 1; j++) {
-					this[i++] = arguments[j + 1];
-				}
-			}
-		},
-		enumerable: false
-	},
+  _t_set: {
+    value: function (this: any, i: number) {
+      if (arguments.length > 1) {
+        for (let j = 0; j < arguments.length - 1; j++) {
+          this[i++] = arguments[j + 1];
+        }
+      }
+    },
+    enumerable: false
+  },
 });
-	
+
 // IE ployfill
 if (typeof Object.assign !== "function") {
-	Object.assign = function(target, varArgs) { // .length of function is 2
-		"use strict";
+  (Object as any).assign = function (target: any, varArgs: any) { // .length of function is 2
+    "use strict";
 
-		if (target === undefined || target === null) { // TypeError if undefined or null
-			throw new TypeError("cannot convert undefined or null to object");
-		}
+    if (target === undefined || target === null) { // TypeError if undefined or null
+      throw new TypeError("cannot convert undefined or null to object");
+    }
 
-		var to = Object(target);
+    const to = Object(target);
 
-		for (var index = 1; index < arguments.length; index++) {
-			var nextSource = arguments[index];
+    for (let index = 1; index < arguments.length; index++) {
+      const nextSource = arguments[index];
 
-			if (nextSource !== undefined && nextSource !== null) { // Skip over if undefined or null
-				for (var nextKey in nextSource) {
-					// Avoid bugs when hasOwnProperty is shadowed
-					if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-						to[nextKey] = nextSource[nextKey];
-					}
-				}
-			}
-		}
-		return to;
-	};
+      if (nextSource !== undefined && nextSource !== null) { // Skip over if undefined or null
+        for (const nextKey in nextSource) {
+          // Avoid bugs when hasOwnProperty is shadowed
+          if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+            to[nextKey] = nextSource[nextKey];
+          }
+        }
+      }
+    }
+    return to;
+  };
 }

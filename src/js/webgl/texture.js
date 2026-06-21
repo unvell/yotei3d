@@ -1,4 +1,4 @@
-import { isPowerOf2 } from "../utility/utility.js";
+import { isPowerOf2 } from "../utility/utility";
 
 export class Texture {
 	constructor(image) {

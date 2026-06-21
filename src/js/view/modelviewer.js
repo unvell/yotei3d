@@ -1,5 +1,5 @@
 import { Keys } from '../scene/viewer.js';
-import { performMovementAccelerationAnimation } from '../utility/utility.js';
+import { performMovementAccelerationAnimation } from '../utility/utility';
 
 export class ModelViewer {
   constructor(scene, {
