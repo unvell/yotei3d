@@ -166,7 +166,7 @@ const exampleItems = ref([
   },
   {
     title: 'Rain',
-    thumbnail: '/img/examples/rain.png',
+    thumbnail: '/img/examples/rain.jpg',
     link: 'rain.html',
     desc: 'Real-time rainfall with slanted streak particles.',
   },
