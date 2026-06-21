@@ -1,4 +1,6 @@
 
+import { arrayRemove } from './utility';
+
 export class EventDispatcher {
   owner: any;
   events: { [name: string]: any };
@@ -73,7 +75,7 @@ export class EventDispatcher {
           }
         }
 
-        this._eventListeners[eventName]._t_remove(listener);
+        arrayRemove(this._eventListeners[eventName], listener);
       };
     }
 

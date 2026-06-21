@@ -1,9 +1,9 @@
 
-import { Vec2, Vec3, Vec4, Color3, Color4, Matrix3, Matrix4, Ray, MathFunctions3 as _mf3 } from "@jingwood/graphics-math";
+import { Vec2, Vec3, Vec4, Color3, Color4, Ray } from "@jingwood/graphics-math";
 import { BoundingBox3D } from "@jingwood/graphics-math";
 
 import { EventDispatcher } from '../utility/event';
-import { SceneObject, Sun, ObjectTypes } from './object'
+import { SceneObject, Sun, ObjectTypes } from './object';
 import { Material } from './material';
 import { loadObjFormat } from '../utility/objloader';
 import { ResourceManager, ResourceTypes } from '../utility/resourcemanager';
@@ -13,11 +13,62 @@ import { Mesh } from "../webgl/mesh";
 import { Texture } from "../webgl/texture";
 import { CubeMap } from "../webgl/cubemap";
 import { Archive } from "../utility/archive";
-import { Animation } from "./animation"
-import { byteArrayToBase64, GLTFLoader, Keys } from '@'
+import { Animation } from "./animation";
+import { arrayRemove, byteArrayToBase64 } from "../utility/utility";
+import { GLTFLoader } from "../utility/gltfloader";
+import { Keys } from "./viewer";
 
 export class Scene {
-	constructor(renderer) {
+	renderer: any;
+
+	objects: any[];
+	hoverObject: any;
+	selectedObjects: Set<any>;
+
+	hitObject: any;
+	draggingObject: any;
+
+	models: any;
+	materials: any;
+	_refmaps: any;
+	_bundles: any;
+	_lightSources: any;
+	_activedLightSources: any[];
+
+	resourceManager: ResourceManager;
+	animation: boolean;
+	requestedUpdateFrame: boolean;
+
+	shadowMap: any;
+	shadowMapUpdateRequested: boolean;
+	skybox: any;
+
+	mainCamera: Camera;
+	sun: Sun;
+
+	_probeVolume?: any;
+	_probesBaked?: boolean;
+
+	// --- members injected by the EventDispatcher mixin (see bottom of file) ---
+	declare on: (event: string, listener: (...args: any[]) => any) => any;
+	declare addEventListener: (event: string, listener: (...args: any[]) => any) => any;
+	declare removeEventListener: (event: string, listener: (...args: any[]) => any) => void;
+	declare onmousedown: (...args: any[]) => any;
+	declare onmouseup: (...args: any[]) => any;
+	declare onmousemove: (...args: any[]) => any;
+	declare onmousewheel: (...args: any[]) => any;
+	declare onbegindrag: (...args: any[]) => any;
+	declare ondrag: (...args: any[]) => any;
+	declare onenddrag: (...args: any[]) => any;
+	declare onkeyup: (...args: any[]) => any;
+	declare onkeydown: (...args: any[]) => any;
+	declare onobjectAdd: (...args: any[]) => any;
+	declare onobjectRemove: (...args: any[]) => any;
+	declare onmainCameraChange: (...args: any[]) => any;
+	declare onframe: (...args: any[]) => any;
+	declare onarchiveLoaded: (...args: any[]) => any;
+
+	constructor(renderer?: any) {
 		this.renderer = renderer;
 
 		this.objects = [];
@@ -41,7 +92,7 @@ export class Scene {
     this.shadowMap = null;
     this.shadowMapUpdateRequested = true;
     this.skybox = null;
-    
+
 		// main camera
     this.mainCamera = new Camera();
     this.mainCamera.location.set(0, 1, 3);
@@ -55,47 +106,47 @@ export class Scene {
 
 	}
 
-	loadArchive(name, url, loadingSession, callback) {
-	
+	loadArchive(name: string, url: string, loadingSession: any, callback?: any) {
+
 		let archiveInfo = this._bundles[name];
-	
+
 		if (!archiveInfo) {
       const archive = new Archive();
       archive.src = url;
-	
+
 			archiveInfo = {
 				name: name,
 				url: url,
 				archive: archive,
 			};
-	
+
 			this._bundles[name] = archiveInfo;
-	
+
 			archive.isLoading = true;
-	
+
 			if (loadingSession) {
 				loadingSession.downloadArchives.push(archive);
 			}
-		
-			loadingSession.rm.add(url, ResourceTypes.Binary, stream => {
+
+			loadingSession.rm.add(url, ResourceTypes.Binary, (stream: any) => {
 				try {
 					archive.loadFromStream(stream);
 				} catch (e) { console.error(e); }
 				archive.isLoading = false;
 				if (typeof callback === "function") callback(archive);
 				this.onarchiveLoaded(url, archive);
-			}, e => {
+			}, (e: any) => {
 				archive.dataLength = e.total;
 				archive.loadingLength = e.loaded;
-		
+
 				if (loadingSession) loadingSession.progress();
 			});
-		
+
 			if (!loadingSession) {
 				loadingSession.rm.load();
 			}
 		} else if (archiveInfo.archive.isLoading) {
-			this.on("archiveLoaded", function(_url, bundle) {
+			this.on("archiveLoaded", function(_url: any, bundle: any) {
 				if (url === _url) {
 					if (typeof callback === "function") callback(bundle);
 				}
@@ -105,16 +156,16 @@ export class Scene {
 		}
 	}
 
-	loadArchives(archs, loadingSession) {
-		for (const [key, value] of Object.entries(archs)) {
+	loadArchives(archs: any, loadingSession: any) {
+		for (const [key, value] of Object.entries(archs) as [string, any][]) {
 			this.loadArchive(key, value.url, loadingSession);
 		};
 	}
 
-  createObjectFromBundle(url, ondone, loadingSession) {
-    this.loadArchive(url, url, loadingSession, archive => {
+  createObjectFromBundle(url: string, ondone: any, loadingSession?: any) {
+    this.loadArchive(url, url, loadingSession, (archive: any) => {
       const manifestDataText = archive.getChunkTextData(0x1, 0x7466696d);
-          
+
       if (manifestDataText) {
         let manifest;
         try {
@@ -129,13 +180,13 @@ export class Scene {
     });
   }
 
-  createObjectFromURL(url, finishCallback) {
+  createObjectFromURL(url: string, finishCallback?: any) {
     if (url.endsWith('.toba') || url.endsWith('.tob')
       || url.endsWith('.soba') || url.endsWith('.sob')) {
       const rm = new ResourceManager();
       const loadingSession = new LoadingSession(rm);
 
-      this.createObjectFromBundle(url, (bundle, manifest) => {
+      this.createObjectFromBundle(url, (bundle: any, manifest: any) => {
         const rootObject = this.createObjectFromManifest(manifest, null, bundle);
 
         if (typeof finishCallback === "function") {
@@ -143,17 +194,17 @@ export class Scene {
         }
 
       }, loadingSession);
-	
+
       rm.load();
       return loadingSession;
     } else if (url.endsWith(".gltf")) {
       const loader = new GLTFLoader(this);
-      loader.loadFromUrl(url, obj => finishCallback(obj));
+      loader.loadFromUrl(url, (obj: any) => finishCallback(obj));
     } else {
     const rm = new ResourceManager();
       const loadingSession = new LoadingSession(rm);
 
-      this.createObjectFromBundle(url, (bundle, manifest) => {
+      this.createObjectFromBundle(url, (bundle: any, manifest: any) => {
         const rootObject = this.createObjectFromManifest(manifest, null, bundle);
 
         if (typeof finishCallback === "function") {
@@ -161,19 +212,19 @@ export class Scene {
         }
 
       }, loadingSession);
-	
+
       rm.load();
     }
   }
-	
+
   // create objects from a manifest, add them to the scene
-	load() {
-	
+	load(...args: any[]): LoadingSession {
+
 		const loadingSession = new LoadingSession(this.resourceManager);
-		
-		for (let i = 0; i < arguments.length; i++) {
-			let objDefine = arguments[i];
-	
+
+		for (let i = 0; i < args.length; i++) {
+			let objDefine = args[i];
+
 			if (objDefine) {
 				const obj = this.createObjectFromManifest(objDefine, loadingSession)
         if (obj) {
@@ -181,10 +232,10 @@ export class Scene {
         }
 			}
 		}
-	
+
 		this.resourceManager.load();
 		this.requireUpdateFrame();
-	
+
 		return loadingSession;
 	}
 
@@ -192,7 +243,7 @@ export class Scene {
 		// TODO
 	}
 
-	createObjectFromManifest(manifest, loadingSession, bundle) {
+	createObjectFromManifest(manifest: any, loadingSession?: any, bundle?: any) {
     let loadingSessionCreated = false
     if (!loadingSession) {
       loadingSession = new LoadingSession()
@@ -203,17 +254,17 @@ export class Scene {
 		if (_bundles) {
 			this.loadArchives(_bundles, loadingSession);
 		}
-			
+
 		var _materials = manifest._materials;
 		if (_materials) {
 			this.loadMaterials(_materials, loadingSession, bundle);
 		}
-	
+
 		var _refmaps = manifest._refmaps;
 		if (_refmaps) {
 			this.loadReflectionMaps(_refmaps, loadingSession, bundle);
 		}
-	
+
     const rootObject = new SceneObject();
 		this.setupObjectFromManifest(rootObject, manifest, loadingSession, bundle);
 
@@ -224,16 +275,16 @@ export class Scene {
     return rootObject;
 	}
 
-	createObjectFromObjFormat(url, callback) {
-		this.resourceManager.add(url, ResourceTypes.Text, text => {
+	createObjectFromObjFormat(url: string, callback: any) {
+		this.resourceManager.add(url, ResourceTypes.Text, (text: any) => {
 			callback(loadObjFormat(text));
 		});
 		this.resourceManager.load();
 	}
 
-	add() {
-		for (var i = 0; i < arguments.length; i++) {
-			var obj = arguments[i];
+	add(...objs: any[]) {
+		for (var i = 0; i < objs.length; i++) {
+			var obj = objs[i];
 			if (obj instanceof SceneObject) {
 				this.objects.push(obj)
 
@@ -246,7 +297,7 @@ export class Scene {
 		this.requireUpdateFrame();
 	}
 
-	whenObjectAdd(obj) {
+	whenObjectAdd(obj: any) {
 		if (obj.mat && obj.mat.emission > 0) {
 			this._lightSources.push(obj);
 		}
@@ -254,8 +305,8 @@ export class Scene {
 		this.onobjectAdd(obj);
 	}
 
-	whenObjectRemove(obj) {
-		this._lightSources.t_remove(obj);
+	whenObjectRemove(obj: any) {
+		arrayRemove(this._lightSources, obj);
 
 		this.onobjectRemove(obj);
 	}
@@ -265,11 +316,11 @@ export class Scene {
 		this.requireUpdateFrame();
 	}
 
-	beforeDrawFrame(renderer) {
+	beforeDrawFrame(renderer: any) {
 		this.updateLightSources();
 	}
 
-	afterDrawFrame(renderer) {
+	afterDrawFrame(renderer: any) {
 		this.onframe(renderer);
 		this.requestedUpdateFrame = false;
 	}
@@ -281,7 +332,7 @@ export class Scene {
 	// Define a light-probe irradiance volume over an axis-aligned region.
 	// min/max are [x,y,z] world bounds; dims is [nx,ny,nz] probe counts per axis.
 	// The renderer bakes it once (requires renderer.options.enableLightProbes).
-	setLightProbeVolume(min, max, dims) {
+	setLightProbeVolume(min: any, max: any, dims: any) {
 		this._probeVolume = { min, max, dims };
 		this._probesBaked = false;
 		this.requireUpdateFrame();
@@ -293,7 +344,7 @@ export class Scene {
 		this.requireUpdateFrame();
 	}
 
-	loadMaterials(mats, loadingSession, bundle) {
+	loadMaterials(mats: any, loadingSession: any, bundle?: any) {
 		for (const [mName, matDefine] of Object.entries(mats)) {
       const mat = new Material()
       mat.name = mName
@@ -302,25 +353,12 @@ export class Scene {
 		}
 	}
 
-	loadReflectionMaps(refmaps, loadingSession, bundle) {
+	loadReflectionMaps(refmaps: any, loadingSession: any, bundle?: any) {
 		var _this = this;
 
 		var datafileUrl = refmaps._datafile;
-		// loadingSession.rm.add(maps[i], ResourceTypes.Binary, function(stream) {
-		// 	var header = new Int32Array(stream);
-		// 	var res = header[2];
-		// 	var faceDataLength = res * res * 3 * 4;
-		// 	var probeDataLength = faceDataLength * 6;
 
-		// 	var facedata = new Float32Array(stream, header[0]);
-		
-		// 	refmaps._t_foreach(function(pName, pValue) {
-		// 		if (pName == "_datafile") return;
-		// 		pValue.cubemap.setFaceData();
-		// 	});
-		// });
-
-		for (const [pName, pValue] of Object.entries(refmaps)) {
+		for (const [pName, pValue] of Object.entries(refmaps) as [string, any][]) {
 			if (pName == "_datafile") continue;
 
 			pValue.name = pName;
@@ -333,7 +371,7 @@ export class Scene {
 
 			if (!datafileUrl) {
 				pValue.downloadedImageCount = 0;
-		
+
 				var maps = pValue.maps;
 				var dataUrl = pValue.data;
 				var rm = loadingSession.rm;
@@ -353,7 +391,7 @@ export class Scene {
 					}
 				} else if (dataUrl) {
 
-					const loadedHandler = function(buffer) {
+					const loadedHandler = function(buffer: any) {
 						pValue.cubemap.setRawData(buffer);
 					};
 
@@ -365,7 +403,7 @@ export class Scene {
 		}
 	}
 
-	remove(obj) {
+	remove(obj: any) {
 		if (!obj) return;
 
 		// if object has parent, remove from its parent
@@ -381,12 +419,12 @@ export class Scene {
 		this.onobjectRemove(obj);
 	}
 
-	selectObject(obj) {
+	selectObject(obj: any) {
 		this.selectedObjects.add(obj);
 		obj.isSelected = true;
 	}
 
-	deselectObject(obj) {
+	deselectObject(obj: any) {
 		this.selectedObjects.delete(obj);
 		obj.isSelected = false;
 	}
@@ -399,14 +437,14 @@ export class Scene {
 		this.selectedObjects.clear();
 		this.requireUpdateFrame();
 	}
-	
+
 	updateLightSources() {
 		this._activedLightSources = [];
 
 		if (!this.renderer.options.enableLighting) {
 			return;
 		}
-		
+
 		if (this.renderer.debugger) {
 			this.renderer.debugger.beforeSelectLightSource();
 		}
@@ -423,21 +461,21 @@ export class Scene {
 			if (object.visible === true) {
 				if (typeof object.mat === "object" && object.mat !== null) {
 					if (typeof object.mat.emission !== "undefined" && object.mat.emission > 0) {
-							
+
 						var lightWorldPos;
-						
+
 						if (Array.isArray(object.meshes) && object.meshes.length > 0) {
 							var bounds = object.getBounds();
 							lightWorldPos = Vec3.add(bounds.min, Vec3.mul(Vec3.sub(bounds.max, bounds.min), 0.5));
 						} else {
 							lightWorldPos = new Vec4(0, 0, 0, 1).mulMat(object._transform).xyz;
 						}
-	
+
 						var distance = Vec3.sub(lightWorldPos, cameraLocation).length();
 						if (distance > LightLimitation.Distance) return;
-	
+
 						var index = -1;
-	
+
 						for (var i = 0; i < LightLimitation.Count
 							&& i < this._activedLightSources.length; i++) {
 							var existLight = this._activedLightSources[i];
@@ -446,7 +484,7 @@ export class Scene {
 								break;
 							}
 						}
-	
+
 						if (index === -1) {
 							this._activedLightSources.push({
 								object: object,
@@ -464,7 +502,7 @@ export class Scene {
 				}
 			}
 		}
-	
+
 		if (this._activedLightSources.length > LightLimitation.Count) {
       this._activedLightSources.splice(LightLimitation.Count);
     }
@@ -474,7 +512,7 @@ export class Scene {
 		}
 	}
 
-	createMeshFromURL(url, handler, rm) {
+	createMeshFromURL(url: string, handler: any, rm?: any) {
 		var renderer = this.renderer;
 
 		var cachedMesh = renderer.cachedMeshes[url];
@@ -486,10 +524,10 @@ export class Scene {
 		if (rm === undefined) {
 			rm = this.resourceManager;
 		}
-	
-		rm.add(url, ResourceTypes.Binary, function(stream) {
+
+		rm.add(url, ResourceTypes.Binary, function(stream: any) {
 			var mesh = renderer.cachedMeshes[url];
-		
+
 			if (!mesh && stream) {
 				mesh = new Mesh();
 				mesh.loadFromStream(stream);
@@ -507,18 +545,18 @@ export class Scene {
 		rm.load();
 	}
 
-	createTextureFromURL(url, handler) {
+	createTextureFromURL(url: string, handler: any) {
 		if (this.renderer) {
 			this.renderer.createTextureFromURL(url, handler);
 		}
 	}
 
-	prepareObjectMesh(obj, objDefine, name, value, loadingSession, bundle) {
+	prepareObjectMesh(obj: any, objDefine: any, name: any, value: any, loadingSession: any, bundle?: any) {
 		const scene = this;
 		const renderer = this.renderer;
 
 		const rm = loadingSession ? loadingSession.rm : this.resourceManager;
-			
+
     if (typeof value === "string" && value.length > 0) {
       const cachedKey = bundle ? (bundle.src + '|$|' + value) : value;
 
@@ -531,12 +569,12 @@ export class Scene {
 			} else {
 				if (loadingSession) loadingSession.resourceMeshCount++;
 
-				var loadedHandler = function(buffer, archive) {
+				var loadedHandler = function(this: any, buffer: any, archive: any) {
 					if (loadingSession) {
 						loadingSession.downloadMeshCount++;
 						loadingSession.progress();
 					}
-			
+
 					var mesh = scene.prepareObjectMeshFromURLStream(obj, value, buffer, loadingSession, bundle);
 
 					if (mesh) {
@@ -569,7 +607,7 @@ export class Scene {
 											img = new Image();
 											img.src = "data:image/jpeg;base64," + imageDataBase64;
 										}
-				
+
 										if (img) {
 											img.onload = function() {
 												tex.image = img;
@@ -611,14 +649,14 @@ export class Scene {
 		}
 	}
 
-	prepareObjectMeshFromURLStream(obj, url, buffer, loadingSession, bundle) {
+	prepareObjectMeshFromURLStream(obj: any, url: string, buffer: any, loadingSession?: any, bundle?: any) {
 		if (!buffer) return;
 
 		var mesh = null;
 		var renderer = this.renderer;
-  
+
     const cacheUrl = (bundle ? bundle.src : '') + '|$|' + url;
-    
+
 		if (renderer.cachedMeshes.hasOwnProperty(cacheUrl)) {
 			mesh = renderer.cachedMeshes[cacheUrl];
 		} else {
@@ -643,16 +681,16 @@ export class Scene {
 		return mesh;
 	}
 
-	prepareMaterialObject(mat, matDefine, loadingSession, bundle) {
+	prepareMaterialObject(mat: any, matDefine: any, loadingSession?: any, bundle?: any) {
 
-		const setTextureImage = (name, buffer, url) => {
+		const setTextureImage = (name: string, buffer: any, url: string) => {
 			if (loadingSession) {
 				loadingSession.downloadTextureCount++;
 				loadingSession.progress();
 			}
 
       const cacheKey = bundle ? (bundle.src + '|$|' + url) : url;
-  
+
       let timg = this.renderer.cachedImages[cacheKey];
 			if (timg) {
 				mat[name] = timg.tex;
@@ -696,7 +734,7 @@ export class Scene {
 			}
 		}
 
-		for (const [name, value] of Object.entries(matDefine)) {
+		for (const [name, value] of Object.entries(matDefine) as [string, any][]) {
 
 			switch (name) {
 				case "color":
@@ -722,10 +760,10 @@ export class Scene {
 						} else {
 							if (loadingSession) loadingSession.resourceTextureCount++;
 
-							if (!Archive.canLoadFromArchive(this, value, 0, bundle, (buffer, bundle, uid) => {
-								setTextureImage(name, buffer, value, bundle, uid);
+							if (!Archive.canLoadFromArchive(this, value, 0, bundle, (buffer: any, bundle: any, uid: any) => {
+								setTextureImage(name, buffer, value);
 							})) {
-								loadingSession.rm.add(value, ResourceTypes.Image, (image) => {
+								loadingSession.rm.add(value, ResourceTypes.Image, (image: any) => {
 									setTextureImage(name, image, value);
 								});
 							}
@@ -751,39 +789,11 @@ export class Scene {
 		}
 	}
 
-	setupObjectFromManifest(obj, objDefine, loadingSession, bundle) {
+	setupObjectFromManifest(obj: any, objDefine: any, loadingSession?: any, bundle?: any) {
+		const scene = this;
 
-    for (const [name, value] of Object.entries(objDefine)) {
+    for (const [name, value] of Object.entries(objDefine) as [string, any][]) {
       switch (name) {
-        // case "_models":
-        // 	value._t_foreach(function(mName, mValue) {
-        // 		scene.models[mName] = mValue;
-        // 	});
-        // 	this.setupObjectFromManifest(value, loadingSession, bundle);
-        // 	break;
-
-        // since always read _materials before reading scene objects 
-        // the following code can be ignored
-        //	
-        // case "_materials":
-        // 	value._t_foreach(function(mName, mValue) {
-        // 		if (typeof mValue.name === "undefined") {
-        // 			mValue.name = mName;
-        // 		}
-        
-        // 		scene.materials[mName] = mValue;
-        // 		scene.prepareMaterialObject(mValue, rm, loadingSession);
-        // 	});
-        // 	break;
-
-        // case "model":
-        // 	var model = scene.models[value];
-        // 	if (!(model instanceof SceneObject)) {
-        // 		scene.setupObjectFromManifest(model, loadingSession, bundle);
-        // 	}
-        // 	Object.setPrototypeOf(obj, model);
-        // 	break;
-
         case "mesh":
           if (typeof value === "string" && value.length > 0) {
             this.prepareObjectMesh(obj, objDefine, "mesh", value, loadingSession, bundle);
@@ -802,13 +812,13 @@ export class Scene {
           if (typeof value === "string" && value.length > 0) {
             if (loadingSession) loadingSession.resourceLightmapCount++;
 
-            loadingSession.rm.add(value, ResourceTypes.Image, function(image) {
+            loadingSession.rm.add(value, ResourceTypes.Image, function(image: any) {
 
               if (loadingSession) {
                 loadingSession.downloadLightmapCount++;
                 loadingSession.progress();
               }
-          
+
               if (image) {
                 var lmapTex = new Texture(image);
                 obj.lightmap = lmapTex;
@@ -817,14 +827,6 @@ export class Scene {
             });
           }
           break;
-
-        // case "refmap":
-        // 	if (typeof value === "string" && value.length > 0) {
-        // 		if (scene._refmaps && scene._refmaps.hasOwnProperty(value)) {
-        // 			obj.refmap = scene._refmaps[value].cubemap;
-        // 		}
-        // 	}
-        // 	break;
 
         case "mat":
           if (typeof value === "string" && value.length > 0) {
@@ -841,7 +843,7 @@ export class Scene {
             this.prepareMaterialObject(obj.mat, value, loadingSession, bundle);
           }
           break;
-        
+
         case "location":
         case "angle":
         case "scale":
@@ -865,36 +867,13 @@ export class Scene {
         	this.renderer.surface.appendChild(div);
         	break;
 
-        case "mainCamera":
+        case "mainCamera": {
           const camera = new Camera();
           this.setupObjectFromManifest(camera, value, loadingSession);
           this.mainCamera = camera;
           this.add(camera);
           break;
-
-        // case "scene":
-        // case "_scene":
-        // case "parent":
-        // case "_parent":
-        // case "_location":
-        // case "_materials":
-        // case "_archives":
-        // case "_bundles":
-        // case "_eventListeners":
-        // case "_customProperties":
-        // case "shader":
-        // case "viewSize":
-        // case "texTiling":
-        // case "color":
-        // case "renderTexture":
-        // case "collisionTarget":
-        // case "collisionOption":
-        // case "radiyBody":
-        // case "envmap":
-        // case "tag":
-        // case "userData":
-          // ignore these properties
-          // break;
+        }
 
         case 'onmousedown':
         case 'onmouseup':
@@ -902,27 +881,16 @@ export class Scene {
         case 'onmouseover':
         case 'onmouseout':
         case 'onclick':
-        case 'onmousewheel':
+        case 'onmousewheel': {
             const eventName = name.slice(2); // Remove 'on' prefix
             obj.addEventListener(eventName, value);
           break
+        }
 
-          // if ((typeof value === "object")
-          //   && value
-          //   && !(value instanceof Mesh)
-          //   && !(value instanceof Texture)
-          //   && !(value instanceof CubeMap)
-          //   && !(value instanceof Scene)
-          //   && !(value instanceof Vec3)
-          //   && !(value instanceof Color3)
-          //   && !(value instanceof Color4)
-          //   && !(value instanceof Matrix3)
-          //   && !(value instanceof Matrix4)
-          //   && !(value instanceof Array)) {
           case "children":
           case "child":
           case "objects":
-            for (const [name, objDefine] of Object.entries(value)) {
+            for (const [name, objDefine] of Object.entries(value) as [string, any][]) {
               const child = new SceneObject();
               child.name = name;
               this.setupObjectFromManifest(child, objDefine, loadingSession, bundle);
@@ -937,22 +905,12 @@ export class Scene {
           break;
       }
     }
-
-		// const _bundle = obj._bundle || obj.bundle;
-		// if (_bundle) {
-		// 	this.createObjectFromBundle(_bundle, function(bundle, manifest) {
-		// 		Object.assign(obj, manifest);
-		// 		prepareObjectProperties(obj, loadingSession, bundle);
-		// 	}, loadingSession);
-		// } else {
-			// prepareObjectProperties(obj, objDefine, loadingSession, bundle);
-		// }
 	}
 
 	/*
 	 * Finds objects and children in this scene by specified name. Returns null if nothing found.
 	 */
-	findObjectByName(name) {
+	findObjectByName(name: string): any {
 		for (const obj of this.objects) {
 			if (obj.name === name) return obj;
 		}
@@ -969,10 +927,10 @@ export class Scene {
 	 * Find over all objects in this scene by specified type,
 	 * put the result into an array.
 	 */
-	findObjectsByType(type, options) {
+	findObjectsByType(type?: any, options?: any): any[] {
 		type = (type || ObjectTypes.GenericObject);
 		options = options || {};
-		let arr = [];
+		let arr: any[] = [];
 
 		for (const obj of this.objects) {
 			if (obj.type === type) {
@@ -989,28 +947,11 @@ export class Scene {
 		return arr;
 	}
 
-	// /*
-	//  * Finds objects and children in this scene by given conditions. Returns null if nothing found.
-	//  */
-	// iterateObjects(handler) {
-	// 	for (let i = 0; i < this.objects.length; i++) {
-	// 		let obj = this.objects[i];
-	// 		if (handler(obj)) yield obj;
-	// 	}
-
-	// 	for (let k = 0; k < this.objects.length; k++) {
-	// 		let obj = this.objects[k];
-	// 		obj.iterateObjects(handler);
-	// 	}
-
-	// 	return null;
-	// }
-	
 	/*
 	 * itearte over all children of this object,
 	 * pass the object to specified iterator function.
 	 */
-	eachObject(iterator) {
+	eachObject(iterator: any) {
 		if (typeof iterator !== "function") return;
 
 		for (const obj of this.objects) {
@@ -1022,11 +963,11 @@ export class Scene {
 		}
 	}
 
-	findObjectsByCurrentMousePosition(options) {
+	findObjectsByCurrentMousePosition(options?: any) {
 		return this.findObjectsByViewPosition(this.renderer.viewer.mouse.position, options);
 	}
 
-	findObjectsByViewPosition(p, options) {
+	findObjectsByViewPosition(p: any, options?: any): any {
 		if (!this.objects?.length) return { object: null };
 
 		const ray = this.renderer.createWorldRayFromScreenPosition(p);
@@ -1034,25 +975,25 @@ export class Scene {
 		return this.findObjectsByViewRay(ray, options);
 	}
 
-	findObjectsByRay(ray, options) {
+	findObjectsByRay(ray: any, options?: any) {
 		return this.findObjectsByWorldRay(ray, options);
 	}
 
-	findObjectsByViewRay(ray, options) {
+	findObjectsByViewRay(ray: any, options?: any) {
 		//TODO: remove?
 		return this.findObjectsByWorldRay(ray, options);
 	}
 
-	findObjectsByWorldRay(ray, options) {
+	findObjectsByWorldRay(ray: any, options?: any): any {
 
 		if (this.renderer.options.debugMode && this.renderer.debugger) {
 			this.renderer.debugger.beforeRaycast();
 		}
-	
+
 		options = options || {};
 
-		const out = { object: null, hits: [], t: Ray.MaxDistance };
-	
+		const out: any = { object: null, hits: [], t: Ray.MaxDistance };
+
 		const rayNormalizedDir = ray.dir.normalize();
 
 		const session = {
@@ -1066,7 +1007,7 @@ export class Scene {
 		}
 
 		if (out.hits.length > 0) {
-			out.hits.sort((a, b) => a.t - b.t);
+			out.hits.sort((a: any, b: any) => a.t - b.t);
 
 			out.object = out.hits[0].object;
 			out.t = out.hits[0].t;
@@ -1082,7 +1023,7 @@ export class Scene {
 		return out;
 	}
 
-	hitTestObjectByRay(obj, ray, out, session, options) {
+	hitTestObjectByRay(obj: any, ray: any, out: any, session: any, options: any) {
 		if ((!options.includeInvisible && obj.visible === false) || obj.hitable === false) {
 			return false;
 		}
@@ -1094,7 +1035,7 @@ export class Scene {
 		if (typeof options.descendantFilter === "function" && options.descendantFilter(obj) === false) {
 			return false;
 		}
-	
+
 		if (typeof obj.hitTestByRay === "function"
 			&& (typeof options.filter !== "function" || options.filter(obj))) {
 			if (obj.hitTestByRay.call(obj, ray, out)) {
@@ -1116,11 +1057,6 @@ export class Scene {
 			return false;
 		}
 
-		// const bbox = obj.getBounds();
-		// if (bbox && !_mf3.rayIntersectsBox(ray, bbox)) {
-		// 	return false;
-		// }
-
 		session.level++;
 
 		if (Array.isArray(obj.objects)) {
@@ -1135,10 +1071,10 @@ export class Scene {
 
       session.mmat = obj._transform;
       session.nmat = obj._normalTransform;
-		
+
 			for (const mesh of obj.meshes) {
 				const mout = mesh.hitTestByRay(ray, Ray.MaxDistance, session, options);
-			
+
 				if (mout) {
 					out.hits.push({
 						object: obj,
@@ -1156,14 +1092,14 @@ export class Scene {
 	/*
 	 * Get the bounds of this scene.
 	 */
-	getBounds(options) {
+	getBounds(options?: any): any {
 		let bbox = null;
 
 		for (const object of this.objects) {
 			if (typeof object.visible !== "undefined" && object.visible) {
 
 				const objectBBox = object.getBounds(options);
-		
+
 				if (!options || !options.filter || options.filter(object)) {
 					bbox = BoundingBox3D.findBoundingBoxOfBoundingBoxes(bbox, objectBBox);
 				} else if (!bbox) {
@@ -1180,7 +1116,7 @@ export class Scene {
 		return bbox;
 	}
 
-	mousedown(scrpos) {
+	mousedown(scrpos: any): any {
 
 		var out = this.findObjectsByCurrentMousePosition();
 
@@ -1188,7 +1124,7 @@ export class Scene {
 			var obj = out.object;
 
 			var renderer = this.renderer;
-		
+
 			if (renderer.debugger
 				&& renderer.viewer.pressedKeys.has(Keys.Shift)
 				&& renderer.viewer.pressedKeys.has(Keys.Control)) {
@@ -1211,13 +1147,13 @@ export class Scene {
 
 	begindrag() {
 		var ret = false;
-	
+
 		if (this.hitObject) {
 			this.draggingObject = this.hitObject;
-		
+
 			ret = this.draggingObject.onbegindrag();
 		}
-	
+
 		if (!ret) {
 			return this.onbegindrag();
 		}
@@ -1241,7 +1177,7 @@ export class Scene {
 		if (this.renderer.debugger) {
 			this.renderer.debugger.hideObjectInfoPanel();
 		}
-	
+
 		if (this.draggingObject) {
 			ret = this.draggingObject.onenddrag();
 		}
@@ -1254,7 +1190,7 @@ export class Scene {
 		}
 	}
 
-	mousemove(pos) {
+	mousemove(pos: any): any {
 		if (this.renderer.options.enableObjectHover) {
 
 			var out = this.findObjectsByViewPosition(this.renderer.viewer.mouse.position);
@@ -1279,11 +1215,11 @@ export class Scene {
 		return this.onmousemove(pos);
 	}
 
-	mouseup(pos) {
+	mouseup(pos: any): any {
 		if (this.hitObject) {
 			this.hitObject.onmouseup(pos);
 		}
-	
+
 		this.hitObject = null;
 
 		if (this.renderer.debugger) {
@@ -1293,15 +1229,15 @@ export class Scene {
 		return this.onmouseup(pos);
 	}
 
-	keydown(key) {
+	keydown(key: any): any {
 		return this.onkeydown(key);
 	}
 
-	keyup(key) {
+	keyup(key: any): any {
 		return this.onkeyup(key);
 	}
 
-	animate(options, onframe, onfinish) {
+	animate(options: any, onframe?: any, onfinish?: any): any {
 		if (typeof Animation !== "function") {
 			return "requires animation feature but library is not included";
 		}
@@ -1317,13 +1253,12 @@ export class Scene {
     this.materials = {};
     this._refmaps = {};
     this._bundles = {};
-    // scene._bundles = {};
     this._lightSources = new Set();
     this._activedLightSources = [];
 
     console.debug('scene released');
   }
-  
+
   destroyAllObjects() {
     for (const obj of this.objects) {
       obj.destroy();
@@ -1349,7 +1284,28 @@ new EventDispatcher(Scene).registerEvents(
 ///////////////////////// LoadingSession /////////////////////////
 
 export class LoadingSession {
-	constructor(rm) {
+	rm: any;
+	progressRate: number;
+
+	resourceMeshCount: number;
+	resourceTextureCount: number;
+	resourceLightmapCount: number;
+
+	downloadMeshCount: number;
+	downloadTextureCount: number;
+	downloadLightmapCount: number;
+
+	downloadArchives: any[];
+
+	// --- members injected by the EventDispatcher mixin (see bottom of file) ---
+	declare on: (event: string, listener: (...args: any[]) => any) => any;
+	declare addEventListener: (event: string, listener: (...args: any[]) => any) => any;
+	declare removeEventListener: (event: string, listener: (...args: any[]) => any) => void;
+	declare onprogress: (...args: any[]) => any;
+	declare onfinish: (...args: any[]) => any;
+	declare onobjectMeshDownload: (...args: any[]) => any;
+
+	constructor(rm?: any) {
 		this.rm = rm || new ResourceManager();
 		this.progressRate = 0;
 
@@ -1363,13 +1319,13 @@ export class LoadingSession {
 
 		this.downloadArchives = [];
 	}
-	
+
 	progress() {
 		var loaded = this.totalDownloads;
 		var total = this.totalResources;
 
 		this.progressRate = loaded / total;
-		
+
 		this.onprogress(this.progressRate);
 
 		if (this.progressRate >= 1) {

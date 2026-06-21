@@ -2,6 +2,7 @@ import { Color3 } from "@jingwood/graphics-math";
 import { ParticleObject } from "../scene/object.js";
 import { ParticleMesh } from "../webgl/mesh.js";
 import { Material } from "../scene/material";
+import { arraySet } from "../utility/utility";
 
 // Rain — a self-contained rainfall effect.
 //
@@ -161,9 +162,9 @@ export class Rain extends ParticleObject {
     const c = this.mat.color as number[];
     const b = this._bri[i];
     // ParticleMesh layout: [positions][colors][sizes]
-    vb._t_set(i * 3, this._px[i], this._py[i], this._pz[i]);
-    vb._t_set((n + i) * 3, c[0] * b, c[1] * b, c[2] * b);
-    vb._t_set(n * 6 + i, this._len[i]);
+    arraySet(vb, i * 3, this._px[i], this._py[i], this._pz[i]);
+    arraySet(vb, (n + i) * 3, c[0] * b, c[1] * b, c[2] * b);
+    arraySet(vb, n * 6 + i, this._len[i]);
   }
 
   private _writeAll(): void {

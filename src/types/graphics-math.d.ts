@@ -49,6 +49,7 @@ declare module '@jingwood/graphics-math' {
     static cross(a: Vec3, b: Vec3): Vec3;
     static length(v: Vec3): number;
     static normalize(v: Vec3): Vec3;
+    static fromArray(arr: ArrayLike<number>): Vec3;
   }
 
   export class Vec4 {
@@ -141,7 +142,10 @@ declare module '@jingwood/graphics-math' {
   }
 
   export class Ray {
+    origin: Vec3;
+    dir: Vec3;
     constructor(origin?: Vec3, dir?: Vec3);
+    static MaxDistance: number;
   }
 
   export const MathFunctions: {

@@ -1387,9 +1387,9 @@ export class Renderer {
 	};
 
 	releaseResources() {
-		this.cachedTextures._t_foreach((_, tex) => tex.destroy());
+		Object.values(this.cachedTextures).forEach(tex => tex.destroy());
 		this.cachedTextures = {};
-		this.cachedMeshes._t_foreach((_, mesh) => mesh.destroy());
+		Object.values(this.cachedMeshes).forEach(mesh => mesh.destroy());
 		this.cachedMeshes = {};
 	}
 

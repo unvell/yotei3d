@@ -5,6 +5,7 @@ import { byteToString } from "./utility";
 type ChunkReadyCallback = (buffer: ArrayBuffer | null) => void;
 
 export class Archive {
+  src?: string;
   isLoading = false;
   dataLength = 0;
   loadingLength = 0;

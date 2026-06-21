@@ -22,6 +22,8 @@ import { Texture } from '../webgl/texture';
 // renderer's drawObject path is unified (a later phase) — they are dormant
 // groundwork here, not yet read by the runtime.
 export class Material {
+  /** Optional material name (set by scene loaders from manifest keys). */
+  name?: string;
   /** glTF baseColorFactor. */
   color: Color3 | number[] = new Color3(0.8, 0.8, 0.8);
   /** glTF roughnessFactor. */
