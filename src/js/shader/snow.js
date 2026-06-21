@@ -46,12 +46,14 @@ export class SnowShader extends Shader {
 		}
 		this.colorUniform.set(color);
 
-		this.opacityUniform.set(typeof obj.snowOpacity === "number" ? obj.snowOpacity : 0.9);
-
-		this.sizeScaleUniform.set(typeof obj.sizeScale === "number" ? obj.sizeScale : 20);
-		this.maxSizeUniform.set(typeof obj.maxSize === "number" ? obj.maxSize : 64);
-		this.focusDistUniform.set(typeof obj.focusDist === "number" ? obj.focusDist : 12);
-		this.focusRangeUniform.set(typeof obj.focusRange === "number" ? obj.focusRange : 10);
+		// flake appearance — read from the SnowMaterial (obj.mat); legacy
+		// per-object fields kept as a fallback for unmigrated callers.
+		const num = (a, b, d) => typeof a === "number" ? a : (typeof b === "number" ? b : d);
+		this.opacityUniform.set(num(mat && mat.opacity, obj.snowOpacity, 0.9));
+		this.sizeScaleUniform.set(num(mat && mat.sizeScale, obj.sizeScale, 20));
+		this.maxSizeUniform.set(num(mat && mat.maxSize, obj.maxSize, 64));
+		this.focusDistUniform.set(num(mat && mat.focusDist, obj.focusDist, 12));
+		this.focusRangeUniform.set(num(mat && mat.focusRange, obj.focusRange, 10));
 
 		// alpha blend; depth test on (geometry occludes flakes) but no depth
 		// write so flakes don't fight each other
