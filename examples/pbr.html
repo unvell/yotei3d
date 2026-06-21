@@ -63,14 +63,13 @@
         }
       }
 
-      // ---- glTF model load (validates the revived loader + material mapping) ----
-      // Placed in the top-left corner and rotated so three faces are visible —
-      // distinct per-face shading confirms normals were unpacked correctly.
-      scene.createObjectFromURL("/models/cube.gltf", obj => {
+      // ---- textured glTF model (full PBR map set: baseColor + emissive +
+      // normal + packed occlusion-roughness-metallic) under the same IBL ----
+      scene.createObjectFromURL("/models/WaterBottle/WaterBottle.gltf", obj => {
         if (!obj) return;
-        obj.location.set(-1.6, 1.7, 5);
-        obj.angle.set(20, 35, 0);
-        obj.scale.set(0.5, 0.5, 0.5);
+        obj.location.set(-2.1, -0.2, 4);
+        obj.angle.set(0, 20, 0);
+        obj.scale.set(11, 11, 11);   // model is authored at real-world ~0.2m
         scene.add(obj);
       });
 
