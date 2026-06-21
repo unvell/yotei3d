@@ -11,9 +11,11 @@ declare module '@jingwood/graphics-math' {
   }
 
   export class Vec3 {
-    x: number;
-    y: number;
-    z: number;
+    // Declared as accessors so subclasses (e.g. ObjectVectorProperty) may
+    // override x/y/z with their own get/set without a property-vs-accessor clash.
+    get x(): number; set x(v: number);
+    get y(): number; set y(v: number);
+    get z(): number; set z(v: number);
     constructor(x?: number | Vec3, y?: number, z?: number);
     clone(): Vec3;
     equals(x: number, y: number, z: number): boolean;
@@ -30,7 +32,7 @@ declare module '@jingwood/graphics-math' {
     cross(v: Vec3): Vec3;
     lerp(v2: Vec3, t: number): Vec3;
     offset(x: number | { x: number; y: number; z: number }, y?: number, z?: number): Vec3;
-    set(x: number | Vec3 | number[], y?: number, z?: number): Vec3;
+    set(x: number | Vec3 | number[], y?: number, z?: number): void;
     static get zero(): Vec3;
     static get one(): Vec3;
     static get One(): Vec3;
@@ -87,6 +89,10 @@ declare module '@jingwood/graphics-math' {
     rotateY(angle: number): Matrix4;
     rotateZ(angle: number): Matrix4;
     scale(x: number, y: number, z: number): Matrix4;
+    lookAt(location: Vec3, target: Vec3, up: Vec3): Matrix4;
+    extractLookAtVectors(): { dir: Vec3; up: Vec3 };
+    toArray(): number[];
+    static Identity: Matrix4;
   }
 
   export class Quaternion {
