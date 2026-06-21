@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Scene, Shapes, SceneObject, Rain, ObjectViewController } from "@";
+    import { Renderer, Scene, Shapes, SceneObject, Rain, GroundFog, ObjectViewController } from "@";
 
     window.addEventListener("load", function() {
 
@@ -49,6 +49,22 @@
         box.mat.roughness = 0.7;
         city.add(box);
       }
+
+      // ---- drifting ground fog ----
+      // Stacked noise planes hugging the ground; slowly flows with the wind.
+      const fog = new GroundFog({
+        size: 70,
+        layers: 4,
+        baseHeight: 0.3,
+        layerGap: 0.8,
+        color: [0.58, 0.62, 0.70],
+        opacity: 0.55,
+        density: 0.6,
+        noiseScale: 0.05,
+        drift: [1.2, 0.4],   // matches the wind direction of the rain
+      });
+      scene.add(fog);
+      scene.on("frame", () => fog.update());
 
       // ---- the rain ----
       // Added after the geometry so the depth buffer already holds the scene;

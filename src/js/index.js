@@ -7,6 +7,7 @@ export * from './scene/camera.js';
 export * from './scene/object.js';
 export * from './scene/animation.js';
 export * from './effect/rain.js';
+export * from './effect/fog.js';
 export * from './view/modelviewer.js';
 export * from './view/objectcontroller.js';
 export * from './view/touchcontroller.js';
