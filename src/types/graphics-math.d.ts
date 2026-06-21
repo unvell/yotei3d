@@ -42,9 +42,13 @@ declare module '@jingwood/graphics-math' {
     static back: Vec3;
     static add(a: Vec3, b: Vec3): Vec3;
     static sub(a: Vec3, b: Vec3): Vec3;
+    static mul(a: Vec3, s: number): Vec3;
+    static neg(a: Vec3): Vec3;
     static lerp(a: Vec3, b: Vec3, t: number): Vec3;
     static dot(a: Vec3, b: Vec3): number;
     static cross(a: Vec3, b: Vec3): Vec3;
+    static length(v: Vec3): number;
+    static normalize(v: Vec3): Vec3;
   }
 
   export class Vec4 {
