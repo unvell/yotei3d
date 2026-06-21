@@ -21,7 +21,7 @@ export class Color4 {
 						this.r = r.r;
 						this.g = r.g;
 						this.b = r.b;
-						this.a = g;
+						this.a = 1;
 					} else if (r instanceof Color4) {
 						this.r = r.r;
 						this.g = r.g;
@@ -34,6 +34,20 @@ export class Color4 {
 					this.b = r;
 					this.a = r;
 				}
+				break;
+
+			case 2:
+				// (Color3 | Color4, alpha) or (gray, alpha)
+				if (typeof r === "object") {
+					this.r = r.r;
+					this.g = r.g;
+					this.b = r.b;
+				} else {
+					this.r = r;
+					this.g = r;
+					this.b = r;
+				}
+				this.a = g;
 				break;
 
 			case 3:

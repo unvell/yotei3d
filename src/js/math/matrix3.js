@@ -5,6 +5,8 @@
 // MIT License (c) 2015-2019 Jingwood, All rights reserved.
 ////////////////////////////////////////////////////////////////////////////////
 
+import { MathFunctions3 } from "./functions3.js";
+
 export class Matrix3 {
 	constructor(copySource) {
 		if (copySource) {
@@ -149,8 +151,8 @@ export class Matrix3 {
 		return m3;
 	}
 
-	extractEulerAngles(order) {
-		return MathFunctions.getEulerAnglesFromMatrix(this, order);
+	extractEulerAngles() {
+		return MathFunctions3.getEulerAnglesFromMatrix(this);
 	}
 
 	mulInv(m1) {

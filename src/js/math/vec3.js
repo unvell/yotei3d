@@ -177,11 +177,17 @@ export class Vec3 {
 		return v1.lerp(v2, t);
 	}
 
-	fromEulers(e1, e2) {
-		var v = MathFunctions.vectorFromEulerAngles(e1, e2);
-		this.x = v.x;
-		this.y = v.y;
-		this.z = v.z;
+	// Sets this vector to a unit direction from pitch (rotation about X) and
+	// yaw (rotation about Y), both in degrees. Inverse of
+	// MathFunctions3.eulerAnglesFromVectors. (+Z is the zero-angle direction.)
+	fromEulers(pitch, yaw) {
+		const p = pitch * Math.PI / 180;
+		const y = yaw * Math.PI / 180;
+		const cp = Math.cos(p);
+		this.x = cp * Math.sin(y);
+		this.y = Math.sin(p);
+		this.z = cp * Math.cos(y);
+		return this;
 	}
 
 	offset(x, y, z) {

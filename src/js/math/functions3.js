@@ -16,7 +16,7 @@ export function approxiEquals3(v1, v2, epsilon = EPSILON) {
 
 export class MathFunctions3 {
 	static clamp3(v, min = 0, max = 1) {
-		new Vec3(MathFunctions.clamp(v.x, min, max),
+		return new Vec3(MathFunctions.clamp(v.x, min, max),
 			MathFunctions.clamp(v.y, min, max),
 			MathFunctions.clamp(v.z, min, max));
 	}
@@ -27,15 +27,21 @@ export class MathFunctions3 {
 		}
 	}
 
+	// Returns the euler angles of the direction from v2 to v1 as a Vec3:
+	// x = pitch (rotation about X), y = yaw (rotation about Y), z = 0 (roll),
+	// all in degrees. Inverse of Vec3.prototype.fromEulers.
 	static eulerAnglesFromVectors(v1, v2) {
-		const l = v1 - v2;
+		const dir = Vec3.sub(v1, v2);
 
-		const padj = sqrt(l.x * l.x + l.z * l.z);
+		const horizontal = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
 
-		const x = atan2f(l.x, l.z);
-		const y = 90 - atan2(padj, l.y);
+		const pitch = Math.atan2(dir.y, horizontal);
+		const yaw = Math.atan2(dir.x, dir.z);
 
-		return { x: MathFunctions.degreeToAngle(x), y: MathFunctions.degreeToAngle(y) };
+		return new Vec3(
+			MathFunctions.degreeToAngle(pitch),
+			MathFunctions.degreeToAngle(yaw),
+			0);
 	}
 
 	static getEulerAnglesFromMatrix(m/*, order*/) {

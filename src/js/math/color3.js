@@ -72,14 +72,14 @@ export class Color3 {
 	}
 
 	length() {
-		return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+		return Math.sqrt(this.r * this.r + this.g * this.g + this.b * this.b);
 	}
 
 	normalize() {
 		const scalar = 1 / this.length();
 
 		if (isFinite(scalar)) {
-			return new Color3(this.x * scalar, this.y * scalar, this.z * scalar);
+			return new Color3(this.r * scalar, this.g * scalar, this.b * scalar);
 		} else {
 			return new Color3();
 		}

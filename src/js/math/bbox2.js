@@ -120,7 +120,7 @@ export class BoundingBox2D {
 		this.min.x = Math.min(p1.x, p2.x, p3.x, p4.x);
 		this.min.y = Math.min(p1.y, p2.y, p3.y, p4.y);
 		this.max.x = Math.max(p1.x, p2.x, p3.x, p4.x);
-		this.max.y = Math.max(p1.x, p2.x, p3.x, p4.x);
+		this.max.y = Math.max(p1.y, p2.y, p3.y, p4.y);
 	}
 
 	updateFromTwoBoundingBoxes(b1, b2) {
@@ -170,6 +170,7 @@ export class BoundingBox2D {
 		if (this.min.x > box2.max.x) return false;
 		if (this.max.y < box2.min.y) return false;
 		if (this.min.y > box2.max.y) return false;
+		return true;
 	}
 
 	toString() {

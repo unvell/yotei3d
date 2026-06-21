@@ -110,8 +110,8 @@ export class BoundingBox3D {
 
 	containsPoint(p) {
 		return p.x > this._min.x && p.x < this._max.x
-			&& p.y > this._min.y && p.x < this._max.y
-			&& p.z > this._min.x && p.z < this._max.z;
+			&& p.y > this._min.y && p.y < this._max.y
+			&& p.z > this._min.z && p.z < this._max.z;
 	}
 
 	containsBox(bbox) {
