@@ -5,7 +5,7 @@ import { BoundingBox3D } from "@/math";
 import { EventDispatcher } from '../utility/event';
 import { SceneObject, Sun, ObjectTypes } from './object';
 import { Material } from './material';
-import { loadObjFormat } from '../utility/objloader';
+import { loadObjFormat, loadMtlFormat } from '../utility/objloader';
 import { ResourceManager, ResourceTypes } from '../utility/resourcemanager';
 import { LightLimitation } from "../shader/standard";
 import { Camera } from "./camera";
@@ -275,11 +275,43 @@ export class Scene {
     return rootObject;
 	}
 
-	createObjectFromObjFormat(url: string, callback: any) {
-		this.resourceManager.add(url, ResourceTypes.Text, (text: any) => {
-			callback(loadObjFormat(text));
+	// Load a Wavefront .obj model. If the file references a companion .mtl
+	// (`mtllib`) it is fetched too so per-material diffuse colours are applied,
+	// unless options.loadMtl === false. options also forwards to loadObjFormat
+	// (e.g. { alignBottom: true } to sit the model on y = 0).
+	createObjectFromObjFormat(url: string, callback: any, options: any = {}) {
+		const rm = new ResourceManager();
+
+		const build = (materials?: any) => {
+			const text = rm.get(url);
+			const obj = loadObjFormat(text, {
+				...options,
+				materials: { ...(materials || {}), ...(options.materials || {}) },
+			});
+			if (typeof callback === "function") callback(obj);
+		};
+
+		rm.add(url, ResourceTypes.Text, (text: any) => {
+			let mtllib: string | undefined;
+			const m = typeof text === "string" ? text.match(/^\s*mtllib\s+(.+)$/m) : null;
+			if (m) mtllib = m[1].trim();
+
+			if (mtllib && options.loadMtl !== false) {
+				const base = url.slice(0, url.lastIndexOf('/') + 1);
+				rm.add(base + mtllib, ResourceTypes.Text, (mtlText: any) => {
+					let materials;
+					try {
+						if (typeof mtlText === "string") materials = loadMtlFormat(mtlText);
+					} catch (e) { console.warn("parse mtl error: " + e); }
+					build(materials);
+				});
+				rm.load();
+			} else {
+				build();
+			}
 		});
-		this.resourceManager.load();
+
+		rm.load();
 	}
 
 	add(...objs: any[]) {

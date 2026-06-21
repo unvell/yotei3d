@@ -5,6 +5,7 @@ export * from './scene/viewer.js';
 export * from './scene/material';
 export * from './scene/camera.js';
 export * from './scene/object.js';
+export * from './scene/terrain';
 export * from './scene/animation.js';
 export * from './effect/rain';
 export * from './effect/fog';
@@ -24,6 +25,7 @@ export * from './utility/event';
 export * from './utility/resourcemanager';
 export * from './utility/archive.js';
 export * from './utility/gltfloader.js';
+export * from './utility/objloader';
 export * from './utility/utility';
 
 import * as Shapes from './scene/shapes';

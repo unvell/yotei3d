@@ -147,6 +147,12 @@ const exampleItems = ref([
     desc: 'Spherical-harmonic light-probe irradiance volume (toggle to compare).',
   },
   {
+    title: 'Terrain',
+    thumbnail: '/img/examples/terrain.png',
+    link: 'terrain.html',
+    desc: 'Procedural heightfield terrain scattered with a low-poly tree model.',
+  },
+  {
     title: 'Floor Walkthrough',
     thumbnail: '/img/examples/floor-walkthrough.png',
     link: 'floor-walkthrough.html',

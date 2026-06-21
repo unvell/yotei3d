@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Terrain - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Terrain, PointLight, ObjectViewController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.62, 0.78, 0.92, 1],
+        enableLighting: true,
+        enablePostprocess: true,
+        enableAntialias: true,
+        enableShadow: true,
+        enableSSAO: true,
+        enableEnvmap: true,
+        shadowQuality: {
+          scale: 26,
+          viewDepth: 4,
+          resolution: 2048,
+          intensity: 0.32,
+          enableCache: false,
+        },
+        bloomEffect: {
+          enabled: true,
+          threshold: 0.85,
+          gamma: 1.2,
+        },
+        renderingImage: {
+          gamma: 1.1,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // --- terrain: rolling hills generated from fractal value-noise ---------
+      const terrain = new Terrain({
+        width: 70,
+        depth: 70,
+        segments: 110,
+        height: 7,
+        noiseScale: 3.5,
+        octaves: 5,
+        seed: 7,
+        color: [0.30, 0.44, 0.20],
+      });
+      scene.add(terrain);
+
+      // --- load the low-poly tree once, then scatter clones over the hills --
+      scene.createObjectFromObjFormat("/models/low_poly_tree/Lowpoly_tree_sample.obj", tree => {
+        if (!tree) return;
+
+        terrain.scatter(() => tree.clone(), 70, {
+          minScale: 0.16,
+          maxScale: 0.34,
+          yOffset: -0.25,        // sink the trunk base slightly into the ground
+          maxSlopeAngle: 38,     // keep trees off the steepest faces
+          margin: 2,
+        });
+
+        scene.shadowMapUpdateRequested = true;
+        scene.requireUpdateFrame();
+      }, { alignBottom: true }); // sit the model's base on y = 0 for ground placement
+
+      // --- lighting ---------------------------------------------------------
+      // warm, fairly high sun for long soft shadows across the landscape
+      scene.sun.location.set(8, 14, 6);
+      scene.sun.mat.color = [1.25, 1.18, 1.0];
+
+      const fill = new PointLight();
+      fill.location.set(-20, 18, -14);
+      fill.mat.emission = 12;
+      fill.mat.color = [0.7, 0.8, 1.0];
+      scene.add(fill);
+
+      // --- camera + orbit/zoom controller -----------------------------------
+      scene.mainCamera.fieldOfView = 55;
+      scene.mainCamera.location.set(0, 26, 52);
+      scene.mainCamera.angle.set(-24, 0, 0);
+
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+        minVerticalRotateAngle: -4,
+        maxVerticalRotateAngle: 80,
+      });
+      controller.targetObject = terrain;
+
+      scene.show();
+    });
+
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center bg-gray-800/40 text-white">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Procedural terrain scattered with low-poly trees. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
