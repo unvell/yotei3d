@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Clouds - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject, Clouds, TouchController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.42, 0.62, 0.86, 1.0],   // clear blue sky
+        enablePostprocess: true,
+        enableLighting: true,
+        enableShadow: true,
+        renderingImage: {
+          gamma: 1.1,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // ---- a simple green ground to anchor the horizon ----
+      const ground = new Shapes.Plane();
+      ground.scale.set(400, 1, 400);
+      ground.mat.color = [0.46, 0.62, 0.36];
+      ground.mat.roughness = 0.95;
+      scene.add(ground);
+
+      // a few low hills so the scene isn't empty
+      const props = new SceneObject();
+      scene.add(props);
+      for (let i = 0; i < 8; i++) {
+        const s = new Shapes.Sphere(20, 32);
+        const r = 6 + Math.random() * 10;
+        s.scale.set(r, r * 0.4, r);
+        s.location.set((Math.random() - 0.5) * 160, -r * 0.28, -30 - Math.random() * 140);
+        const g = 0.42 + Math.random() * 0.12;
+        s.mat.color = [g * 0.85, g, g * 0.6];
+        s.mat.roughness = 0.95;
+        props.add(s);
+      }
+
+      // ---- the clouds ----
+      const clouds = new Clouds({
+        clusters: 28,
+        width: 280, depth: 280,
+        height: 42,
+        heightVariance: 14,
+        wind: [3.2, 0.8],
+        opacity: 0.95,
+      });
+      scene.add(clouds);
+
+      scene.on("frame", () => clouds.update());
+
+      // warm midday sun
+      scene.sun.location.set(0.5, 1, 0.4);
+      scene.sun.mat.color = [1.05, 1.02, 0.95];
+
+      scene.mainCamera.fieldOfView = 64;
+      scene.mainCamera.location.set(0, 9, 55);
+      scene.mainCamera.angle.set(9, 0, 0);
+
+      const controller = new TouchController(scene);
+
+      scene.animation = true;   // continuous redraw for the drifting clouds
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Soft puffy clouds drifting across a blue sky. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

@@ -10,6 +10,7 @@ export * from './effect/rain.js';
 export * from './effect/fog.js';
 export * from './effect/lightning.js';
 export * from './effect/snow.js';
+export * from './effect/cloud.js';
 export * from './view/modelviewer.js';
 export * from './view/objectcontroller.js';
 export * from './view/touchcontroller.js';
