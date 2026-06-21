@@ -101,6 +101,45 @@
       window._lightning = lightning;
       scene.on("frame", () => lightning.update());
 
+      // ---- sound ----
+      // Rain loop: Sound Effect by LIECIO from Pixabay
+      // Thunder:   Sound Effect by Evana Limon from Pixabay
+      const rainSound = new Audio("/audio/calming-rain.mp3");
+      rainSound.loop = true;
+      rainSound.volume = 0.55;
+
+      const thunderSound = new Audio("/audio/thunderstorm.mp3");
+      thunderSound.volume = 0.8;
+
+      let soundOn = false;
+      const soundBtn = document.getElementById("sound-toggle");
+
+      function setSound(on) {
+        soundOn = on;
+        if (on) {
+          rainSound.play().catch(() => {});
+          soundBtn.textContent = "🔊 Sound: On";
+        } else {
+          rainSound.pause();
+          thunderSound.pause();
+          soundBtn.textContent = "🔈 Sound: Off";
+        }
+      }
+      // browsers block audio until a user gesture — the click counts as one
+      soundBtn.addEventListener("click", () => setSound(!soundOn));
+
+      // play thunder just after the flash (sound lags light), no overlap
+      lightning.options.onStrike = () => {
+        if (!soundOn) return;
+        if (!thunderSound.paused && !thunderSound.ended) return;  // already rolling
+        const delay = 250 + Math.random() * 450;
+        setTimeout(() => {
+          if (!soundOn) return;
+          thunderSound.currentTime = 0;
+          thunderSound.play().catch(() => {});
+        }, delay);
+      };
+
       scene.mainCamera.fieldOfView = 50;
       scene.mainCamera.location.set(0, 6, 28);
       scene.mainCamera.angle.set(-8, 0, 0);
@@ -119,6 +158,8 @@
 	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
 		<div class="menu hover:text-sky-600">
 			&lt; <a href="index.html">Back</a>
+			&nbsp;&nbsp;
+			<a id="sound-toggle" href="javascript:void(0)">🔈 Sound: Off</a>
 		</div>
     <div>Real-time rainfall with slanted streak particles. Drag to orbit, scroll to zoom.</div>
 		<div class="logo">
@@ -127,6 +168,12 @@
 	</div>
 
 	<div id="canvas-container">
+	</div>
+
+	<div class="fixed bottom-0 left-0 z-10 px-4 py-2" style="font-size:11px; opacity:0.55;">
+		Sound Effect by LIECIO from <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a>
+		&nbsp;·&nbsp;
+		Sound Effect by Evana Limon from <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a>
 	</div>
 </body>
 </html>

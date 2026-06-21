@@ -22,6 +22,7 @@ export class LightningFlash {
 			skyBoost: 0.85,            // peak amount added to the sky colour
 			minInterval: 4,            // seconds between strikes (min)
 			maxInterval: 11,           // seconds between strikes (max)
+			onStrike: null,            // callback fired when a strike begins (e.g. play thunder)
 		}, options);
 
 		// remember the resting values so each frame can restore towards them
@@ -61,6 +62,10 @@ export class LightningFlash {
 		this._spikes = spikes;
 		this._elapsed = 0;
 		this._duration = t + 0.35;                       // let the last spike fade out
+
+		if (typeof this.options.onStrike === "function") {
+			this.options.onStrike(this);
+		}
 	}
 
 	_intensity() {
