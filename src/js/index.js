@@ -6,7 +6,7 @@ export * from './scene/material';
 export * from './scene/camera.js';
 export * from './scene/object.js';
 export * from './scene/animation.js';
-export * from './effect/rain.js';
+export * from './effect/rain';
 export * from './effect/fog.js';
 export * from './effect/lightning.js';
 export * from './effect/snow.js';
