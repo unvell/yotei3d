@@ -14,6 +14,7 @@ export * from './view/modelviewer.js';
 export * from './view/objectcontroller.js';
 export * from './view/touchcontroller.js';
 export * from './view/floorviewcontroller.js'
+export * from './view/fpscontroller'
 export * from './webgl/cubemap.js';
 export * from './webgl/texture';
 export * from './webgl/shader.js';

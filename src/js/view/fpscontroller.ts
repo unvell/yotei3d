@@ -1,6 +1,14 @@
 import { Vec3, Matrix4 } from "@jingwood/graphics-math";
+import { Keys, MouseButtons } from "../scene/viewer";
+import { invokeIfExist } from "../utility/utility";
 
 export class FPSController {
+  scene: any;
+  renderer: any;
+  options: any;
+
+  /** optional callback, invoked after a first-person move (if assigned) */
+  oncameramove?: (...args: any[]) => any;
 
   static defaultOptions() {
     return {
@@ -8,44 +16,44 @@ export class FPSController {
     };
   }
 
-  constructor(scene, options) {
+  constructor(scene: any, options?: any) {
     this.scene = scene;
     this.renderer = scene.renderer;
     this.options = { ...FPSController.defaultOptions(), ...options };
 
     const viewer = this.renderer.viewer;
-    let movementDetectingTimer = null;
+    let movementDetectingTimer: any = null;
 
-    scene.on("keydown", _ => {
+    scene.on("keydown", () => {
       if (!movementDetectingTimer) {
-        movementDetectingTimer = setInterval(_ => {
+        movementDetectingTimer = setInterval(() => {
           this.detectFirstPersonMove();
         }, 10);
       }
     });
 
-    scene.on("keyup", _ => {
+    scene.on("keyup", () => {
       if (viewer.pressedKeys.length === 0) {
         clearInterval(movementDetectingTimer);
         movementDetectingTimer = null;
       }
     });
 
-    scene.on("begindrag", _ => {
+    scene.on("begindrag", () => {
       this.renderer.viewer.setCursor("none");
     });
 
-    scene.on("enddrag", _ => {
+    scene.on("enddrag", () => {
       this.renderer.viewer.setCursor("auto");
     });
 
-    scene.on("drag", _ => {
+    scene.on("drag", () => {
       const camera = scene.mainCamera;
-    
+
       if (viewer && camera) {
         if (viewer.mouse.pressedButtons.has(MouseButtons.Left)
           || viewer.touch.fingers == 1) {
-          
+
           if (viewer.pressedKeys.has(Keys.Shift)) {
             this.dragToMoveCamera();
           } else {
@@ -72,21 +80,17 @@ export class FPSController {
     else if (camera.angle.x > 80) camera.angle.x = 80;
 
     camera.angle.y = (camera.angle.y + 360) % 360;
-      
+
     this.scene.requireUpdateFrame();
   }
-};
 
-FPSController.prototype.dragToMoveCamera = (function() {
-  var m;
-    
-  return function() {
+  dragToMoveCamera() {
     var viewer = this.renderer.viewer;
     var camera = this.scene.mainCamera;
 
-    if (m === undefined) m = new Matrix4();
+    const m = new Matrix4();
     m.loadIdentity().rotate(camera.angle);
-          
+
     var transformedDir = new Vec3(
       viewer.mouse.movement.x * 50 / viewer.renderer.renderSize.width, 0,
       viewer.mouse.movement.y * 50 / viewer.renderer.renderSize.height).mulMat(m);
@@ -97,16 +101,13 @@ FPSController.prototype.dragToMoveCamera = (function() {
     camera.onmove();
 
     this.scene.requireUpdateFrame();
-  };
-})();
-  
-FPSController.prototype.detectFirstPersonMove = (function() {
-  const m = new Matrix4(), dir = new Vec3();
-    
-  return function() {
+  }
+
+  detectFirstPersonMove() {
+    const m = new Matrix4(), dir = new Vec3();
+
     var scene = this.scene;
     var viewer = this.renderer.viewer;
-    var Viewer = Viewer;
 
     if (scene && scene.mainCamera) {
       var camera = scene.mainCamera;
@@ -136,7 +137,7 @@ FPSController.prototype.detectFirstPersonMove = (function() {
           dir.z = 1;
         }
       }
-      
+
       if (viewer.pressedKeys.has(Keys.Left)) {
         camera.angle.y += this.options.moveSpeed * 10;
         scene.requireUpdateFrame();
@@ -146,11 +147,11 @@ FPSController.prototype.detectFirstPersonMove = (function() {
       }
 
       camera.angle.y = (camera.angle.y + 360) % 360;
-        
+
       if (dir.x !== 0 || dir.y !== 0 || dir.z !== 0) {
 
         m.loadIdentity().rotate(camera.angle);
-          
+
         var transformedDir = dir.mulMat(m);
 
         transformedDir.y = 0;
@@ -162,6 +163,5 @@ FPSController.prototype.detectFirstPersonMove = (function() {
         invokeIfExist(this, "oncameramove");
       }
     }
-  };
-})();
-
+  }
+}
