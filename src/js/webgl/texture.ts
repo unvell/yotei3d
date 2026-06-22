@@ -222,6 +222,20 @@ export class Texture {
   // e.g. a decoded HDR equirectangular panorama. WebGL2 only; on WebGL1 the
   // data is uploaded as clamped RGBA8.
   static createFloat(renderer: any, width: number, height: number, data: Float32Array): Texture {
+    // RGBA16F (half-float) can only represent magnitudes up to 65504. HDR
+    // panoramas that contain the sun disk routinely store values of 10^5+,
+    // which overflow to +Infinity the moment they're narrowed to half-float on
+    // upload. That Infinity then bleeds into NaN through cubemap mip-filtering
+    // and the IBL irradiance/specular convolution, smearing the whole scene
+    // with magenta/purple garbage. Clamp the source to the half-float ceiling
+    // (in place — the decoded buffer is single-use) so every downstream value
+    // stays finite while the sun is still represented as an extremely bright,
+    // well-defined highlight.
+    const HALF_FLOAT_MAX = 65504;
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] > HALF_FLOAT_MAX) data[i] = HALF_FLOAT_MAX;
+    }
+
     const tex = new Texture();
     tex.renderer = renderer;
     tex.image = data;
