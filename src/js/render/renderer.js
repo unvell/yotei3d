@@ -27,7 +27,7 @@ export class Renderer {
 				method: ProjectionMethods.Persp,
 				angle: 70.0,
 				near: 0.5,
-				far: 50.0,
+				far: 200.0,
 			},
 			backColor: new Color4(0.93, 0.93, 0.93, 1.0),
 			backgroundImage: null,
