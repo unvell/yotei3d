@@ -27,12 +27,10 @@
           near: 1,
           far: 400,
         },
+        // The shadow frustum auto-fits to the scene each frame, so this large
+        // open terrain needs no scale/viewDepth tuning — just a higher
+        // resolution to keep the wide-area shadows crisp.
         shadowQuality: {
-          scale: 42,
-          // depth slab must span the terrain along the light direction. With a
-          // 70×70 terrain lit from a corner this reaches ~±35, so a viewDepth of
-          // 6 left almost all of it outside the slab (false self-shadow band).
-          viewDepth: 40,
           resolution: 2048,
           intensity: 0.3,
           enableCache: false,

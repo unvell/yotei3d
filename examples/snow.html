@@ -15,13 +15,9 @@
         enablePostprocess: true,
         enableLighting: true,
         enableShadow: true,
-        // The ground plane is 60×60 but the drifts sit within ~±15. Size the
-        // shadow frustum to that region (the default scale:5 / viewDepth:2 only
-        // covered a tiny central patch, so the rest fell outside the depth slab
-        // and read as a false diagonal half-shadow).
+        // The shadow frustum now auto-fits to the scene each frame, so no
+        // scale/viewDepth tuning is needed — just pick a resolution + intensity.
         shadowQuality: {
-          scale: 20,
-          viewDepth: 16,
           resolution: 1024,
           intensity: 0.25,
           enableCache: false,
