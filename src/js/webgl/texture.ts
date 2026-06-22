@@ -13,6 +13,7 @@ export class Texture {
   linearInterpolation: boolean;
   canMipmap: boolean;
   _mipmapped: boolean;
+  hdr?: boolean;
 
   constructor(image?: any) {
     this.glTexture = null;
@@ -120,7 +121,12 @@ export class Texture {
 
     gl.bindTexture(gl.TEXTURE_2D, this.glTexture);
 
-    if (this.image === null || this.image instanceof Uint8Array || this.image instanceof Float32Array) {
+    if (this.hdr && this.renderer.isWebGL2) {
+      // floating-point source (e.g. a decoded equirectangular HDR panorama).
+      // RGBA16F is texture-filterable in core WebGL2, so LINEAR sampling works
+      // without extra extensions.
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, this.width, this.height, 0, gl.RGBA, gl.FLOAT, this.image);
+    } else if (this.image === null || this.image instanceof Uint8Array || this.image instanceof Float32Array) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.image);
     } else if (typeof Image === "function" && this.image instanceof Image) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.image);
@@ -201,6 +207,21 @@ export class Texture {
     const tex = new Texture(new Uint8Array([255, 255, 255, 255]));
     tex.width = 1;
     tex.height = 1;
+    return tex;
+  }
+
+  // Create a floating-point (RGBA16F) 2D texture from linear float pixel data —
+  // e.g. a decoded HDR equirectangular panorama. WebGL2 only; on WebGL1 the
+  // data is uploaded as clamped RGBA8.
+  static createFloat(renderer: any, width: number, height: number, data: Float32Array): Texture {
+    const tex = new Texture();
+    tex.renderer = renderer;
+    tex.image = data;
+    tex.width = width;
+    tex.height = height;
+    tex.hdr = true;
+    tex.enableMipmapped = false;
+    tex.linearInterpolation = true;
     return tex;
   }
 }

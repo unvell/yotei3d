@@ -21,6 +21,7 @@ export * from './view/touchcontroller.js';
 export * from './view/floorviewcontroller.js'
 export * from './view/fpscontroller'
 export * from './webgl/cubemap.js';
+export * from './webgl/hdrskybox.js';
 export * from './webgl/texture';
 export * from './webgl/shader.js';
 export * from './webgl/mesh.js';
@@ -29,6 +30,7 @@ export * from './utility/resourcemanager';
 export * from './utility/archive.js';
 export * from './utility/gltfloader.js';
 export * from './utility/objloader';
+export * from './utility/hdrloader.js';
 export * from './utility/utility';
 
 import * as Shapes from './scene/shapes';

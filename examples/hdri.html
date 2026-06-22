@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>HDRI Environment - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject, HDRSkyBox, ObjectViewController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        enablePostprocess: true,
+        enableEnvmap: true,    // drives runtime IBL baking from the (HDR) skybox
+        enableShadow: true,
+        renderingImage: {
+          gamma: 1.1,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // image-based lighting from a single equirectangular HDR (Radiance .hdr)
+      // panorama. HDRSkyBox decodes it to linear float, projects it into a
+      // mipmapped HDR cubemap, and (with enableEnvmap) the renderer bakes a
+      // diffuse irradiance map + uses the cube for specular reflections.
+      const sky = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_02_4k.hdr", {
+        faceSize: 1024,
+      });
+      scene.skybox = sky;
+
+      scene.iblIntensity = 1.0;
+      scene.exposure = 1.0;
+
+      // ---- PBR test grid: metallic (rows) x roughness (columns) ----
+      const grid = new SceneObject();
+      scene.add(grid);
+
+      const N = 6;
+      const spacing = 1.15;
+      for (let row = 0; row < N; row++) {
+        const metallic = row / (N - 1);
+        for (let col = 0; col < N; col++) {
+          const roughness = Math.max(0.05, col / (N - 1));
+
+          const sphere = new Shapes.Sphere(24, 48);
+          sphere.mat.color = [0.95, 0.95, 0.95];
+          sphere.mat.metallic = metallic;
+          sphere.mat.roughness = roughness;
+
+          sphere.location.set(
+            (col - (N - 1) / 2) * spacing,
+            (row - (N - 1) / 2) * spacing,
+            0
+          );
+          sphere.scale.set(0.5, 0.5, 0.5);
+          grid.add(sphere);
+        }
+      }
+
+      // ---- textured glTF model under the same HDRI lighting ----
+      scene.createObjectFromURL("/models/WaterBottle/WaterBottle.gltf", obj => {
+        if (!obj) return;
+        obj.location.set(-2.1, -0.2, 4);
+        obj.angle.set(0, 20, 0);
+        obj.scale.set(11, 11, 11);
+        scene.add(obj);
+      });
+
+      scene.sun.location.set(1, 1, 1);
+      scene.sun.mat.color = [1.0, 0.98, 0.95];
+
+      scene.mainCamera.fieldOfView = 50;
+      scene.mainCamera.location.set(0, 0, 9);
+      scene.mainCamera.angle.set(0, 0, 0);
+
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+      });
+      controller.targetObject = grid;
+
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>HDRI: equirectangular .hdr panorama as skybox + image-based lighting. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

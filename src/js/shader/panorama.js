@@ -21,6 +21,7 @@ export class PanoramaShader extends Shader {
 
 		this.textureUniform = this.bindUniform("texture", "tex", 0);
 		this.colorUniform = this.bindUniform("color", "color3");
+		this.hdrExposureUniform = this.bindUniform("hdrExposure", "float");
 		// this.texTilingUniform = this.findUniform("texTiling");
 		// this.opacityUniform = this.bindUniform("opacity", "float");
 
@@ -91,6 +92,15 @@ export class PanoramaShader extends Shader {
     } else {
       this.textureUniform.set(this.emptyCubemap);
 		}
+
+		// HDR skies carry values > 1, so tone-map them with the scene exposure to
+		// stay consistent with lit objects. LDR cubemaps pass through unchanged.
+		let hdrExposure = 0.0;
+		if (texture && texture.hdr) {
+			const scene = this.renderer.currentScene;
+			hdrExposure = (scene && typeof scene.exposure === "number") ? scene.exposure : 1.0;
+		}
+		this.hdrExposureUniform.set(hdrExposure);
 
 		// color
 		if (color) {

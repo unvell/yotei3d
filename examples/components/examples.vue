@@ -128,6 +128,13 @@ const exampleItems = ref([
     isHover: false,
   },
   {
+    title: 'HDRI Environment',
+    thumbnail: '/img/examples/pbr.png',
+    link: 'hdri.html',
+    desc: 'Equirectangular .hdr (Radiance) panorama used as a skybox and image-based lighting source — projected to a float cubemap with diffuse irradiance + specular reflections.',
+    isHover: false,
+  },
+  {
     title: 'WaterBottle (glTF PBR)',
     thumbnail: '/img/examples/waterbottle.png',
     link: 'waterbottle.html',

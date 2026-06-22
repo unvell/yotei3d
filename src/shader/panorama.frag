@@ -1,13 +1,24 @@
 
-precision mediump float;
+precision highp float;
 
 uniform samplerCube texture;
 uniform vec3 color;
+
+// > 0 enables exposure tone mapping, so an HDR sky's highlights roll off to
+// 1.0 instead of hard-clipping to white. Matches standard.frag's tonemap() so
+// the background stays consistent with lit/reflective objects. Left at 0 for
+// ordinary LDR cubemap skyboxes (unchanged passthrough).
+uniform float hdrExposure;
+
 varying vec3 texcoord;
 
 void main(void) {
 
 	vec3 fcolor = textureCube(texture, texcoord).rgb * color;
+
+	if (hdrExposure > 0.0) {
+		fcolor = vec3(1.0) - exp(-fcolor * hdrExposure);
+	}
 
 	gl_FragColor = vec4(fcolor, 1.0);
 }

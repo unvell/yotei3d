@@ -8,6 +8,10 @@
 /examples-dist
 node_modules
 
+# Large HDR/EXR test assets (kept local, not committed)
+/examples/textures/hdr/*.hdr
+/examples/textures/hdr/*.exr
+
 # yotei3d-*.tgz
 # yotei3d-min.js
 # yotei3d-single.js

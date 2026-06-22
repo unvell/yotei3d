@@ -18,6 +18,7 @@ import { ShadowMapShader } from './shadowmap';
 import { AttributeShader } from './attrib';
 import { SSAOShader } from './ssao';
 import { IrradianceShader } from './ibl';
+import { EquirectShader } from './equirect';
 
 // import viewerVert from '../../shader/viewer.vert';
 // import viewerFrag from '../../shader/viewer.frag';
@@ -67,6 +68,7 @@ import ssaoVert from '../../shader/ssao.vert';
 import ssaoFrag from '../../shader/ssao.frag';
 import iblVert from '../../shader/ibl.vert';
 import irradianceFrag from '../../shader/irradiance.frag';
+import equirectFrag from '../../shader/equirect.frag';
 
 export const ShaderSources = {
   // viewer: { vert: viewerVert, frag: viewerFrag, class: "ViewerShader" },
@@ -94,5 +96,6 @@ export const ShaderSources = {
   attributemap: { vert: attribmapVert, frag: attribmapFrag, class: AttributeShader },
   ssao: { vert: ssaoVert, frag: ssaoFrag, class: SSAOShader },
   irradiance: { vert: iblVert, frag: irradianceFrag, class: IrradianceShader },
+  equirect: { vert: iblVert, frag: equirectFrag, class: EquirectShader },
 
 }

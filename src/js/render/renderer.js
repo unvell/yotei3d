@@ -175,6 +175,18 @@ export class Renderer {
 			}
 		}
 
+		// HDR / floating-point render targets — required for HDRI environment
+		// maps: the equirectangular->cubemap projection and the diffuse
+		// irradiance bake both render into RGBA16F cube faces, which is only
+		// color-renderable with this extension. Half-float *filtering* is core
+		// in WebGL2, so reflections still get smooth roughness mip blending.
+		// When unavailable the HDR pipeline gracefully falls back to RGBA8
+		// (the environment is still used for IBL, just clamped to LDR range).
+		this.extHDR = false;
+		if (this.isWebGL2) {
+			this.extHDR = !!gl.getExtension("EXT_color_buffer_float");
+		}
+
 		this.canvas.addEventListener('webglcontextlost', function (e) {
 			console.error(e);
 			console.error(gl.getError());

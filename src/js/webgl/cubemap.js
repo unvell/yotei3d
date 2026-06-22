@@ -38,7 +38,7 @@ export class CubeMap {
     return CubeMap.LoadingFaces;
   }
 
-  create(width, height, defaultData) {
+  create(width, height, defaultData, options) {
     if (!this.renderer) {
       throw "renderer must be specified before create empty cubemap";
     }
@@ -46,16 +46,25 @@ export class CubeMap {
     this.width = width;
     this.height = height;
 
+    const opts = options || {};
+    // HDR faces use RGBA16F (half-float). Requires WebGL2 + a color-renderable
+    // float target (EXT_color_buffer_float); otherwise fall back to RGBA8 and
+    // let the environment clamp to LDR range.
+    this.hdr = !!(opts.hdr && this.renderer.isWebGL2 && this.renderer.extHDR);
+
     this.use();
-    
+
     const gl = this.gl;
     const faces = this.getLoadingFaces();
 
     this.setParameters();
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-    
+
+    const internalFormat = this.hdr ? gl.RGBA16F : gl.RGBA;
+    const type = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+
     for (let i = 0; i < faces.length; i++) {
-      gl.texImage2D(faces[i], 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, defaultData);
+      gl.texImage2D(faces[i], 0, internalFormat, width, height, 0, gl.RGBA, type, defaultData);
     }
 
     this.disuse();
@@ -72,7 +81,11 @@ export class CubeMap {
     gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     if (this.mipmappable) {
-      gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+      // trilinear (LINEAR_MIPMAP_LINEAR) lets the standard shader's explicit-LOD
+      // reflection sampling blend smoothly across roughness; plain
+      // LINEAR_MIPMAP_NEAREST would band between mip levels.
+      gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER,
+        this.trilinear ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR_MIPMAP_NEAREST);
     } else {
       gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }
