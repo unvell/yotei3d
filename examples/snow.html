@@ -13,15 +13,8 @@
       const renderer = new Renderer({
         backColor: [0.74, 0.79, 0.86, 1.0],   // soft overcast winter sky
         enablePostprocess: true,
-        enableLighting: true,
-        enableShadow: true,
-        // The shadow frustum now auto-fits to the scene each frame, so no
-        // scale/viewDepth tuning is needed — just pick a resolution + intensity.
-        shadowQuality: {
-          resolution: 1024,
-          intensity: 0.25,
-          enableCache: false,
-        },
+        enableLighting: false,
+        enableShadow: false,
         renderingImage: {
           gamma: 1.05,
           resolutionRatio: 1,
@@ -79,7 +72,7 @@
 
       // distance fog: far mounds and the horizon fade into the winter haze.
       // Colour defaults to the background sky if omitted.
-      scene.fog = { near: 24, far: 64 };
+      scene.fog = { near: 24, far: 30 };
 
       // soft cool daylight
       scene.sun.location.set(0.4, 1, 0.5);
