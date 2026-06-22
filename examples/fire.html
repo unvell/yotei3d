@@ -77,6 +77,8 @@
         swayAmp: 0.2,
         swayFreq: 6.5,
         intensity: 1.0,
+        sizeBase: 30,
+        sizeTip: 12,
       });
       fire.location.y = 0.2;
       scene.add(fire);
@@ -85,13 +87,16 @@
       const smoke = new Smoke({
         count: 280,
         radius: 0.45,
-        baseY: 2.6,
+        baseY: 3.6,
         height: 9,
         riseSpeed: 1.5,
         wind: [0.6, 0.15],
         swirl: 0.6,
         spread: 4.8,
-        opacity: 0.2,
+        opacity: 0.1,
+        sizeStart: 50,  // 22 → 36
+        sizeEnd: 140,   // 90 → 140
+        maxSize: 320,   // 大粒が頭打ちしないよう少し上げる
       });
       scene.add(smoke);
 
