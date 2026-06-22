@@ -105,6 +105,8 @@
         selfShadow: 0.35,                   // darker undersides = more volume
         fadeIn: 3.5,
         groundShadow: true,                 // soft shadows drifting on the grass
+        groundTarget: terrain,              // follow the terrain surface (not a fixed height)
+        shadowY: 0.6,                       // float just above the ground
         shadowStrength: 0.34,
         shadowScale: 1.7,
       });
@@ -117,8 +119,8 @@
       scene.sun.mat.color = [1.05, 1.02, 0.95];
 
       scene.mainCamera.fieldOfView = 70;
-      scene.mainCamera.location.set(0, 20, 88);
-      scene.mainCamera.angle.set(4, 0, 0);   // a touch of ground so cloud shadows show
+      scene.mainCamera.location.set(0, 24, 92);
+      scene.mainCamera.angle.set(9, 0, 0);   // a touch of ground so cloud shadows show
 
       const controller = new TouchController(scene);
 

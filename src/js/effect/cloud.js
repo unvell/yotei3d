@@ -57,7 +57,12 @@ export class Clouds extends ParticleObject {
 			// simple cast shadow: a soft dark blob on the ground per cluster,
 			// drifting with the wind (see the "cloudshadow" shader)
 			groundShadow: false,     // enable the ground shadow
-			shadowY: 0.2,            // height the shadow blobs sit at (just above ground)
+			shadowY: 0.2,            // flat ground: the blob's world height. with a
+			                         //   groundTarget: how far the blob floats above
+			                         //   the sampled surface.
+			groundTarget: null,      // optional object with getHeightAt(x,z) (e.g. a
+			                         //   Terrain) so shadows follow an uneven surface
+			                         //   instead of sitting at a fixed height
 			shadowStrength: 0.3,     // peak shadow opacity
 			shadowScale: 1.6,        // shadow radius relative to clusterRadius
 			shadowColor: [0.05, 0.07, 0.10],
@@ -184,10 +189,22 @@ export class Clouds extends ParticleObject {
 		const rad = o.clusterRadius * o.shadowScale;
 		// match the layer fade-in (cloudOpacity ramps from 0 to opacity)
 		const fadeIn = o.opacity > 0 ? this.cloudOpacity / o.opacity : 1;
+
+		// optionally snap each blob onto an uneven ground (e.g. a Terrain) so it
+		// isn't buried under hills; otherwise sit at the fixed shadowY height
+		const g = o.groundTarget;
+		const sample = g && typeof g.getHeightAt === "function";
+		const gx = sample && g.location ? g.location.x : 0;
+		const gy = sample && g.location ? g.location.y : 0;
+		const gz = sample && g.location ? g.location.z : 0;
+
 		for (let ci = 0; ci < planes.length; ci++) {
 			const p = planes[ci];
 			const cx = this._cx[ci], cz = this._cz[ci];
-			p.location.set(cx, o.shadowY, cz);
+			// world XZ of the cluster, then the ground height under it
+			const wx = this.location.x + cx, wz = this.location.z + cz;
+			const surfaceY = sample ? g.getHeightAt(wx - gx, wz - gz) + gy + o.shadowY : o.shadowY;
+			p.location.set(cx, surfaceY - this.location.y, cz);
 			p.scale.set(rad, 1, rad);
 			// fade toward the volume rim, same as the cloud puffs
 			const e = Math.max(Math.abs(cx) / halfW, Math.abs(cz) / halfD);
