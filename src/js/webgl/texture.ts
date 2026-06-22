@@ -14,6 +14,10 @@ export class Texture {
   canMipmap: boolean;
   _mipmapped: boolean;
   hdr?: boolean;
+  // Upload the image bottom-row-first (UNPACK_FLIP_Y). The engine's default is
+  // top-origin UVs (matching glTF), so set this for bottom-origin sources such
+  // as a texture hand-assigned to a Wavefront .obj mesh.
+  flipY?: boolean;
 
   constructor(image?: any) {
     this.glTexture = null;
@@ -121,6 +125,8 @@ export class Texture {
 
     gl.bindTexture(gl.TEXTURE_2D, this.glTexture);
 
+    if (this.flipY) gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
     if (this.hdr && this.renderer.isWebGL2) {
       // floating-point source (e.g. a decoded equirectangular HDR panorama).
       // RGBA16F is texture-filterable in core WebGL2, so LINEAR sampling works
@@ -131,6 +137,8 @@ export class Texture {
     } else if (typeof Image === "function" && this.image instanceof Image) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.image);
     }
+
+    if (this.flipY) gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
     const err = gl.getError();
     if (err) console.log(err);
