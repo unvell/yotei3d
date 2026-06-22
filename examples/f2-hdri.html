@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, SceneObject, HDRSkyBox, ObjectViewController, Texture } from "@";
+    import { Renderer, Shapes, SceneObject, PointLight, HDRSkyBox, ObjectViewController, Texture } from "@";
 
     window.addEventListener("load", function() {
 
@@ -16,7 +16,7 @@
         enableShadow: false,     // flying shot: no ground geometry to receive shadows
         bloomEffect: {
           enabled: true,
-          threshold: 0.75,
+          threshold: 0.5,    // low enough that the afterburner plume haloes
           gamma: 1.3,
         },
         renderingImage: {
@@ -75,6 +75,44 @@
           scene.requireUpdateFrame();
         };
         img.src = "/models/F2/skin1.jpg";
+
+        // ---- afterburner ----
+        // The exhaust nozzle sits at the rear of the fuselage (model-local
+        // z ≈ -4.6, exhaust pointing -Z). Build a glowing plume from a chain of
+        // additive, emissive blobs that fade hot-blue → white → orange → red and
+        // taper to a point; the bloom pass turns them into a soft flame. A point
+        // light throws warm light onto the airframe. All parented to the jet so
+        // the plume tracks the aircraft's pose.
+        const burner = new SceneObject();
+        burner.location.set(0, -0.1, -4.6);
+        obj.add(burner);
+
+        // many heavily-overlapping blobs so they merge into one tapering plume
+        function blob(z, rad, color, opacity) {
+          const p = new Shapes.Sphere(16, 24);
+          p.scale.set(rad, rad, rad * 1.8);     // elongated along the exhaust
+          p.location.set(0, 0, z);
+          p.mat.color = color;
+          p.mat.emission = 1.0;                 // self-lit (feeds the bloom pass)
+          p.mat.additive = true;                // glowing, non-occluding layers
+          p.opacity = opacity;
+          burner.add(p);
+        }
+        blob(-0.15, 0.25, [0.7, 0.9, 1.0],   0.6);   // hot blue-white root
+        blob(-0.42, 0.31, [1.0, 0.97, 0.88], 0.65);  // white-hot (brightest)
+        blob(-0.72, 0.33, [1.0, 0.85, 0.5],  0.6);   // yellow
+        blob(-1.04, 0.31, [1.0, 0.62, 0.27], 0.55);  // orange
+        blob(-1.38, 0.27, [1.0, 0.47, 0.16], 0.5);   // orange
+        blob(-1.73, 0.22, [1.0, 0.34, 0.1],  0.46);  // orange-red
+        blob(-2.08, 0.17, [0.96, 0.25, 0.08], 0.42); // red
+        blob(-2.42, 0.12, [0.88, 0.18, 0.06], 0.36); // red
+        blob(-2.74, 0.08, [0.8, 0.14, 0.05],  0.3);  // red tip
+
+        const burnerLight = new PointLight();
+        burnerLight.location.set(0, -0.1, -4.2);
+        burnerLight.mat.color = [1.0, 0.6, 0.3];
+        burnerLight.mat.emission = 5.0;
+        obj.add(burnerLight);
 
         holder.add(obj);
       });
