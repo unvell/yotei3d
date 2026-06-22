@@ -475,6 +475,14 @@ export class GLTFLoader {
       obj.rotationType = 'q';
     }
 
+    // Node scale — applied as the local TRS scale (updateTransform composes
+    // translate * rotate * scale, matching glTF's TRS order). Without this,
+    // scaled-down authored parts (common in Blender exports) render at their
+    // full unscaled size and the model falls apart.
+    if (Array.isArray(node.scale)) {
+      obj.scale.set(node.scale[0], node.scale[1], node.scale[2]);
+    }
+
     if (!isNaN(node.skin)) {
       this.session.skinnedObjects.push({ obj, skinId: node.skin });
     }
