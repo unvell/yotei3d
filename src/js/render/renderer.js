@@ -69,6 +69,7 @@ export class Renderer {
 			showDebugPanel: false,
 			pipelinePreview: false,
 			enableAntialias: false,
+			preferWebGL2: true,
 			webglOptions: {
 				alpha: true,
 				antialias: true,
@@ -100,10 +101,20 @@ export class Renderer {
 		initDOM(this);
 
 		let gl;
+		this.isWebGL2 = false;
 
 		try {
-			gl = this.canvas.getContext("webgl", this.options.webglOptions);
-			if (!gl) gl = this.canvas.getContext("experimental-webgl");
+			// Prefer WebGL2 (backward compatible — the existing GLSL ES 1.00
+			// shaders run unchanged). Fall back to WebGL1 when unavailable.
+			if (this.options.preferWebGL2) {
+				gl = this.canvas.getContext("webgl2", this.options.webglOptions);
+				this.isWebGL2 = !!gl;
+			}
+
+			if (!gl) {
+				gl = this.canvas.getContext("webgl", this.options.webglOptions)
+					|| this.canvas.getContext("experimental-webgl", this.options.webglOptions);
+			}
 		} catch (e) {
 			console.error("cannot create webgl context: " + e);
 		}
@@ -113,9 +124,34 @@ export class Renderer {
 			return;
 		}
 
-		// 32-bit element indices (WebGL1) — required for meshes with > 65535
-		// vertices, e.g. detailed glTF models. Harmless if unsupported.
-		this._extElementIndexUint = gl.getExtension("OES_element_index_uint");
+		// 32-bit element indices — required for meshes with > 65535 vertices,
+		// e.g. detailed glTF models. Core in WebGL2; needs an extension in
+		// WebGL1 (harmless if unsupported there).
+		this._extElementIndexUint = this.isWebGL2
+			|| gl.getExtension("OES_element_index_uint");
+
+		// Vertex Array Objects record the full buffer→attribute wiring once, so
+		// each draw becomes a single bind instead of ~16 vertexAttribPointer /
+		// enableVertexAttribArray calls. Core in WebGL2; an extension in WebGL1.
+		// glVAO stays null when neither is available, and Mesh falls back to
+		// per-draw attribute setup.
+		this.glVAO = null;
+		if (this.isWebGL2) {
+			this.glVAO = {
+				create: () => gl.createVertexArray(),
+				bind: vao => gl.bindVertexArray(vao),
+				delete: vao => gl.deleteVertexArray(vao),
+			};
+		} else {
+			const vaoExt = gl.getExtension("OES_vertex_array_object");
+			if (vaoExt) {
+				this.glVAO = {
+					create: () => vaoExt.createVertexArrayOES(),
+					bind: vao => vaoExt.bindVertexArrayOES(vao),
+					delete: vao => vaoExt.deleteVertexArrayOES(vao),
+				};
+			}
+		}
 
 		this.canvas.addEventListener('webglcontextlost', function (e) {
 			console.error(e);

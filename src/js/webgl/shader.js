@@ -2,6 +2,27 @@
 import { Color3 } from "@/math";
 import { Texture } from "../webgl/texture";
 
+// Canonical vertex-attribute locations, shared by every shader.
+//
+// WebGL normally lets the driver assign an attribute location per program at
+// link time, so the same semantic ("vertexNormal") can land on a different
+// index in each shader. That makes a Vertex Array Object — which records the
+// buffer→location wiring — unusable across shaders. By forcing these locations
+// with bindAttribLocation() before linking, one VAO per mesh works with every
+// shader (shadow pass, standard pass, wireframe, …) unchanged.
+export const VertexAttributes = Object.freeze({
+	vertexPosition: 0,
+	vertexNormal: 1,
+	vertexTexcoord: 2,
+	vertexTexcoord2: 3,
+	vertexTangent: 4,
+	vertexBitangent: 5,
+	vertexColor: 6,
+	vertexSize: 7,
+	a_joint: 8,
+	a_weight: 9,
+});
+
 export class Shader {
 	constructor(renderer, vertShaderSrc, fragShaderSrc) {
 		this.renderer = renderer;
@@ -38,7 +59,18 @@ export class Shader {
 		if (this.vertexShader != null && this.fragmentShader != null) {
 			this.attach(this.vertexShader);
 			this.attach(this.fragmentShader);
+			this.bindAttributeLocations();
 			this.link();
+		}
+	}
+
+	// Pin every shared vertex attribute to its canonical location before the
+	// program is linked. Names absent from a given shader are simply ignored,
+	// so this is safe to apply uniformly. See VertexAttributes above.
+	bindAttributeLocations() {
+		const gl = this.gl;
+		for (const name in VertexAttributes) {
+			gl.bindAttribLocation(this.glShaderProgramId, VertexAttributes[name], name);
 		}
 	}
 

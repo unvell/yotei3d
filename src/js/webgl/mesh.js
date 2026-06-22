@@ -3,6 +3,7 @@ import { Vec2, Vec3, Vec4, Matrix4 } from "@/math";
 import { MathFunctions as _mf, MathFunctions2 as _mf2, MathFunctions3 as _mf3 } from "@/math";
 import { BoundingBox3D } from "@/math";
 import { WireframeShader } from "../shader/wireframe";
+import { VertexAttributes as VA } from "./shader";
 
 export class Mesh {
 	constructor() {
@@ -345,7 +346,13 @@ export class Mesh {
 			gl.bindBuffer(gl.ARRAY_BUFFER, this.meta.skinJointWeightsBufferId);
 			gl.bufferData(gl.ARRAY_BUFFER, this.jointWeightsBuffer, gl.STATIC_DRAW);
     }
-    
+
+		// Record the whole attribute layout (including the element buffer and
+		// skin attributes) into a VAO so draw() is a single bind. The wireframe
+		// edge layout reuses the vertex buffer with a different offset, so it
+		// gets its own VAO, built lazily on first use.
+		this.buildVAO(renderer);
+
 		var indexBufferLength = (!this.indexBuffer ? 0 : (this.indexBuffer.length * (this.indexBuffer.BYTES_PER_ELEMENT || 2)));
 		
 		if (renderer.debugger) {
@@ -373,15 +380,124 @@ export class Mesh {
 
 			renderer.debugger.totalNumberOfPolygonBound += this._polygonCount;
 		}
-		
+
 		return true;
+	}
+
+	// Wire every vertex attribute the mesh actually owns to its canonical
+	// location, and disable the ones it doesn't. Shader-independent: the
+	// locations are fixed across all shaders (see VertexAttributes), so this
+	// runs once into a VAO at bind time, or per-draw on the WebGL1 fallback.
+	// Also binds the element buffer, which is part of VAO state.
+	setupVertexAttributes(gl) {
+		const meta = this.meta;
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, meta.vertexBufferId);
+
+		// position — always present
+		gl.vertexAttribPointer(VA.vertexPosition, 3, gl.FLOAT, false, meta.stride, 0);
+		gl.enableVertexAttribArray(VA.vertexPosition);
+
+		// normal
+		if (meta.normalCount > 0) {
+			gl.vertexAttribPointer(VA.vertexNormal, 3, gl.FLOAT, true, meta.stride, meta.normalOffset);
+			gl.enableVertexAttribArray(VA.vertexNormal);
+		} else {
+			gl.disableVertexAttribArray(VA.vertexNormal);
+		}
+
+		// texcoords 1
+		if (meta.texcoordCount > 0) {
+			gl.vertexAttribPointer(VA.vertexTexcoord, 2, gl.FLOAT, false, meta.stride, meta.texcoordOffset);
+			gl.enableVertexAttribArray(VA.vertexTexcoord);
+		} else {
+			gl.disableVertexAttribArray(VA.vertexTexcoord);
+		}
+
+		// texcoords 2
+		if (meta.texcoordCount > 0 && meta.uvCount > 1) {
+			gl.vertexAttribPointer(VA.vertexTexcoord2, 2, gl.FLOAT, false, meta.stride, meta.texcoord2Offset);
+			gl.enableVertexAttribArray(VA.vertexTexcoord2);
+		} else {
+			gl.disableVertexAttribArray(VA.vertexTexcoord2);
+		}
+
+		// tangents & bitangents
+		if (meta.tangentBasisCount > 0) {
+			gl.vertexAttribPointer(VA.vertexTangent, 3, gl.FLOAT, false, meta.stride, meta.tangentBasisOffset);
+			gl.vertexAttribPointer(VA.vertexBitangent, 3, gl.FLOAT, false, meta.stride, meta.bitangentBasisOffset);
+			gl.enableVertexAttribArray(VA.vertexTangent);
+			gl.enableVertexAttribArray(VA.vertexBitangent);
+		} else {
+			gl.disableVertexAttribArray(VA.vertexTangent);
+			gl.disableVertexAttribArray(VA.vertexBitangent);
+		}
+
+		// color
+		if (meta.hasColor) {
+			gl.vertexAttribPointer(VA.vertexColor, 3, gl.FLOAT, false, meta.stride, meta.vertexColorOffset);
+			gl.enableVertexAttribArray(VA.vertexColor);
+		} else {
+			gl.disableVertexAttribArray(VA.vertexColor);
+		}
+
+		// size
+		if (meta.hasSize) {
+			gl.vertexAttribPointer(VA.vertexSize, 1, gl.FLOAT, false, meta.stride, meta.vertexSizeOffset);
+			gl.enableVertexAttribArray(VA.vertexSize);
+		} else {
+			gl.disableVertexAttribArray(VA.vertexSize);
+		}
+
+		// skin: joints & weights (own buffers). Previously bound per-frame in the
+		// shader's beginMesh(); folded in here so they live in the mesh VAO.
+		if (this.jointBuffer && meta.skinJointBufferId) {
+			gl.bindBuffer(gl.ARRAY_BUFFER, meta.skinJointBufferId);
+			gl.vertexAttribPointer(VA.a_joint, 4, gl.UNSIGNED_SHORT, false, meta.jointStride, 0);
+			gl.enableVertexAttribArray(VA.a_joint);
+		} else {
+			gl.disableVertexAttribArray(VA.a_joint);
+		}
+		if (this.jointWeightsBuffer && meta.skinJointWeightsBufferId) {
+			gl.bindBuffer(gl.ARRAY_BUFFER, meta.skinJointWeightsBufferId);
+			gl.vertexAttribPointer(VA.a_weight, 4, gl.FLOAT, false, 0, 0);
+			gl.enableVertexAttribArray(VA.a_weight);
+		} else {
+			gl.disableVertexAttribArray(VA.a_weight);
+		}
+
+		// element buffer — captured as part of VAO state
+		if (this.indexed && meta.indexBufferId) {
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, meta.indexBufferId);
+		}
+	}
+
+	// Build the mesh VAO from the current buffers. No-op when VAOs are
+	// unavailable (Mesh.draw then sets attributes per draw instead).
+	buildVAO(renderer) {
+		const vao = renderer.glVAO;
+		if (!vao || !this.meta || !this.meta.vertexBufferId) return;
+
+		this.meta.vaoId = vao.create();
+		vao.bind(this.meta.vaoId);
+		this.setupVertexAttributes(renderer.gl);
+		vao.bind(null);
 	}
 
 	unbind() {
 		if (this.meta) {
 
 			const renderer = this.meta.renderer;
-		
+
+			if (this.meta.vaoId && renderer && renderer.glVAO) {
+				renderer.glVAO.delete(this.meta.vaoId);
+				this.meta.vaoId = undefined;
+			}
+			if (this.meta.edgeVaoId && renderer && renderer.glVAO) {
+				renderer.glVAO.delete(this.meta.edgeVaoId);
+				this.meta.edgeVaoId = undefined;
+			}
+
 			if (this.meta.vertexBufferId) {
 				if (renderer) renderer.gl.deleteBuffer(this.meta.vertexBufferId);
 				this.meta.vertexBufferId = undefined;
@@ -445,81 +561,38 @@ export class Mesh {
 
 		const meta = this.meta;
 		const gl = renderer.gl;
-
-		gl.bindBuffer(gl.ARRAY_BUFFER, this.meta.vertexBufferId);
-
-		// vertex
-		gl.vertexAttribPointer(sp.vertexPositionAttribute, 3, gl.FLOAT, false, meta.stride, 0);
-		gl.enableVertexAttribArray(sp.vertexPositionAttribute);
-
-		// normal	
-		if (sp.vertexNormalAttribute >= 0) {
-			if (meta.normalCount > 0) {
-				gl.vertexAttribPointer(sp.vertexNormalAttribute, 3, gl.FLOAT, true, meta.stride ?? meta.normalStride ?? 0, meta.normalOffset);
-				gl.enableVertexAttribArray(sp.vertexNormalAttribute);
-			} else {
-				gl.disableVertexAttribArray(sp.vertexNormalAttribute);
-			}
-		}
-	
-		// texcoords 1
-		if (sp.vertexTexcoordAttribute >= 0) {
-			if (meta.texcoordCount > 0) {
-				gl.vertexAttribPointer(sp.vertexTexcoordAttribute, 2, gl.FLOAT, false, meta.stride, meta.texcoordOffset);
-				gl.enableVertexAttribArray(sp.vertexTexcoordAttribute);
-			} else {
-				gl.disableVertexAttribArray(sp.vertexTexcoordAttribute);
-			}
-		}
-	
-		// texcoords 2
-		if (sp.vertexTexcoord2Attribute >= 0) {
-			if (meta.texcoordCount > 0 && meta.uvCount > 1) {
-				gl.vertexAttribPointer(sp.vertexTexcoord2Attribute, 2, gl.FLOAT, false, meta.stride, meta.texcoord2Offset);
-				gl.enableVertexAttribArray(sp.vertexTexcoord2Attribute);
-			} else {
-				gl.disableVertexAttribArray(sp.vertexTexcoord2Attribute);
-			}
-		}
-	
-		// tangents & bitangents
-		if (sp.vertexTangentAttribute >= 0 && sp.vertexBitangentAttribute >= 0) {
-			if (meta.tangentBasisCount > 0) {
-				gl.vertexAttribPointer(sp.vertexTangentAttribute, 3, gl.FLOAT, false, meta.stride, meta.tangentBasisOffset);
-				gl.vertexAttribPointer(sp.vertexBitangentAttribute, 3, gl.FLOAT, false, meta.stride, meta.bitangentBasisOffset);
-				gl.enableVertexAttribArray(sp.vertexTangentAttribute);
-				gl.enableVertexAttribArray(sp.vertexBitangentAttribute);
-			} else {
-				gl.disableVertexAttribArray(sp.vertexTangentAttribute);
-				gl.disableVertexAttribArray(sp.vertexBitangentAttribute);
-			}
-		}
-
-		// color
-		if (sp.vertexColorAttribute >= 0) {
-			if (meta.hasColor) {
-				gl.vertexAttribPointer(sp.vertexColorAttribute, 3, gl.FLOAT, false, meta.stride, meta.vertexColorOffset);
-				gl.enableVertexAttribArray(sp.vertexColorAttribute);
-			} else {
-				gl.disableVertexAttribArray(sp.vertexColorAttribute);
-			}
-		}
-
-		// size
-		if (sp.vertexSizeAttribute >= 0) {
-			if (meta.hasSize) {
-				gl.vertexAttribPointer(sp.vertexSizeAttribute, 1, gl.FLOAT, false, meta.stride, meta.vertexSizeOffset);
-				gl.enableVertexAttribArray(sp.vertexSizeAttribute);
-			} else {
-				gl.disableVertexAttribArray(sp.vertexSizeAttribute);
-			}
-    }
+		const vao = renderer.glVAO;
 
 		if (renderer.currentShader instanceof WireframeShader && meta.edgeCount > 0) {
-			gl.vertexAttribPointer(sp.vertexPositionAttribute, 3, gl.FLOAT, false, meta.stride, meta.edgeDataOffset);
-			gl.drawArrays(gl.LINES, 0, meta.edgeCount * 2);
+			// Wireframe edge layout: same vertex buffer, different offset/primitive.
+			if (vao) {
+				if (!meta.edgeVaoId) {
+					meta.edgeVaoId = vao.create();
+					vao.bind(meta.edgeVaoId);
+					gl.bindBuffer(gl.ARRAY_BUFFER, meta.vertexBufferId);
+					gl.vertexAttribPointer(VA.vertexPosition, 3, gl.FLOAT, false, meta.stride, meta.edgeDataOffset);
+					gl.enableVertexAttribArray(VA.vertexPosition);
+				} else {
+					vao.bind(meta.edgeVaoId);
+				}
+				gl.drawArrays(gl.LINES, 0, meta.edgeCount * 2);
+				vao.bind(null);
+			} else {
+				gl.bindBuffer(gl.ARRAY_BUFFER, meta.vertexBufferId);
+				gl.vertexAttribPointer(VA.vertexPosition, 3, gl.FLOAT, false, meta.stride, meta.edgeDataOffset);
+				gl.enableVertexAttribArray(VA.vertexPosition);
+				gl.drawArrays(gl.LINES, 0, meta.edgeCount * 2);
+			}
 		}
 		else {
+			// Bind the recorded attribute layout (one call) or, without VAO
+			// support, set every pointer up per draw.
+			if (vao && meta.vaoId) {
+				vao.bind(meta.vaoId);
+			} else {
+				this.setupVertexAttributes(gl);
+			}
+
 			let glPrimitiveMode;
 
 			switch (this.composeMode) {
@@ -527,7 +600,7 @@ export class Mesh {
 				case Mesh.ComposeModes.Lines: glPrimitiveMode = gl.LINES; break;
 				case Mesh.ComposeModes.LineStrip: glPrimitiveMode = gl.LINE_STRIP; break;
 				case Mesh.ComposeModes.LineLoop: glPrimitiveMode = gl.LINE_LOOP; break;
-		
+
 				default:
 				case Mesh.ComposeModes.Triangles: glPrimitiveMode = gl.TRIANGLES; break;
 
@@ -538,15 +611,22 @@ export class Mesh {
 			if (renderer.wireframe && glPrimitiveMode != gl.LINES) {
 				glPrimitiveMode = gl.LINE_LOOP;
 			}
-	
+
 			if (this.indexed) {
-				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.meta.indexBufferId);
+				// element buffer is part of the VAO; bind it only on the fallback path
+				if (!vao || !meta.vaoId) {
+					gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.meta.indexBufferId);
+				}
 				// 32-bit indices for meshes with > 65535 vertices, else 16-bit
 				const indexType = (this.indexBuffer instanceof Uint32Array)
 					? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
 				gl.drawElements(glPrimitiveMode, meta.indexCount, indexType, 0);
 			} else {
 				gl.drawArrays(glPrimitiveMode, 0, meta.vertexCount);
+			}
+
+			if (vao && meta.vaoId) {
+				vao.bind(null);
 			}
 		}
 
@@ -1159,6 +1239,10 @@ export class DynamicMesh extends Mesh {
 		this.meta.vertexBufferId = gl.createBuffer();
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.meta.vertexBufferId);
 		gl.bufferData(gl.ARRAY_BUFFER, this.vertexBuffer, gl.DYNAMIC_DRAW);
+
+		// Buffer contents change via bufferSubData, but the attribute layout is
+		// fixed, so the VAO stays valid across updates.
+		this.buildVAO(renderer);
 	}
 
 	updateGLBuffer() {

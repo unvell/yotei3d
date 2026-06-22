@@ -153,32 +153,10 @@ export class ShadowMapShader extends Shader {
     }
   }
 
-  beginMesh(mesh) {
-    super.beginMesh(mesh);
+  // skin joint/weight attributes are now recorded in the mesh VAO
+  // (Mesh.setupVertexAttributes); joint matrices are still set per object,
+  // so no per-mesh attribute binding is needed here.
 
-    const gl = this.gl;
-    
-    // skin
-    if (this.vertexJointAttribute >= 0) {
-      if (mesh.jointBuffer) {
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.meta.skinJointBufferId);
-        gl.vertexAttribPointer(this.vertexJointAttribute, 4, gl.UNSIGNED_SHORT, false, mesh.meta.jointStride, 0);
-        gl.enableVertexAttribArray(this.vertexJointAttribute);
-      } else {
-        gl.disableVertexAttribArray(this.vertexJointAttribute);
-      }
-    }
-    if (this.vertexWeightAttribute >= 0) {
-      if (mesh.jointWeightsBuffer) {
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.meta.skinJointWeightsBufferId);
-        gl.vertexAttribPointer(this.vertexWeightAttribute, 4, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(this.vertexWeightAttribute);
-      } else {
-        gl.disableVertexAttribArray(this.vertexWeightAttribute);
-      }
-    }
-  }
-  
   endObject(obj) {
     super.endObject(obj);
 
