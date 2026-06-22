@@ -21,17 +21,19 @@
         enableEnvmap: true,
         // The default far plane is only 50; this is a large open scene, so push
         // it well out (otherwise the back of the terrain gets clipped to sky).
-        perspective: {
-          method: "persp",
-          angle: 55,
-          near: 1,
-          far: 400,
-        },
+        // perspective: {
+        //   method: "persp",
+        //   angle: 55,
+        //   near: 1,
+        //   far: 400,
+        // },
         // The shadow frustum auto-fits to the scene each frame, so this large
         // open terrain needs no scale/viewDepth tuning — just a higher
         // resolution to keep the wide-area shadows crisp.
         shadowQuality: {
-          resolution: 2048,
+          scale: 10,
+          viewDepth: 2,
+          resolution: 1024,
           intensity: 0.3,
           enableCache: false,
         },
