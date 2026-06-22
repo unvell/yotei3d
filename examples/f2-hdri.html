@@ -28,19 +28,16 @@
       const scene = renderer.createScene();
       window._scene = scene;
 
-      // night HDRI: lights the jet + serves as the sky/horizon background
-      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_02_4k.hdr", {
+      // clear-blue-sky HDRI: lights the jet + serves as the sky background
+      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
       });
-      // a dark, moody night exposure — keep the dusk-sky tint on the airframe
-      // subtle instead of letting the bright horizon blow it out
-      scene.iblIntensity = 0.75;
-      scene.exposure = 0.85;
+      scene.iblIntensity = 1.0;
+      scene.exposure = 1.0;
 
-      // a dim, cool rim light from behind so the dark airframe keeps a readable
-      // edge against the night sky
-      scene.sun.location.set(-0.4, 0.7, -0.8);
-      scene.sun.mat.color = [0.5, 0.6, 0.95];
+      // warm daylight key light to complement the sky's blue ambient
+      scene.sun.location.set(0.5, 0.9, 0.3);
+      scene.sun.mat.color = [1.15, 1.08, 0.95];
 
       const holder = new SceneObject();
       scene.add(holder);
@@ -60,12 +57,13 @@
         const img = new Image();
         img.onload = () => {
           const skin = new Texture(img);
+          skin.flipY = true;   // .obj UVs are bottom-origin (V=0 at the bottom)
           obj.eachChild(c => {
             if (!c.mat) return;
             if (c.name === "body") {
               c.mat.tex = skin;
-              c.mat.metallic = 0.0;    // painted airframe: dielectric, matte
-              c.mat.roughness = 0.68;
+              c.mat.metallic = 0.1;    // painted airframe: a little sky sheen
+              c.mat.roughness = 0.5;
             } else if (c.name === "light-side-red") {
               c.mat.color = [1.0, 0.05, 0.0]; c.mat.emission = 2.0;
             } else if (c.name === "light-side-green") {
@@ -101,7 +99,7 @@
 		<div class="menu hover:text-sky-600">
 			&lt; <a href="index.html">Back</a>
 		</div>
-    <div>F-2 (Blender model) lit by a night HDRI. Drag to orbit, scroll to zoom.</div>
+    <div>F-2 (Blender model) lit by a clear-sky HDRI. Drag to orbit, scroll to zoom.</div>
 		<div class="logo">
       <img src="/img/logo.svg">
 		</div>
