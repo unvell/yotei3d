@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, SceneObject, HDRSkyBox, ObjectViewController } from "@";
+    import { Renderer, SceneObject, HDRSkyBox, ObjectViewController, Texture } from "@";
 
     window.addEventListener("load", function() {
 
@@ -32,23 +32,52 @@
       scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_02_4k.hdr", {
         faceSize: 1024,
       });
-      scene.iblIntensity = 1.1;
-      scene.exposure = 1.5;
+      // a dark, moody night exposure — keep the dusk-sky tint on the airframe
+      // subtle instead of letting the bright horizon blow it out
+      scene.iblIntensity = 0.75;
+      scene.exposure = 0.85;
 
-      // a dim, cool key light so the dark night HDRI doesn't leave the airframe
-      // completely black
-      scene.sun.location.set(-0.5, 0.8, -0.6);
-      scene.sun.mat.color = [0.85, 0.88, 1.0];
+      // a dim, cool rim light from behind so the dark airframe keeps a readable
+      // edge against the night sky
+      scene.sun.location.set(-0.4, 0.7, -0.8);
+      scene.sun.mat.color = [0.5, 0.6, 0.95];
 
       const holder = new SceneObject();
       scene.add(holder);
 
-      scene.createObjectFromURL("/models/F2/F2.gltf", obj => {
-        if (!obj) { console.error("failed to load F2.gltf"); return; }
+      // The aircraft is loaded from the Wavefront .obj that the raygen offline
+      // renderer uses — its geometry is already baked to world space, so it
+      // sidesteps glTF node-transform quirks. The .obj loader reads UVs but not
+      // textures, so we wire the paint scheme (skin1) onto the body group, and
+      // light the nav/landing lights via emission (MTL emissive isn't parsed).
+      scene.createObjectFromObjFormat("/models/F2/F2.obj", obj => {
+        if (!obj) { console.error("failed to load F2.obj"); return; }
         window.jet = obj;
         obj.location.set(0, 0, 0);
         // initial hero pose: rear three-quarter view, banking as if climbing
         obj.angle.set(6, 210, 4);
+
+        const img = new Image();
+        img.onload = () => {
+          const skin = new Texture(img);
+          obj.eachChild(c => {
+            if (!c.mat) return;
+            if (c.name === "body") {
+              c.mat.tex = skin;
+              c.mat.metallic = 0.0;    // painted airframe: dielectric, matte
+              c.mat.roughness = 0.68;
+            } else if (c.name === "light-side-red") {
+              c.mat.color = [1.0, 0.05, 0.0]; c.mat.emission = 2.0;
+            } else if (c.name === "light-side-green") {
+              c.mat.color = [0.0, 1.0, 0.1]; c.mat.emission = 2.0;
+            } else if (c.name === "light-white") {
+              c.mat.color = [1.0, 1.0, 1.0]; c.mat.emission = 3.0;
+            }
+          });
+          scene.requireUpdateFrame();
+        };
+        img.src = "/models/F2/skin1.jpg";
+
         holder.add(obj);
       });
 
@@ -72,7 +101,7 @@
 		<div class="menu hover:text-sky-600">
 			&lt; <a href="index.html">Back</a>
 		</div>
-    <div>F-2 (glTF from Blender) lit by a night HDRI. Drag to orbit, scroll to zoom.</div>
+    <div>F-2 (Blender model) lit by a night HDRI. Drag to orbit, scroll to zoom.</div>
 		<div class="logo">
       <img src="/img/logo.svg">
 		</div>
