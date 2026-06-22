@@ -17,3 +17,6 @@ node_modules
 # yotei3d-single.js
 .yarn/install-state.gz
 .yarn/install-state.gz
+
+# Playwright MCP screenshots / artifacts
+.playwright-mcp/
