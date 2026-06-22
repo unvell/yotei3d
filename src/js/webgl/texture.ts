@@ -129,9 +129,13 @@ export class Texture {
     const err = gl.getError();
     if (err) console.log(err);
 
+    // WebGL2 lifts the power-of-two restriction: NPOT textures support full
+    // mipmapping and REPEAT/MIRRORED_REPEAT wrap. On WebGL1 they don't, so
+    // there we still require power-of-two dimensions.
     this.canMipmap = this.enableMipmapped
       // && this.width > 4 && this.height > 4
-      && isPowerOf2(this.width) && isPowerOf2(this.height);
+      && (!!this.renderer.isWebGL2
+        || (isPowerOf2(this.width) && isPowerOf2(this.height)));
 
     if (this.canMipmap) {
       this.generateMipmap();
