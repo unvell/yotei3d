@@ -183,6 +183,13 @@ const exampleItems = ref([
     desc: 'Gentle snowfall with soft fluttering flakes.',
   },
   {
+    title: 'Clouds',
+    thumbnail: '/img/examples/clouds.jpg',
+    link: 'cloud.html',
+    desc: 'Soft, billowy clouds drifting across a blue sky — with self-shading for volume and gentle shadows cast on the ground below. Includes a live tuning panel.',
+    isHover: false,
+  },
+  {
     title: 'Panorama',
     thumbnail: '/img/examples/panorama.png',
     link: 'panorama.html',

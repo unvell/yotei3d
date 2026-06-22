@@ -4,9 +4,26 @@
 	<title>Clouds - Yotei3D Examples</title>
 	<meta charset="utf-8" />
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<style>
+		#cloud-panel{position:fixed;top:48px;right:12px;z-index:20;width:232px;
+			background:rgba(18,26,38,.72);color:#eaf2ff;
+			font:12px/1.35 system-ui,-apple-system,sans-serif;
+			border-radius:8px;padding:10px 12px;backdrop-filter:blur(4px);
+			max-height:calc(100vh - 64px);overflow:auto;user-select:none}
+		#cloud-panel .cp-title{font-weight:600;margin-bottom:6px;font-size:13px;
+			display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+		#cloud-panel .cp-row{margin:7px 0}
+		#cloud-panel .cp-row label{display:flex;justify-content:space-between;margin-bottom:2px}
+		#cloud-panel .cp-row .cp-val{opacity:.75;font-variant-numeric:tabular-nums}
+		#cloud-panel input[type=range]{width:100%;accent-color:#7fb3ff;margin:0}
+		#cloud-panel button{margin-top:9px;width:100%;padding:6px;border:0;border-radius:6px;
+			background:#3b6bd6;color:#fff;cursor:pointer;font-size:12px}
+		#cloud-panel button:hover{background:#4f7ce0}
+		#cloud-panel.collapsed .cp-body{display:none}
+	</style>
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, Clouds, TouchController } from "@";
+    import { Renderer, Shapes, SceneObject, Clouds, Terrain, TouchController } from "@";
 
     window.addEventListener("load", function() {
 
@@ -35,11 +52,24 @@
       window._scene = scene;
 
       // ---- a simple green ground to anchor the horizon ----
-      const ground = new Shapes.Plane();
-      ground.scale.set(400, 1, 400);
-      ground.mat.color = [0.46, 0.62, 0.36];
-      ground.mat.roughness = 0.95;
-      scene.add(ground);
+      // const ground = new Shapes.Plane();
+      // ground.scale.set(1000, 1, 1000);
+      // ground.mat.color = [0.46, 0.62, 0.36];
+      // ground.mat.roughness = 0.95;
+      // scene.add(ground);
+
+      const terrain = new Terrain({
+        width: 1000,
+        depth: 1000,
+        segments: 200,
+        height: 7,
+        noiseScale: 3.5,
+        octaves: 5,
+        seed: 7,
+        color: [0.30, 0.44, 0.20],
+      });
+      terrain.location.y = -1;
+      scene.add(terrain);
 
       // a few low hills so the scene isn't empty
       const props = new SceneObject();
@@ -55,6 +85,10 @@
         props.add(s);
       }
 
+      // distance fog: far mounds and the horizon fade into the winter haze.
+      // Colour defaults to the background sky if omitted.
+      scene.fog = { near: 24, far: 500 };
+
       // ---- the clouds ----
       const clouds = new Clouds({
         clusters: 100,
@@ -68,7 +102,11 @@
         wind: [1.6, 0.4],
         opacity: 0.15,
         bottomColor: [0.86, 0.89, 0.95],   // brighter undersides, sunlit cumulus
+        selfShadow: 0.35,                   // darker undersides = more volume
         fadeIn: 3.5,
+        groundShadow: true,                 // soft shadows drifting on the grass
+        shadowStrength: 0.34,
+        shadowScale: 1.7,
       });
       scene.add(clouds);
 
@@ -79,13 +117,75 @@
       scene.sun.mat.color = [1.05, 1.02, 0.95];
 
       scene.mainCamera.fieldOfView = 70;
-      scene.mainCamera.location.set(0, 8, 60);
-      scene.mainCamera.angle.set(14, 0, 0);
+      scene.mainCamera.location.set(0, 20, 88);
+      scene.mainCamera.angle.set(4, 0, 0);   // a touch of ground so cloud shadows show
 
       const controller = new TouchController(scene);
 
       scene.animation = true;   // continuous redraw for the drifting clouds
       scene.show();
+
+      // ---- live tuning panel ----------------------------------------------
+      // Cheap params (opacity / wind / edge fade) are read live every frame so
+      // we just set them on clouds.options; structural params (counts, sizes,
+      // height, radius) regenerate the field via clouds.rebuild().
+      const CP = [
+        { k:'opacity',          label:'opacity',       min:0,  max:1,   step:0.01, live:v=>clouds.options.opacity=v,       get:()=>clouds.options.opacity },
+        { k:'windX',            label:'wind →',        min:0,  max:8,   step:0.1,  live:v=>clouds.options.wind[0]=v,       get:()=>clouds.options.wind[0] },
+        { k:'windZ',            label:'wind ↑',        min:-4, max:4,   step:0.1,  live:v=>clouds.options.wind[1]=v,       get:()=>clouds.options.wind[1] },
+        { k:'fadeMargin',       label:'edge fade',     min:0,  max:0.6, step:0.01, live:v=>{clouds.fadeMargin=v;clouds.options.fadeMargin=v;}, get:()=>clouds.options.fadeMargin },
+        { k:'selfShadow',       label:'self shadow',   min:0,  max:1,   step:0.02, rebuild:true },
+        { k:'shadowStrength',   label:'cast shadow',   min:0,  max:0.7, step:0.01, live:v=>clouds.options.shadowStrength=v, get:()=>clouds.options.shadowStrength },
+        { k:'shadowScale',      label:'shadow size',   min:0.6,max:3,   step:0.1,  live:v=>clouds.options.shadowScale=v,    get:()=>clouds.options.shadowScale },
+        { k:'clusters',         label:'clusters',      min:10, max:160, step:2,    rebuild:true },
+        { k:'puffsPerCluster',  label:'puffs/cluster', min:20, max:140, step:2,    rebuild:true },
+        { k:'height',           label:'height',        min:20, max:100, step:1,    rebuild:true },
+        { k:'heightVariance',   label:'height var',    min:0,  max:40,  step:1,    rebuild:true },
+        { k:'clusterRadius',    label:'radius',        min:6,  max:60,  step:1,    rebuild:true },
+        { k:'clusterThickness', label:'thickness',     min:1,  max:30,  step:0.5,  rebuild:true },
+        { k:'puffSizeMin',      label:'size min',      min:8,  max:50,  step:1,    rebuild:true },
+        { k:'puffSizeMax',      label:'size max',      min:10, max:70,  step:1,    rebuild:true },
+      ];
+      const fmt = (v, step) => (+v).toFixed(step < 1 ? 2 : 0);
+      const host = document.getElementById('cp-sliders');
+      for (const c of CP) {
+        const val = c.get ? c.get() : clouds.options[c.k];
+        const row = document.createElement('div');
+        row.className = 'cp-row';
+        row.innerHTML = '<label><span>' + c.label + '</span><span class="cp-val"></span></label>'
+          + '<input type="range" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">';
+        const input = row.querySelector('input');
+        const out = row.querySelector('.cp-val');
+        input.value = val;
+        out.textContent = fmt(val, c.step);
+        input.addEventListener('input', () => {
+          const v = parseFloat(input.value);
+          out.textContent = fmt(v, c.step);
+          if (c.rebuild) clouds.rebuild({ [c.k]: v });
+          else c.live(v);
+        });
+        host.appendChild(row);
+      }
+
+      // collapse / expand
+      document.getElementById('cp-toggle').addEventListener('click', () => {
+        document.getElementById('cloud-panel').classList.toggle('collapsed');
+      });
+
+      // dump the current tuning as a ready-to-paste Clouds() call
+      document.getElementById('cp-log').addEventListener('click', () => {
+        const o = clouds.options;
+        const dump = {
+          clusters:o.clusters, puffsPerCluster:o.puffsPerCluster,
+          width:o.width, depth:o.depth, height:o.height, heightVariance:o.heightVariance,
+          clusterRadius:o.clusterRadius, clusterThickness:o.clusterThickness,
+          puffSizeMin:o.puffSizeMin, puffSizeMax:o.puffSizeMax,
+          wind:[o.wind[0], o.wind[1]], opacity:o.opacity, fadeMargin:o.fadeMargin, fadeIn:o.fadeIn,
+        };
+        const text = 'new Clouds(' + JSON.stringify(dump, null, 2) + ')';
+        console.log(text);
+        if (navigator.clipboard) navigator.clipboard.writeText(text).catch(()=>{});
+      });
     });
   </script>
 </head>
@@ -97,6 +197,14 @@
     <div>Soft puffy clouds drifting across a blue sky. Drag to orbit, scroll to zoom.</div>
 		<div class="logo">
       <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="cloud-panel">
+		<div class="cp-title" id="cp-toggle"><span>Cloud parameters</span><span>▾</span></div>
+		<div class="cp-body">
+			<div id="cp-sliders"></div>
+			<button id="cp-log">Log / copy params</button>
 		</div>
 	</div>
 
