@@ -162,7 +162,7 @@ const exampleItems = ref([
   },
   {
     title: 'Terrain',
-    thumbnail: '/img/examples/terrain.png',
+    thumbnail: '/img/examples/terrain.jpg',
     link: 'terrain.html',
     desc: 'Procedural heightfield terrain scattered with a low-poly tree model.',
   },
