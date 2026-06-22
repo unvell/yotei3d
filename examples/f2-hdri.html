@@ -132,20 +132,19 @@
           function streak(rad, halfLen, opacity) {
             const p = new Shapes.Sphere(20, 32);
             p.scale.set(rad, rad, halfLen);
-            p.location.set(-side * 0.4, -0.32, -halfLen); // from the tip, back -Z
+            p.location.set(-side * 0.4, 0, -halfLen); // from the tip, back -Z
             p.mat.color = [0.96, 0.98, 1.0];      // cool white
-            p.opacity = 0.2;
             p.mat.emission = 1.0;
             p.mat.additive = true;
             p.mat.castLight = false;              // glow only — don't act as a light
             p.opacity = opacity;
             trail.add(p);
           }
-          streak(0.085, 4.4, 0.32);   // thin bright core
-          streak(0.18,  4.0, 0.12);   // soft wider halo
+          streak(0.085, 10.0, 0.32);   // thin bright core
+          streak(0.18,  10.0, 0.12);   // soft wider halo
         }
-        vaporTrail(1);
-        vaporTrail(-1);
+        vaporTrail(1.1);
+        vaporTrail(-1.1);
 
         holder.add(obj);
       });
