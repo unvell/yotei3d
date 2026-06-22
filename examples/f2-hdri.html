@@ -91,10 +91,11 @@
         function blob(z, rad, color, opacity) {
           const p = new Shapes.Sphere(16, 24);
           p.scale.set(rad, rad, rad * 1.8);     // elongated along the exhaust
-          p.location.set(0, 0, z);
+          p.location.set(0, -0.55, z);
           p.mat.color = color;
           p.mat.emission = 1.0;                 // self-lit (feeds the bloom pass)
           p.mat.additive = true;                // glowing, non-occluding layers
+          p.mat.castLight = false;              // glow only — don't act as a light
           p.opacity = opacity;
           burner.add(p);
         }
@@ -113,6 +114,38 @@
         burnerLight.mat.color = [1.0, 0.6, 0.3];
         burnerLight.mat.emission = 5.0;
         obj.add(burnerLight);
+
+        // ---- wingtip vapor trails (wingtip vortices) ----
+        // High-g flight condenses a thin white vortex line off each wingtip
+        // (model-local x = ±3.89, y = -0.58, z = -1.2). Trail a chain of soft
+        // additive-white blobs straight back (-Z), curling slightly inward and
+        // down as the vortex dissipates and fading out along its length.
+        function vaporTrail(side) {   // side: +1 right wingtip, -1 left
+          const trail = new SceneObject();
+          trail.location.set(3.89 * side, -0.58, -1.2);
+          obj.add(trail);
+
+          // one smooth, very elongated ellipsoid per layer — a single continuous
+          // surface, so there are no overlapping hard circles to scallop the
+          // edge. A thin bright core inside a wider soft halo reads as a clean
+          // vapor line; additive depth through the tapered ends fades it out.
+          function streak(rad, halfLen, opacity) {
+            const p = new Shapes.Sphere(20, 32);
+            p.scale.set(rad, rad, halfLen);
+            p.location.set(-side * 0.4, -0.32, -halfLen); // from the tip, back -Z
+            p.mat.color = [0.96, 0.98, 1.0];      // cool white
+            p.opacity = 0.2;
+            p.mat.emission = 1.0;
+            p.mat.additive = true;
+            p.mat.castLight = false;              // glow only — don't act as a light
+            p.opacity = opacity;
+            trail.add(p);
+          }
+          streak(0.085, 4.4, 0.32);   // thin bright core
+          streak(0.18,  4.0, 0.12);   // soft wider halo
+        }
+        vaporTrail(1);
+        vaporTrail(-1);
 
         holder.add(obj);
       });
