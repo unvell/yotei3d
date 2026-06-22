@@ -172,9 +172,9 @@ export class Viewer {
             }
 
             // FIXME: integrated 2D 3D event system
-            if (viewer.renderer.current2DScene) {
-              viewer.renderer.current2DScene.begindrag();
-            }
+            // if (viewer.renderer.current2DScene) {
+            //   viewer.renderer.current2DScene.begindrag();
+            // }
 
             viewer.operationMode = OperationModes.Dragging;
           }
@@ -203,9 +203,9 @@ export class Viewer {
           }
 
           // FIXME: integrated 2D 3D event system
-          if (this.renderer.current2DScene) {
-            this.renderer.current2DScene.mousemove(this.mouse.position);
-          }
+          // if (this.renderer.current2DScene) {
+          //   this.renderer.current2DScene.mousemove(this.mouse.position);
+          // }
         }
       });
 
@@ -463,9 +463,9 @@ export class Viewer {
     }
 
     // FIXME: integrated 2D 3D event system
-    if (this.renderer.current2DScene) {
-      this.renderer.current2DScene.mousedown(this.mouse.position);
-    }
+    // if (this.renderer.current2DScene) {
+    //   this.renderer.current2DScene.mousedown(this.mouse.position);
+    // }
   }
 
   performSceneMouseUp(): void {
@@ -480,9 +480,9 @@ export class Viewer {
         }
 
         // FIXME: integrated 2D 3D event system
-        if (this.renderer.current2DScene) {
-          this.renderer.current2DScene.mouseup(this.mouse.position);
-        }
+        // if (this.renderer.current2DScene) {
+        //   this.renderer.current2DScene.mouseup(this.mouse.position);
+        // }
         break;
 
       case OperationModes.Dragging:
@@ -491,9 +491,9 @@ export class Viewer {
         }
 
         // FIXME: integrated 2D 3D event system
-        if (this.renderer.current2DScene) {
-          this.renderer.current2DScene.enddrag(this.mouse.position);
-        }
+        // if (this.renderer.current2DScene) {
+        //   this.renderer.current2DScene.enddrag(this.mouse.position);
+        // }
         break;
     }
   }
