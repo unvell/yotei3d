@@ -500,6 +500,12 @@ export class StandardShader extends Shader {
 		// opacity
 		if (obj.__opacity < 1) {
       gl.enable(gl.BLEND);
+			// additive blending for glowing effects (e.g. an afterburner plume):
+			// layers build up toward a bright core and don't occlude each other.
+			if (obj.mat && obj.mat.additive) {
+				gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+				gl.depthMask(false);
+			}
 			this.opacityUniform.set(obj.__opacity);
 		} else {
 			this.opacityUniform.set(1);
@@ -604,6 +610,10 @@ export class StandardShader extends Shader {
 		this.emissiveMapUniform.unset();
 
 		gl.disable(gl.BLEND);
+		// restore the renderer's default blend func + depth write, in case this
+		// object used additive blending above.
+		gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE_MINUS_DST_ALPHA, gl.ONE);
+		gl.depthMask(true);
     gl.enable(gl.DEPTH_TEST);
 
     // skin
