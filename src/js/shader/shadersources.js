@@ -8,6 +8,8 @@ import { PointShader } from './point';
 import { RainShader } from './rain';
 import { GroundFogShader } from './groundfog';
 import { SnowShader } from './snow';
+import { FireShader } from './fire';
+import { SmokeShader } from './smoke';
 import { CloudShader } from './cloud';
 import { CloudShadowShader } from './cloudshadow';
 import { ImageShader } from './image';
@@ -43,6 +45,10 @@ import groundfogVert from '../../shader/groundfog.vert';
 import groundfogFrag from '../../shader/groundfog.frag';
 import snowVert from '../../shader/snow.vert';
 import snowFrag from '../../shader/snow.frag';
+import fireVert from '../../shader/fire.vert';
+import fireFrag from '../../shader/fire.frag';
+import smokeVert from '../../shader/smoke.vert';
+import smokeFrag from '../../shader/smoke.frag';
 import cloudVert from '../../shader/cloud.vert';
 import cloudFrag from '../../shader/cloud.frag';
 import cloudShadowVert from '../../shader/cloudshadow.vert';
@@ -77,6 +83,8 @@ export const ShaderSources = {
   rain: { vert: rainVert, frag: rainFrag, class: RainShader },
   groundfog: { vert: groundfogVert, frag: groundfogFrag, class: GroundFogShader },
   snow: { vert: snowVert, frag: snowFrag, class: SnowShader },
+  fire: { vert: fireVert, frag: fireFrag, class: FireShader },
+  smoke: { vert: smokeVert, frag: smokeFrag, class: SmokeShader },
   cloud: { vert: cloudVert, frag: cloudFrag, class: CloudShader },
   cloudshadow: { vert: cloudShadowVert, frag: cloudShadowFrag, class: CloudShadowShader },
   image: { vert: imageVert, frag: imageFrag, class: ImageShader },

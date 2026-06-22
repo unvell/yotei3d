@@ -12,6 +12,8 @@ export * from './effect/rain';
 export * from './effect/fog';
 export * from './effect/lightning';
 export * from './effect/snow';
+export * from './effect/fire';
+export * from './effect/smoke';
 export * from './effect/cloud.js';
 export * from './view/modelviewer.js';
 export * from './view/objectcontroller.js';

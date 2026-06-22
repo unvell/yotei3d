@@ -189,6 +189,12 @@ const exampleItems = ref([
     desc: 'Gentle snowfall with soft fluttering flakes.',
   },
   {
+    title: 'Fire & Smoke',
+    thumbnail: '/img/examples/fire.jpg',
+    link: 'fire.html',
+    desc: 'A glowing campfire — additive fire embers feeding the bloom pass, with soft rising smoke above.',
+  },
+  {
     title: 'Clouds',
     thumbnail: '/img/examples/clouds.jpg',
     link: 'cloud.html',

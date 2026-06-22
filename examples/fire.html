@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Fire & Smoke - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject, Fire, Smoke, TouchController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.04, 0.05, 0.08, 1.0],   // night
+        enablePostprocess: true,
+        enableLighting: true,
+        enableShadow: true,
+        bloomEffect: {
+          threshold: 0.55,   // only the hot ember cores bloom
+          gamma: 1.1,
+        },
+        renderingImage: {
+          gamma: 1.1,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // ---- dark earth ----
+      const ground = new Shapes.Plane();
+      ground.scale.set(60, 1, 60);
+      ground.mat.color = [0.12, 0.11, 0.10];
+      ground.mat.roughness = 0.95;
+      scene.add(ground);
+
+      // ---- a ring of stones around the fire pit ----
+      const stones = new SceneObject();
+      scene.add(stones);
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        const s = new Shapes.Cube();
+        const r = 0.18 + Math.random() * 0.12;
+        s.scale.set(r, r * 0.7, r);
+        s.location.set(Math.cos(a) * 1.05, r * 0.3, Math.sin(a) * 1.05);
+        s.angle.set(0, Math.random() * 90, 0);
+        const g = 0.28 + Math.random() * 0.12;
+        s.mat.color = [g, g * 0.96, g * 0.92];
+        s.mat.roughness = 0.9;
+        stones.add(s);
+      }
+
+      // ---- crisscrossed logs, warmly lit from the embers below ----
+      const logs = new SceneObject();
+      scene.add(logs);
+      for (let i = 0; i < 4; i++) {
+        const log = new Shapes.Cube();
+        log.scale.set(1.7, 0.22, 0.22);
+        log.location.set(0, 0.16 + (i % 2) * 0.18, 0);
+        log.angle.set((i % 2) * 8, i * 45, 0);
+        log.mat.color = [0.16, 0.09, 0.05];
+        log.mat.roughness = 0.85;
+        // faint warm self-illumination as if catching the firelight
+        log.mat.emissiveColor = [0.25, 0.08, 0.02];
+        logs.add(log);
+      }
+
+      // ---- the fire ----
+      // Added after the geometry so the depth buffer already holds the scene;
+      // the fire shader tests (but doesn't write) depth, so logs occlude embers.
+      const fire = new Fire({
+        count: 1000,
+        radius: 0.55,
+        height: 3.2,
+        riseSpeed: 3.4,
+        swayAmp: 0.2,
+        swayFreq: 6.5,
+        intensity: 1.0,
+      });
+      fire.location.y = 0.2;
+      scene.add(fire);
+
+      // ---- the smoke, starting where the flame thins out ----
+      const smoke = new Smoke({
+        count: 280,
+        radius: 0.45,
+        baseY: 2.6,
+        height: 9,
+        riseSpeed: 1.5,
+        wind: [0.6, 0.15],
+        swirl: 0.6,
+        spread: 4.8,
+        opacity: 0.2,
+      });
+      scene.add(smoke);
+
+      scene.on("frame", () => {
+        fire.update();
+        smoke.update();
+      });
+
+      // dim, cool moonlight so the logs and stones stay just visible
+      scene.sun.location.set(-0.4, 1, 0.6);
+      scene.sun.mat.color = [0.22, 0.26, 0.36];
+
+      scene.mainCamera.fieldOfView = 50;
+      scene.mainCamera.location.set(0, 2.6, 7.5);
+      scene.mainCamera.angle.set(-10, 0, 0);
+
+      const controller = new TouchController(scene);
+
+      scene.animation = true;   // continuous redraw for the live flame
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Additive fire embers and rising smoke. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
