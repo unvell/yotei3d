@@ -40,15 +40,23 @@ export class Clouds extends ParticleObject {
 			topColor: [1.0, 1.0, 1.0],        // sunlit cloud tops
 			bottomColor: [0.70, 0.74, 0.82],  // shaded undersides (cool grey)
 			opacity: 0.85,
+			fadeMargin: 0.28,        // outer fraction of the volume over which puffs
+			                         //   fade out, so drifting clusters ease in/out
+			                         //   at the edges instead of popping (0 disables)
+			fadeIn: 3.0,             // seconds to ramp the whole layer up from nothing
+			                         //   on first update, so it doesn't appear all at
+			                         //   once (0 = appear immediately)
 			followTarget: null,      // optional camera/object; layer tracks its x/z
 		}, options);
 
 		const n = this.count = opt.clusters * opt.puffsPerCluster;
 
-		this.cloudOpacity = opt.opacity;
+		this.cloudOpacity = opt.fadeIn > 0 ? 0 : opt.opacity;
 		// read by CloudShader for perspective sizing
 		this.sizeScale = opt.sizeScale;
 		this.maxSize = opt.maxSize;
+		// read by CloudShader for the soft edge fade
+		this.fadeMargin = opt.fadeMargin;
 		this.shader = { name: "cloud" };
 		this.castShadow = false;   // puffs must not cast shadows (see Snow)
 
@@ -72,6 +80,7 @@ export class Clouds extends ParticleObject {
 		this.addMesh(this.mesh);
 
 		this._lastTime = 0;
+		this._age = 0;   // seconds since the first update(), drives the fade-in
 
 		for (let ci = 0; ci < opt.clusters; ci++) this._spawnCluster(ci);
 		this._writeAll();
@@ -140,6 +149,13 @@ export class Clouds extends ParticleObject {
 
 		const o = this.options;
 		const wx = o.wind[0] * dt, wz = o.wind[1] * dt;
+
+		// ease the whole layer in on first appearance instead of popping in
+		if (o.fadeIn > 0) {
+			this._age += dt;
+			const t = Math.min(this._age / o.fadeIn, 1);
+			this.cloudOpacity = o.opacity * (t * t * (3 - 2 * t));   // smoothstep
+		}
 
 		const tgt = o.followTarget;
 		if (tgt && tgt.location) {

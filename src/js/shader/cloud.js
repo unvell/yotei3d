@@ -20,6 +20,8 @@ export class CloudShader extends Shader {
 		this.opacityUniform = this.bindUniform("opacity", "float");
 		this.sizeScaleUniform = this.bindUniform("sizeScale", "float");
 		this.maxSizeUniform = this.bindUniform("maxSize", "float");
+		this.fadeHalfUniform = this.bindUniform("fadeHalf", "vec2");
+		this.fadeMarginUniform = this.bindUniform("fadeMargin", "float");
 	}
 
 	beginObject(obj) {
@@ -32,6 +34,11 @@ export class CloudShader extends Shader {
 		this.opacityUniform.set(typeof obj.cloudOpacity === "number" ? obj.cloudOpacity : 0.85);
 		this.sizeScaleUniform.set(typeof obj.sizeScale === "number" ? obj.sizeScale : 700);
 		this.maxSizeUniform.set(typeof obj.maxSize === "number" ? obj.maxSize : 2000);
+		this.fadeHalfUniform.set([
+			typeof obj.halfW === "number" ? obj.halfW : 1e9,
+			typeof obj.halfD === "number" ? obj.halfD : 1e9,
+		]);
+		this.fadeMarginUniform.set(typeof obj.fadeMargin === "number" ? obj.fadeMargin : 0.0);
 
 		// alpha blend; depth test on (geometry occludes puffs) but no depth
 		// write so puffs within a cloud don't fight each other

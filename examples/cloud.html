@@ -15,6 +15,16 @@
         enablePostprocess: true,
         enableLighting: true,
         enableShadow: true,
+        // The default far plane is only 50, but the cloud layer spreads out to
+        // ~400 units. Without pushing it out, only the nearest clusters survive
+        // clipping (they pop in and out as the camera turns). Cover the whole
+        // volume so the cloud field stays put while orbiting.
+        perspective: {
+          method: "persp",
+          angle: 70,
+          near: 0.5,
+          far: 600,
+        },
         renderingImage: {
           gamma: 1.1,
           resolutionRatio: 1,
@@ -47,12 +57,18 @@
 
       // ---- the clouds ----
       const clouds = new Clouds({
-        clusters: 28,
-        width: 280, depth: 280,
-        height: 42,
-        heightVariance: 14,
-        wind: [3.2, 0.8],
-        opacity: 0.95,
+        clusters: 100,
+        width: 480, depth: 480,
+        height: 54,
+        heightVariance: 22,
+        clusterRadius: 20,
+        clusterThickness: 1,
+        puffsPerCluster: 70,
+        puffSizeMin: 18, puffSizeMax: 34,
+        wind: [1.6, 0.4],
+        opacity: 0.15,
+        bottomColor: [0.86, 0.89, 0.95],   // brighter undersides, sunlit cumulus
+        fadeIn: 3.5,
       });
       scene.add(clouds);
 
@@ -62,9 +78,9 @@
       scene.sun.location.set(0.5, 1, 0.4);
       scene.sun.mat.color = [1.05, 1.02, 0.95];
 
-      scene.mainCamera.fieldOfView = 64;
-      scene.mainCamera.location.set(0, 9, 55);
-      scene.mainCamera.angle.set(9, 0, 0);
+      scene.mainCamera.fieldOfView = 70;
+      scene.mainCamera.location.set(0, 8, 60);
+      scene.mainCamera.angle.set(14, 0, 0);
 
       const controller = new TouchController(scene);
 

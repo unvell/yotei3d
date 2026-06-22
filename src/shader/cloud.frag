@@ -3,10 +3,11 @@ precision mediump float;
 
 varying vec4 color;
 varying float vSeed;
+varying float vFade;
 
 uniform float opacity;
 
-// cheap value noise + fbm to give each puff a soft, fluffy edge
+// cheap value noise + fbm to give each puff a soft, lumpy edge
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -30,20 +31,31 @@ float fbm(vec2 p) {
 }
 
 void main(void) {
-	// soft round base
-	vec2 c = gl_PointCoord - vec2(0.5);
-	float d = length(c) * 2.0;
-	if (d > 1.0) discard;
+	// treat the sprite as a little sphere so every puff reads as a rounded,
+	// self-shaded lump — the billowy "cauliflower" look of real cumulus
+	vec2 c = gl_PointCoord * 2.0 - 1.0;
+	float r2 = dot(c, c);
+	if (r2 > 1.0) discard;
+	float r = sqrt(r2);
+	float z = sqrt(1.0 - r2);
 
-	float base = 1.0 - d;
+	// irregular silhouette: displace the soft edge with fbm so the outline is
+	// lumpy (not a clean circle), while keeping a solid opaque core so the
+	// cloud body stays dense and fluffy (no thin/wispy look, no crisp bubbles).
+	float lumps = fbm(gl_PointCoord * 3.0 + vSeed * 53.0);
+	float edge = r + (lumps - 0.5) * 0.7;
+	float a = smoothstep(1.0, 0.35, edge);
 
-	// fluffy modulation, offset per-puff so neighbouring puffs differ
-	vec2 np = gl_PointCoord * 3.0 + vSeed * 53.0;
-	float n = fbm(np);
+	// gentle volumetric shading from an upper, sunlit direction. keep the
+	// contrast modest and the normal fairly flat: a strong per-puff sphere
+	// shade darkens each puff's rim, and that dark rim is exactly what showed
+	// up as a faint circular arc where it overlapped a brighter neighbour.
+	vec3 normal = normalize(vec3(c.x, -c.y, z * 1.1));
+	vec3 L = normalize(vec3(-0.3, 0.58, 0.65));
+	float diff = dot(normal, L) * 0.5 + 0.5;
+	float shade = mix(0.84, 1.05, diff);
 
-	float a = base * (0.72 + 0.55 * n);
-	a = clamp(a, 0.0, 1.0);
-	a = pow(a, 1.25);
+	a = clamp(a, 0.0, 1.0) * vFade;
 
-	gl_FragColor = vec4(color.rgb, a * opacity);
+	gl_FragColor = vec4(color.rgb * shade, a * opacity);
 }
