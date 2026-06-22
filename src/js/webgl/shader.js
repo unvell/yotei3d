@@ -21,6 +21,9 @@ export const VertexAttributes = Object.freeze({
 	vertexSize: 7,
 	a_joint: 8,
 	a_weight: 9,
+	// Per-instance model matrix (mat4) for hardware instancing. A mat4
+	// attribute consumes four consecutive locations, so this reserves 10..13.
+	instanceMatrix: 10,
 });
 
 export class Shader {

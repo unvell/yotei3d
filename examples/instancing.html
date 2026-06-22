@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Instancing - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, InstancedObject } from '@';
+
+    window.addEventListener("load", function() {
+      // create renderer and scene
+      const renderer = new Renderer({
+        enablePostprocess: true,
+        backColor: [0.12, 0.14, 0.18, 1.0],
+      });
+
+      const scene = renderer.createScene();
+
+      // sun + distance fog so the far columns fade into the background
+      scene.sun.location.set(0.5, 1.0, 0.4);
+      scene.sun.mat.color = [1.0, 0.98, 0.92];
+      scene.fog = { near: 60, far: 115, color: [0.12, 0.14, 0.18] };
+
+      // a SINGLE cube mesh shared by every instance
+      const cubeMesh = new Shapes.CubeMesh();
+
+      const N = 44;                          // 44 x 44 = 1936 instances
+      const spacing = 1.5;
+      const half = (N - 1) * spacing / 2;
+
+      // one InstancedObject draws all of them in a single instanced draw call
+      const field = new InstancedObject(cubeMesh, {
+        color: [0.30, 0.66, 1.0],
+        ambient: 0.28,
+      });
+      scene.add(field);
+
+      // animated radial "wave": each column's height ripples outward over time
+      const transforms = new Array(N * N);
+      function rebuild(t) {
+        let k = 0;
+        for (let ix = 0; ix < N; ix++) {
+          for (let iz = 0; iz < N; iz++) {
+            const x = ix * spacing - half;
+            const z = iz * spacing - half;
+            const d = Math.sqrt(x * x + z * z);
+            const h = 2.4 + Math.sin(d * 0.45 - t) * 1.9;
+            transforms[k++] = {
+              location: { x: x, y: h * 0.5, z: z },
+              scale: { x: 0.55, y: h, z: 0.55 },
+            };
+          }
+        }
+        field.setTransforms(transforms);
+      }
+
+      rebuild(0);
+      scene.show();
+
+      // low hero angle: the column wave recedes toward the horizon
+      scene.mainCamera.fieldOfView = 55;
+      scene.mainCamera.location.set(0, 9, 44);
+      scene.mainCamera.angle.set(-9, 0, 0);
+
+      // drive the wave animation
+      const start = Date.now();
+      (function frame() {
+        rebuild((Date.now() - start) * 0.0016);
+        scene.requireUpdateFrame();
+        requestAnimationFrame(frame);
+      })();
+    });
+
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>1,936 cubes drawn in a single instanced draw call. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

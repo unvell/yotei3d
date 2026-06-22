@@ -2,6 +2,7 @@
 import { SolidColorShader } from './solidcolor';
 import { PanoramaShader } from './panorama';
 import { StandardShader } from './standard';
+import { InstancedShader } from './instanced';
 import { WireframeShader } from './wireframe';
 import { PointShader } from './point';
 import { RainShader } from './rain';
@@ -30,6 +31,8 @@ import panoramaVert from '../../shader/panorama.vert';
 import panoramaFrag from '../../shader/panorama.frag';
 import standardVert from '../../shader/standard.vert';
 import standardFrag from '../../shader/standard.frag';
+import instancedVert from '../../shader/instanced.vert';
+import instancedFrag from '../../shader/instanced.frag';
 import wireframeVert from '../../shader/wireframe.vert';
 import wireframeFrag from '../../shader/wireframe.frag';
 import pointVert from '../../shader/points.vert';
@@ -68,6 +71,7 @@ export const ShaderSources = {
   // point: { vert: pointVert, frag: pointFrag, class: "PointShader" },
   panorama: { vert: panoramaVert, frag: panoramaFrag, class: PanoramaShader },
   standard: { vert: standardVert, frag: standardFrag, class: StandardShader },
+  instanced: { vert: instancedVert, frag: instancedFrag, class: InstancedShader },
   wireframe: { vert: wireframeVert, frag: wireframeFrag, class: WireframeShader },
   points: { vert: pointVert, frag: pointFrag, class: PointShader },
   rain: { vert: rainVert, frag: rainFrag, class: RainShader },

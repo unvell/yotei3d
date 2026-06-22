@@ -153,6 +153,12 @@ const exampleItems = ref([
     desc: 'Procedural heightfield terrain scattered with a low-poly tree model.',
   },
   {
+    title: 'Instancing',
+    thumbnail: '/img/examples/instancing.png',
+    link: 'instancing.html',
+    desc: 'Hardware instancing: 1,936 animated cubes drawn in a single draw call via per-instance transforms (WebGL2 drawElementsInstanced).',
+  },
+  {
     title: 'Floor Walkthrough',
     thumbnail: '/img/examples/floor-walkthrough.png',
     link: 'floor-walkthrough.html',

@@ -5,6 +5,7 @@ export * from './scene/viewer.js';
 export * from './scene/material';
 export * from './scene/camera.js';
 export * from './scene/object.js';
+export * from './scene/instancedobject.js';
 export * from './scene/terrain';
 export * from './scene/animation.js';
 export * from './effect/rain';

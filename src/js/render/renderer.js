@@ -153,6 +153,28 @@ export class Renderer {
 			}
 		}
 
+		// Hardware instancing: draw N copies of a mesh in one call, each placed
+		// by a per-instance attribute (divisor = 1). Core in WebGL2; the
+		// ANGLE_instanced_arrays extension in WebGL1. Stays null when neither is
+		// available (InstancedObject then degrades gracefully).
+		this.glInstanced = null;
+		if (this.isWebGL2) {
+			this.glInstanced = {
+				divisor: (loc, d) => gl.vertexAttribDivisor(loc, d),
+				drawArrays: (mode, first, count, primcount) => gl.drawArraysInstanced(mode, first, count, primcount),
+				drawElements: (mode, count, type, offset, primcount) => gl.drawElementsInstanced(mode, count, type, offset, primcount),
+			};
+		} else {
+			const instExt = gl.getExtension("ANGLE_instanced_arrays");
+			if (instExt) {
+				this.glInstanced = {
+					divisor: (loc, d) => instExt.vertexAttribDivisorANGLE(loc, d),
+					drawArrays: (mode, first, count, primcount) => instExt.drawArraysInstancedANGLE(mode, first, count, primcount),
+					drawElements: (mode, count, type, offset, primcount) => instExt.drawElementsInstancedANGLE(mode, count, type, offset, primcount),
+				};
+			}
+		}
+
 		this.canvas.addEventListener('webglcontextlost', function (e) {
 			console.error(e);
 			console.error(gl.getError());
@@ -1001,20 +1023,27 @@ export class Renderer {
 			default:
 			case ObjectTypes.GenericObject:
 				{
-					for (const mesh of obj.meshes) {
-						if (mesh && this.options.enableDrawMesh) {
-							if (mesh.meta && mesh.meta.vertexCount == 0) {
-								console.warn('invaliad mesh from object ' + obj.name);
-							}
-							this.currentShader.beginMesh(mesh);
-							mesh.draw(this);
-							this.currentShader.endMesh(mesh);
+					if (obj.isInstanced) {
+						// hardware-instanced draw: one call for every instance
+						if (this.options.enableDrawMesh) {
+							obj.drawInstanced(this);
 						}
-					}
+					} else {
+						for (const mesh of obj.meshes) {
+							if (mesh && this.options.enableDrawMesh) {
+								if (mesh.meta && mesh.meta.vertexCount == 0) {
+									console.warn('invaliad mesh from object ' + obj.name);
+								}
+								this.currentShader.beginMesh(mesh);
+								mesh.draw(this);
+								this.currentShader.endMesh(mesh);
+							}
+						}
 
-					if (!transparencyRendering) {
-						for (const child of obj.objects) {
-							this.drawObject(child);
+						if (!transparencyRendering) {
+							for (const child of obj.objects) {
+								this.drawObject(child);
+							}
 						}
 					}
 				}
