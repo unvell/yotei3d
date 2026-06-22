@@ -22,6 +22,7 @@ export class InstancedShader extends Shader {
 		this.instanceMatrixAttribute = this.findAttribute("instanceMatrix");
 
 		this.projectViewMatrixUniform = this.bindUniform("projectViewMatrix", "mat4");
+		this.modelMatrixUniform = this.bindUniform("modelMatrix", "mat4");
 
 		this.colorUniform = this.bindUniform("color", "color3");
 		this.sundirUniform = this.bindUniform("sundir", "vec3");
@@ -48,8 +49,10 @@ export class InstancedShader extends Shader {
 		const scene = renderer.currentScene;
 
 		// view-projection only — the per-instance model matrix lives in the
-		// instanceMatrix vertex attribute, not here.
+		// instanceMatrix vertex attribute. modelMatrix is the object's own
+		// transform, composed with each instance in the vertex shader.
 		this.projectViewMatrixUniform.set(renderer.projectionViewMatrixArray);
+		this.modelMatrixUniform.set(obj._transform);
 
 		// sun (mirrors StandardShader)
 		if (scene && scene.sun !== undefined) {

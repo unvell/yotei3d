@@ -10,6 +10,7 @@ attribute vec3 vertexColor;
 attribute mat4 instanceMatrix;
 
 uniform mat4 projectViewMatrix;
+uniform mat4 modelMatrix;   // the InstancedObject's own world transform
 
 varying vec3 vNormal;
 varying vec2 vTexcoord;
@@ -17,13 +18,17 @@ varying vec3 vColor;
 varying vec3 vWorld;
 
 void main(void) {
-	vec4 worldPos = instanceMatrix * vec4(vertexPosition, 1.0);
+	// instances are placed relative to the object, so the object can be moved /
+	// rotated / scaled as a whole (and orbit controllers work on it).
+	mat4 m = modelMatrix * instanceMatrix;
+
+	vec4 worldPos = m * vec4(vertexPosition, 1.0);
 
 	gl_Position = projectViewMatrix * worldPos;
 
 	// Correct for rotation + uniform scale (the common case for scattered
 	// instances); normalize absorbs the uniform scale factor.
-	vNormal = normalize((instanceMatrix * vec4(vertexNormal, 0.0)).xyz);
+	vNormal = normalize((m * vec4(vertexNormal, 0.0)).xyz);
 	vTexcoord = vertexTexcoord;
 	vColor = vertexColor;
 	vWorld = worldPos.xyz;

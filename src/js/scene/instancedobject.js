@@ -10,9 +10,10 @@ import { VertexAttributes } from "../webgl/shader";
 // 1000. Rendered with the lean `instanced` shader (sun + ambient, optional
 // texture, vertex colour, fog).
 //
-// Instance matrices are absolute world transforms; keep the InstancedObject
-// itself at the origin. v1 does not participate in the shadow pass (it neither
-// casts into nor samples the shadow map).
+// Instance matrices are relative to the InstancedObject's own transform, so
+// the whole field can be moved / rotated / scaled as one (and orbit controllers
+// that spin the target object work on it). v1 does not participate in the
+// shadow pass (it neither casts into nor samples the shadow map).
 export class InstancedObject extends SceneObject {
 	constructor(baseMesh, options = {}) {
 		super();

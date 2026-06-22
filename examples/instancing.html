@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Shapes, InstancedObject } from '@';
+    import { Renderer, Shapes, InstancedObject, ObjectViewController } from '@';
 
     window.addEventListener("load", function() {
       // create renderer and scene
@@ -56,12 +56,21 @@
       }
 
       rebuild(0);
-      scene.show();
 
       // low hero angle: the column wave recedes toward the horizon
       scene.mainCamera.fieldOfView = 55;
       scene.mainCamera.location.set(0, 9, 44);
       scene.mainCamera.angle.set(-9, 0, 0);
+
+      // drag to rotate the field, scroll to zoom
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+        minVerticalRotateAngle: -80,
+        maxVerticalRotateAngle: 80,
+      });
+      controller.targetObject = field;
+
+      scene.show();
 
       // drive the wave animation
       const start = Date.now();
