@@ -135,6 +135,13 @@ const exampleItems = ref([
     isHover: false,
   },
   {
+    title: 'F-2 under HDRI',
+    thumbnail: '/img/examples/pbr.png',
+    link: 'f2-hdri.html',
+    desc: 'A glTF aircraft (exported from Blender) lit entirely by a night HDRI environment map. Drag to orbit, scroll to zoom.',
+    isHover: false,
+  },
+  {
     title: 'WaterBottle (glTF PBR)',
     thumbnail: '/img/examples/waterbottle.png',
     link: 'waterbottle.html',
