@@ -180,7 +180,9 @@ export class StandardShader extends Shader {
 		if (scene.renderer.options.enableLighting) {
 
 			lightCount = scene._activedLightSources.length;
-		
+			// never index past the shader's light uniform array (lights[MAX_LIGHT_COUNT])
+			if (lightCount > this.lightUniforms.length) lightCount = this.lightUniforms.length;
+
 			if (this.renderer.options.debugMode) {
 				this.renderer.debugger.currentLightCount = lightCount;
 			}

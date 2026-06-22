@@ -492,7 +492,11 @@ export class Scene {
 		for (const object of this._lightSources) {
 			if (object.visible === true) {
 				if (typeof object.mat === "object" && object.mat !== null) {
-					if (typeof object.mat.emission !== "undefined" && object.mat.emission > 0) {
+					// emissive objects double as point lights, unless they opt out with
+					// castLight === false (e.g. decorative glow blobs — an afterburner
+					// plume or vapor trail — that must not flood the limited light slots).
+					if (typeof object.mat.emission !== "undefined" && object.mat.emission > 0
+						&& object.mat.castLight !== false) {
 
 						var lightWorldPos;
 
