@@ -26,7 +26,7 @@
 
       // ---- a calm snowy ground with a few rounded mounds ----
       const ground = new Shapes.Plane();
-      ground.scale.set(60, 1, 60);
+      ground.scale.set(100, 1, 100);
       ground.mat.color = [0.92, 0.94, 0.97];   // fresh snow
       ground.mat.roughness = 0.95;
       scene.add(ground);
@@ -62,7 +62,7 @@
         swayFreq: 1.0,
         sizeMin: 3,
         sizeMax: 9,
-        color: [1.0, 1.0, 1.0],
+        color: [2.0, 2.0, 2.0],
         opacity: 0.95,
       });
       snow.location.y = 6;   // lift the volume so flakes drift down from above
@@ -79,7 +79,7 @@
       scene.sun.mat.color = [1.0, 1.0, 1.05];
 
       scene.mainCamera.fieldOfView = 50;
-      scene.mainCamera.location.set(0, 5, 26);
+      scene.mainCamera.location.set(0, 1, 0);
       scene.mainCamera.angle.set(-6, 0, 0);
 
       const controller = new TouchController(scene);

@@ -27,7 +27,7 @@
       // panorama. HDRSkyBox decodes it to linear float, projects it into a
       // mipmapped HDR cubemap, and (with enableEnvmap) the renderer bakes a
       // diffuse irradiance map + uses the cube for specular reflections.
-      const sky = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_02_4k.hdr", {
+      const sky = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
       });
       scene.skybox = sky;
@@ -60,15 +60,6 @@
           grid.add(sphere);
         }
       }
-
-      // ---- textured glTF model under the same HDRI lighting ----
-      scene.createObjectFromURL("/models/WaterBottle/WaterBottle.gltf", obj => {
-        if (!obj) return;
-        obj.location.set(-2.1, -0.2, 4);
-        obj.angle.set(0, 20, 0);
-        obj.scale.set(11, 11, 11);
-        scene.add(obj);
-      });
 
       scene.sun.location.set(1, 1, 1);
       scene.sun.mat.color = [1.0, 0.98, 0.95];

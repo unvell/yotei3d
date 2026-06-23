@@ -75,15 +75,15 @@
       // Added after the geometry so the depth buffer already holds the scene;
       // the fire shader tests (but doesn't write) depth, so logs occlude embers.
       const fire = new Fire({
-        count: 500,
+        count: 100,
         radius: 0.55,
-        height: 3.2,
-        riseSpeed: 3.4,
+        height: 3.0,
+        riseSpeed: 3.5,
         swayAmp: 0.2,
         swayFreq: 6.5,
         intensity: 3.5,   // HDR over-drive: hot cores blow past 1.0 to feed bloom
-        sizeBase: 30,
-        sizeTip: 10,
+        sizeBase: 50,
+        sizeTip: 20,
       });
       fire.location.y = 0.2;
       scene.add(fire);
@@ -126,7 +126,7 @@
         // lively, restless flame glow. emission scales both the brightness and
         // (through the warm colour) the HDR energy that spills onto the scene,
         // so the ground and stones pulse with the fire.
-        flickerT += 0.05;
+        flickerT += 0.02;
         const flicker = 6.0
           + Math.sin(flickerT * 13.0) * 1.5
           + Math.sin(flickerT * 7.3) * 1.0
@@ -143,8 +143,8 @@
       scene.sun.mat.color = [0.22, 0.26, 0.36];
 
       scene.mainCamera.fieldOfView = 50;
-      scene.mainCamera.location.set(0, 2.6, 7.5);
-      scene.mainCamera.angle.set(-10, 0, 0);
+      scene.mainCamera.location.set(0, 1, 10.5);
+      scene.mainCamera.angle.set(12, 0, 0);
 
       const controller = new TouchController(scene);
 
