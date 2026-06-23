@@ -9,11 +9,22 @@ import { ScreenMesh } from './pipeline';
 // aligns with how the scene samples the environment.
 //
 //   dir = forward + right * s + up * t,  where (s, t) in [-1, 1]
+// The four side faces use the nominal GL directions. The two pole faces (+Y /
+// -Y) need two corrections because rendering a fullscreen quad into a cube
+// *face* via an FBO is mirrored compared with how the face is later sampled,
+// and that mirror lands differently on the poles than on the sides:
+//   1. `forward` elevation is swapped (+Y target samples the downward
+//      hemisphere, -Y the upward) — without this the poles come out swapped,
+//      i.e. looking up shows the nadir and looking down shows the sky.
+//   2. `up` is then negated, a single-axis (vertical) flip that undoes the
+//      residual mirror so cloud detail stays continuous across the pole/side
+//      seams. This makes the two pole entries intentionally left-handed
+//      (right × up === -forward); that is the correction, not a bug.
 const FACE_BASIS = [
 	{ forward: [ 1,  0,  0], right: [ 0,  0, -1], up: [ 0, -1,  0] }, // +X
 	{ forward: [-1,  0,  0], right: [ 0,  0,  1], up: [ 0, -1,  0] }, // -X
-	{ forward: [ 0,  1,  0], right: [ 1,  0,  0], up: [ 0,  0,  1] }, // +Y
-	{ forward: [ 0, -1,  0], right: [ 1,  0,  0], up: [ 0,  0, -1] }, // -Y
+	{ forward: [ 0, -1,  0], right: [ 1,  0,  0], up: [ 0,  0, -1] }, // +Y target (samples down, mirrored)
+	{ forward: [ 0,  1,  0], right: [ 1,  0,  0], up: [ 0,  0,  1] }, // -Y target (samples up, mirrored)
 	{ forward: [ 0,  0,  1], right: [ 1,  0,  0], up: [ 0, -1,  0] }, // +Z
 	{ forward: [ 0,  0, -1], right: [-1,  0,  0], up: [ 0, -1,  0] }, // -Z
 ];

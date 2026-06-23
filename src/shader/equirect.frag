@@ -17,8 +17,9 @@ void main(void) {
 	vec3 d = normalize(vDir);
 
 	// direction -> lat-long uv. u wraps around the azimuth (atan2(z, x)).
-	// v: GL uploads the panorama's first scanline (the file's top row) to t=0,
-	// so looking up (d.y = +1) must sample t=1 — hence +asin, not -asin.
+	// v maps the elevation; the side faces are oriented to match this, so it is
+	// kept as the natural +asin (the +Y/-Y pole faces are corrected in the
+	// per-face basis instead, see FACE_BASIS in iblbaker.js).
 	float u = 0.5 + atan(d.z, d.x) * INV_2PI;
 	float v = 0.5 + asin(clamp(d.y, -1.0, 1.0)) * INV_PI;
 
