@@ -33,18 +33,19 @@
       //     ocean reflects this same cubemap (no extra reflection pass). -------
       scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
+        rotation: 130,
       });
       scene.iblIntensity = 1.0;
       scene.exposure = 1.0;
 
       // haze the sea into the horizon so the water plane's far edge is hidden
-      // scene.fog = { near: 10, far: 300, color: [0.74, 0.83, 0.90] };
+      scene.fog = { near: 100, far: 500, color: [0.74, 0.83, 0.90] };
 
       // --- the ocean ---------------------------------------------------------
       const ocean = new Ocean({
         size: 1000,
         segments: 280,
-        level: -50,
+        level: -30,
         wind: [1.0, 0.4],
         waveAmp: 0.5,
         waveLen: 22,
@@ -58,7 +59,7 @@
         shallowColor: [0.10, 0.36, 0.40],
         followTarget: scene.mainCamera,   // endless sea: recentres on the camera
       });
-      ocean.location.set(0, -50, 0);
+      ocean.location.set(0, -30, 0);
       scene.add(ocean);
       window._ocean = ocean;
 
