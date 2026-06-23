@@ -67,7 +67,7 @@
         // pushes the lower, hotter logs past the bloom threshold so they glow
         // like burning coals; the higher logs are cooler.
         const heat = 1.0 - (i % 2) * 0.45;
-        log.mat.emissiveColor = [2.8 * heat, 0.5 * heat, 0.09 * heat];
+        log.mat.emissiveColor = [1.5 * heat, 0.4 * heat, 0.09 * heat];
         logs.add(log);
       }
 
@@ -75,10 +75,10 @@
       // Added after the geometry so the depth buffer already holds the scene;
       // the fire shader tests (but doesn't write) depth, so logs occlude embers.
       const fire = new Fire({
-        count: 100,
+        count: 200,
         radius: 0.55,
         height: 3.0,
-        riseSpeed: 3.5,
+        riseSpeed: 2.0,
         swayAmp: 0.2,
         swayFreq: 6.5,
         intensity: 3.5,   // HDR over-drive: hot cores blow past 1.0 to feed bloom
@@ -126,12 +126,12 @@
         // lively, restless flame glow. emission scales both the brightness and
         // (through the warm colour) the HDR energy that spills onto the scene,
         // so the ground and stones pulse with the fire.
-        flickerT += 0.02;
+        flickerT += 0.01;
         const flicker = 6.0
           + Math.sin(flickerT * 13.0) * 1.5
           + Math.sin(flickerT * 7.3) * 1.0
           + (Math.random() - 0.5) * 2.0;
-        firelight.mat.emission = Math.max(2.0, flicker);
+        firelight.mat.emission = Math.max(5.0, flicker);
 
         // tiny positional jitter so highlights and shadows dance
         firelight.location.x = Math.sin(flickerT * 9.0) * 0.07;
