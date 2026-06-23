@@ -9,10 +9,11 @@
 node_modules
 
 # Large HDR/EXR test assets (kept local, not committed)
-/examples/textures/hdr/*.hdr
-/examples/textures/hdr/*.exr
-# ...except the clear-sky map the F-2 example ships with
-!/examples/textures/hdr/kloppenheim_06_puresky_4k.hdr
+# Under public/ so the examples build copies them to the deployed site.
+/examples/public/textures/hdr/*.hdr
+/examples/public/textures/hdr/*.exr
+# ...except the clear-sky map the examples ship with
+!/examples/public/textures/hdr/kloppenheim_06_puresky_4k.hdr
 
 # yotei3d-*.tgz
 # yotei3d-min.js
