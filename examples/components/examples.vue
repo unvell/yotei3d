@@ -142,6 +142,13 @@ const exampleItems = ref([
     isHover: false,
   },
   {
+    title: 'F-2 in Flight',
+    thumbnail: '/img/examples/f2-flight.jpg',
+    link: 'f2-flight.html',
+    desc: 'Fly the F-2 through a drifting cloud deck — A/D bank, W/S pitch, ←/→ yaw, and the whole cloud field steers with you. A live Fire-particle afterburner throbs with the burner pulse while Smoke wingtip vortices trail off the wings.',
+    isHover: false,
+  },
+  {
     title: 'WaterBottle (glTF PBR)',
     thumbnail: '/img/examples/waterbottle.png',
     link: 'waterbottle.html',

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>F-2 in Flight - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<style>
+		#flight-hud{position:fixed;left:12px;bottom:12px;z-index:20;
+			background:rgba(18,26,38,.62);color:#eaf2ff;
+			font:12px/1.5 system-ui,-apple-system,sans-serif;
+			border-radius:8px;padding:8px 12px;backdrop-filter:blur(4px);user-select:none}
+		#flight-hud .fh-title{font-weight:600;margin-bottom:4px;opacity:.85}
+		#flight-hud b{display:inline-block;min-width:30px;text-align:center;
+			padding:0 4px;border-radius:4px;background:rgba(127,179,255,.22);
+			font-weight:600;font-variant-numeric:tabular-nums}
+	</style>
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject, PointLight, HDRSkyBox, ObjectViewController, Texture, Clouds, Fire, Smoke } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        enablePostprocess: true,
+        enableEnvmap: true,      // IBL from the HDRI
+        enableShadow: false,     // airborne shot: nothing on the ground to shade
+        // The cloud field spreads out to ~700 units and the layer sits high; the
+        // default 50-unit far plane would clip all but the nearest puffs. Push it
+        // way out so the whole sky stays put while the clouds rush past.
+        perspective: {
+          method: "persp",
+          angle: 52,
+          near: 0.5,
+          far: 2500,
+        },
+        bloomEffect: {
+          enabled: true,
+          threshold: 0.5,            // low enough that the afterburner plume haloes
+          luminanceThreshold: 1.0,   // HDR bright-pass: hot cores blow past 1.0
+          intensity: 0.9,            // strength of the glow added back
+          gamma: 1.3,
+        },
+        renderingImage: {
+          gamma: 1.1,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // clear-blue-sky HDRI: lights the jet + serves as the sky background
+      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+        faceSize: 1024,
+      });
+      scene.iblIntensity = 1.0;
+      scene.exposure = 1.0;
+
+      // far clouds and the horizon fade into a pale haze so the sky reads deep
+      scene.fog = { near: 120, far: 1600, color: [0.74, 0.82, 0.92] };
+
+      // warm daylight key light to complement the sky's blue ambient
+      scene.sun.location.set(0.5, 0.9, 0.3);
+      scene.sun.mat.color = [1.15, 1.08, 0.95];
+
+      // ---- the clouds we fly through ----------------------------------------
+      // A deep layer centred on the jet's altitude (y≈0) with a big vertical
+      // spread, so clusters sit above, below and right at the aircraft. A strong
+      // wind toward +Z (toward the camera) streams the whole field past us — the
+      // clouds rushing by, not the jet moving, is what sells the speed. Puffs are
+      // soft and semi-transparent so a near one briefly hazes the view like
+      // punching through a real cloud.
+      const clouds = new Clouds({
+        clusters: 50,
+        width: 700, depth: 700,
+        height: 0,                 // layer centred on the jet
+        heightVariance: 36,        // clusters from well below to well above us
+        clusterRadius: 30,
+        clusterThickness: 20,
+        puffsPerCluster: 64,
+        puffSizeMin: 20, puffSizeMax: 100,
+        wind: [6, 78],             // [x, z] units/sec — fast drift toward the camera
+        opacity: 0.34,
+        bottomColor: [0.84, 0.88, 0.95],
+        selfShadow: 0.3,
+        fadeIn: 2.5,
+        fadeMargin: 0.3,           // ease puffs in/out at the volume rim
+      });
+      scene.add(clouds);
+
+      const holder = new SceneObject();
+      scene.add(holder);
+
+      // refs the per-frame loop animates (filled in once the model loads)
+      let jet = null, burner = null, burnerLight = null, burnerFire = null;
+      const vaporTrails = [];   // wingtip condensation Smoke emitters
+
+      // ---- flight controls --------------------------------------------------
+      // A/D bank (roll), W/S pitch, ←/→ yaw. The jet stays parked at the origin
+      // and we fly the *world* past it, so steering re-aims the cloud drift
+      // (see the frame loop) to match wherever the nose points.
+      const SPEED = 78;        // cruise: cloud drift speed, units/sec
+      const MAX_BANK = 55;     // peak roll from A/D (deg)
+      const MAX_PITCH = 26;    // peak pitch from W/S (deg)
+      const YAW_RATE = 38;     // heading change rate from ←/→ (deg/sec)
+      const BASE_PITCH = 5;    // slight nose-up resting attitude
+      let roll = 0, pitch = 0, heading = 0;
+
+      const keys = Object.create(null);
+      const FLIGHT_KEYS = new Set(["KeyW", "KeyS", "KeyA", "KeyD", "ArrowLeft", "ArrowRight"]);
+      window.addEventListener("keydown", e => {
+        if (!FLIGHT_KEYS.has(e.code)) return;
+        keys[e.code] = true; e.preventDefault();
+      });
+      window.addEventListener("keyup", e => {
+        if (!FLIGHT_KEYS.has(e.code)) return;
+        keys[e.code] = false; e.preventDefault();
+      });
+
+      // The aircraft is loaded from the Wavefront .obj that the raygen offline
+      // renderer uses — its geometry is already baked to world space, so it
+      // sidesteps glTF node-transform quirks. The .obj loader reads UVs but not
+      // textures, so we wire the paint scheme (skin1) onto the body group, and
+      // light the nav/landing lights via emission (MTL emissive isn't parsed).
+      scene.createObjectFromObjFormat("/models/F2/F2.obj", obj => {
+        if (!obj) { console.error("failed to load F2.obj"); return; }
+        jet = window.jet = obj;
+        obj.location.set(0, 0, 0);
+        // hero pose: rear three-quarter, banked over as if racking into a turn.
+        // The per-frame loop weaves around this base attitude.
+        obj.angle.set(0, 180, 0);
+
+        const img = new Image();
+        img.onload = () => {
+          const skin = new Texture(img);
+          skin.flipY = true;   // .obj UVs are bottom-origin (V=0 at the bottom)
+          obj.eachChild(c => {
+            if (!c.mat) return;
+            if (c.name === "body") {
+              c.mat.tex = skin;
+              c.mat.metallic = 0.1;    // painted airframe: a little sky sheen
+              c.mat.roughness = 0.5;
+            } else if (c.name === "light-side-red") {
+              c.mat.color = [1.0, 0.05, 0.0]; c.mat.emission = 2.0;
+            } else if (c.name === "light-side-green") {
+              c.mat.color = [0.0, 1.0, 0.1]; c.mat.emission = 2.0;
+            } else if (c.name === "light-white") {
+              c.mat.color = [1.0, 1.0, 1.0]; c.mat.emission = 3.0;
+            }
+          });
+          scene.requireUpdateFrame();
+        };
+        img.src = "/models/F2/skin1.jpg";
+
+        // ---- afterburner ----
+        // The exhaust nozzle sits at the rear of the fuselage (model-local
+        // z ≈ -4.6, exhaust pointing -Z). The plume is built three ways that
+        // stack into one believable flame:
+        //   1. a chain of additive emissive blobs that fade hot-blue → white →
+        //      orange → red and taper to a point — the bloom pass turns them
+        //      into a soft cone (the proven look from the F-2 hero shot);
+        //   2. a live Fire particle emitter firing down the nozzle for shimmer
+        //      and shock-diamond motion;
+        //   3. a point light that throws warm light onto the airframe.
+        // The whole node is throbbed every frame (below) for the burner pulse.
+        burner = new SceneObject();
+        burner.location.set(0, -0.1, -4.6);
+        obj.add(burner);
+
+        // many heavily-overlapping blobs so they merge into one tapering plume
+        function blob(z, rad, color, opacity) {
+          const p = new Shapes.Sphere(16, 24);
+          p.scale.set(rad, rad, rad * 1.8);     // elongated along the exhaust
+          p.location.set(0, -0.55, z);
+          p.mat.color = color;
+          p.mat.emission = 1.0;                 // self-lit (feeds the bloom pass)
+          p.mat.additive = true;                // glowing, non-occluding layers
+          p.mat.castLight = false;              // glow only — don't act as a light
+          p.opacity = opacity;
+          burner.add(p);
+        }
+        blob(-0.15, 0.25, [0.7, 0.9, 1.0],   0.6);   // hot blue-white root
+        blob(-0.42, 0.31, [1.0, 0.97, 0.88], 0.65);  // white-hot (brightest)
+        blob(-0.72, 0.33, [1.0, 0.85, 0.5],  0.6);   // yellow
+        blob(-1.04, 0.31, [1.0, 0.62, 0.27], 0.55);  // orange
+        blob(-1.38, 0.27, [1.0, 0.47, 0.16], 0.5);   // orange
+        blob(-1.73, 0.22, [1.0, 0.34, 0.1],  0.46);  // orange-red
+        blob(-2.08, 0.17, [0.96, 0.25, 0.08], 0.42); // red
+        blob(-2.42, 0.12, [0.88, 0.18, 0.06], 0.36); // red
+        blob(-2.74, 0.08, [0.8, 0.14, 0.05],  0.3);  // red tip
+
+        // live exhaust embers. Fire's embers rise along +Y, so the emitter is
+        // pitched -90° about X to fire down the nozzle (model-local -Z). Tuned
+        // hot blue-white at the root for a jet-exhaust look rather than a
+        // campfire orange.
+        burnerFire = new Fire({
+          count: 80,
+          radius: 0.22,
+          height: 2.6,          // plume length down the nozzle
+          riseSpeed: 7.0,       // fast — it's a jet, not a candle
+          riseVariance: 0.3,
+          spread: 0.1,
+          convergence: 0.55,
+          swayAmp: 0.06,
+          swayFreq: 9.0,
+          sizeBase: 30,
+          sizeTip: 6,
+          intensity: 3.2,       // HDR over-drive so the core feeds the bloom pass
+          colorHot: [0.75, 0.9, 1.0],   // blue-white root
+          colorMid: [0.5, 0.2, 0.8],   // orange mid
+          colorCool: [0.85, 0.18, 0.05],// dark red tip
+          opacity: 0.9,
+          sizeScale: 40,
+        });
+        burnerFire.angle.set(-90, 0, 0);   // fire down the exhaust (-Z)
+        burnerFire.location.set(0, -0.5, -1);
+        burner.add(burnerFire);
+
+        burnerLight = new PointLight();
+        burnerLight.location.set(0, -0.1, -4.2);
+        burnerLight.mat.color = [1.0, 0.6, 0.3];
+        burnerLight.mat.emission = 5.0;
+        obj.add(burnerLight);
+
+        // ---- wingtip vapor trails (wingtip vortices) ----
+        // High-g flight condenses a thin white vortex line off each wingtip
+        // (model-local x = ±3.89, y = -0.58, z = -1.2). Two parts per tip:
+        //   - a crisp additive-white core streak (a single elongated ellipsoid,
+        //     so there are no hard overlapping circles to scallop the edge);
+        //   - a live Smoke emitter trailing back (-Z) for moving condensation
+        //     that curls and dissipates the way a real vortex does.
+        function wingtip(side) {   // side: +1 right wingtip, -1 left
+          const trail = new SceneObject();
+          trail.location.set(3.89 * side, -0.58, -1.2);
+          obj.add(trail);
+
+          // crisp core: thin bright line inside a softer halo
+          // function streak(rad, halfLen, opacity) {
+          //   const p = new Shapes.Sphere(20, 32);
+          //   p.scale.set(rad, rad, halfLen);
+          //   p.location.set(-side * 0.4, 0, -halfLen); // from the tip, back -Z
+          //   p.mat.color = [0.96, 0.98, 1.0];      // cool white
+          //   p.mat.emission = 1.0;
+          //   p.mat.additive = true;
+          //   p.mat.castLight = false;
+          //   p.opacity = opacity;
+          //   trail.add(p);
+          // }
+          // streak(0.075, 9.0, 0.3);    // thin bright core
+          // streak(0.16,  9.0, 0.1);    // soft wider halo
+
+          // moving condensation: Smoke rises +Y, so pitch the emitter -90° about
+          // X to trail it straight back down -Z off the tip. Thin, cool and
+          // faint — it should read as vapor curling off the wing, not exhaust.
+          const vapor = new Smoke({
+            count: 560,         // 5× denser stream
+            radius: 0.1,
+            baseY: 0,
+            height: 20.0,        // trail length back from the tip
+            riseSpeed: 37.5,    // 5× faster — rips back at full flight speed
+            riseVariance: 0.25,
+            wind: [0, 0],
+            swirl: 0.01,        // gentle curl of the vortex core
+            swirlFreq: 2.4,
+            spread: 1.2,
+            color: [0.92, 0.95, 1.0],
+            opacity: 0.16,
+            sizeStart: 10,
+            sizeEnd: 10,
+            sizeScale: 100,
+          });
+          vapor.angle.set(-90, 0, 0);          // trail back down -Z
+          // vapor.scale.set(1, 10, 1);          // trail back down -Z
+          vapor.location.set(-side * 0.4, 0, 0);
+          trail.add(vapor);
+          vaporTrails.push(vapor);
+        }
+        wingtip(1.1);
+        wingtip(-1.1);
+
+        holder.add(obj);
+      });
+
+      // ---- the flight, frame by frame --------------------------------------
+      let t = 0;
+      scene.on("frame", () => {
+        t += 0.016;
+
+        // clouds rush past — the core flight cue
+        clouds.update();
+
+        if (jet) {
+          const dt = 0.016;
+
+          // read the keys into target deflections
+          const bankIn  = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+          const pitchIn = (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0);
+          const yawIn   = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0);
+
+          // bank & pitch ease toward the held deflection and auto-level on
+          // release; yaw integrates into a heading you keep flying (a turn rate,
+          // not a spring), so ←/→ steers onto a new course.
+          roll  += (bankIn  * MAX_BANK  - roll)  * 0.06;
+          pitch += (pitchIn * MAX_PITCH - pitch) * 0.06;
+          heading += yawIn * YAW_RATE * dt;
+
+          // apply the attitude (+ the faint idle tremor so it's never frozen)
+          jet.angle.x = BASE_PITCH + pitch + Math.sin(t * 1.7) * 0.1;
+          jet.angle.y = 180 + heading       + Math.sin(t * 1.3) * 0.1;
+          jet.angle.z = roll                + Math.sin(t * 1.1) * 0.1;
+          jet.location.y = Math.sin(t * 1.5) * 0.03;
+
+          // steer the world: the slipstream rushes past opposite the nose.
+          // getLookAt().dir is the engine's own world-space heading for the
+          // current attitude (for this model it runs down the tail/exhaust — the
+          // way the air flows), so the cloud drift always tracks wherever the jet
+          // points: turn and the clouds sweep across, climb and they sink past.
+          const dir = jet.getLookAt().dir;
+          clouds.options.wind[0] = dir.x * SPEED;
+          clouds.options.wind[1] = dir.z * SPEED;
+          // the cloud model has no vertical wind, so slide the whole deck for
+          // climb/dive and ease it back so we never permanently leave the layer.
+          clouds.location.y += dir.y * SPEED * dt;
+          clouds.location.y *= (1 - 1.2 * dt);
+        }
+
+        if (burnerFire) burnerFire.update();
+        for (const v of vaporTrails) v.update();
+
+        // throb the afterburner: layered sines + a touch of randomness give the
+        // restless shock-diamond pulse. Scaling the burner node stretches the
+        // whole plume; the point light's emission pulses the warm spill on the
+        // airframe.
+        if (burner) {
+          const pulse = 1.0 + Math.sin(t * 24.0) * 0.06 + Math.sin(t * 11.0) * 0.04
+                            + (Math.random() - 0.5) * 0.05;
+          burner.scale.set(1, 1, pulse);
+        }
+        if (burnerLight) {
+          burnerLight.mat.emission = Math.max(2.5,
+            5.0 + Math.sin(t * 22.0) * 1.2 + Math.sin(t * 9.0) * 0.8
+                + (Math.random() - 0.5) * 1.2);
+        }
+      });
+
+      scene.mainCamera.fieldOfView = 52;
+      scene.mainCamera.location.set(0, 1.4, 16);
+      scene.mainCamera.angle.set(-4, 0, 0);
+
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+        minVerticalRotateAngle: -40,
+        maxVerticalRotateAngle: 80,
+      });
+      controller.targetObject = holder;
+
+      scene.animation = true;   // continuous redraw for the live flight
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Fly the F-2 through the clouds — the cloud deck steers with you. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="flight-hud">
+		<div class="fh-title">Flight controls</div>
+		<div><b>A</b> / <b>D</b> &nbsp;bank</div>
+		<div><b>W</b> / <b>S</b> &nbsp;pitch</div>
+		<div><b>←</b> / <b>→</b> &nbsp;yaw</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
