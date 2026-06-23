@@ -18,6 +18,9 @@ export class EquirectShader extends Shader {
 		this.faceRightUniform = this.bindUniform("faceRight", "vec3");
 		this.faceUpUniform = this.bindUniform("faceUp", "vec3");
 
+		// azimuth rotation of the environment (radians), baked into the cubemap
+		this.yawUniform = this.bindUniform("yaw", "float");
+
 		this.equirectMapUniform = this.bindUniform("equirectMap", "tex", 0);
 	}
 

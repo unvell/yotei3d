@@ -39,8 +39,10 @@ export class IBLBaker {
 	// Used to turn a loaded HDR environment into the cubemap the engine samples
 	// for both the skybox background and specular image-based lighting. The
 	// result carries a full mip chain so the standard shader can sample rougher
-	// reflections from coarser levels.
-	equirectToCubemap(equirectTexture, size = 1024) {
+	// reflections from coarser levels. `rotation` (radians) spins the environment
+	// about the vertical axis as it is baked, so the sky and every reflection /
+	// IBL term that samples this cubemap stay in sync.
+	equirectToCubemap(equirectTexture, size = 1024, rotation = 0) {
 		const gl = this.renderer.gl;
 
 		const target = new CubeMap(this.renderer);
@@ -56,6 +58,7 @@ export class IBLBaker {
 		const shader = ShaderSources.equirect.instance;
 		this.renderer.useShader(shader);
 		shader.equirectMapUniform.set(equirectTexture);
+		shader.yawUniform.set(rotation); // spin the environment about the vertical axis
 
 		// wrap the panorama horizontally so the azimuth seam is gap-free
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);

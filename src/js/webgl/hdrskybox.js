@@ -11,8 +11,13 @@ import { loadHDR, decodeRGBE } from '../utility/hdrloader';
 // renderer's `enableEnvmap` option — runtime image-based lighting (diffuse
 // irradiance + specular reflections) exactly like a regular SkyBox.
 //
-//   const sky = new HDRSkyBox(renderer, "/textures/hdr/env.hdr", { faceSize: 1024 });
+//   const sky = new HDRSkyBox(renderer, "/textures/hdr/env.hdr",
+//                             { faceSize: 1024, rotation: 90 });
 //   scene.skybox = sky;
+//
+// `rotation` (degrees, optional) spins the environment about the vertical axis
+// as it is baked, so the sky background and every reflection / IBL term that
+// samples the cubemap stay in sync.
 //
 // On WebGL2 the pipeline is fully HDR; on WebGL1 (no float render targets) it
 // gracefully falls back to LDR-clamped cube faces.
@@ -26,6 +31,13 @@ export class HDRSkyBox extends SkyBox {
 		// resolution of each baked cube face. 1024 is a good default for sharp
 		// reflections from a 2K–4K source panorama.
 		this.faceSize = opts.faceSize || 1024;
+
+		// horizontal (azimuth) rotation of the environment, in degrees. Baked
+		// into the cubemap once at load, so the sky background, reflections and
+		// IBL all rotate together. Handy for aiming the HDR's sun/landmarks at a
+		// chosen heading. e.g. new HDRSkyBox(r, url, { rotation: 90 }).
+		this.rotation = opts.rotation || 0;
+
 		this.loaded = false;
 
 		if (typeof hdrUrl === "string") {
@@ -45,7 +57,8 @@ export class HDRSkyBox extends SkyBox {
 		const equirect = Texture.createFloat(this.renderer, hdr.width, hdr.height, hdr.data);
 
 		const baker = new IBLBaker(this.renderer);
-		this.cubemap = baker.equirectToCubemap(equirect, this.faceSize);
+		const yaw = (this.rotation || 0) * Math.PI / 180;
+		this.cubemap = baker.equirectToCubemap(equirect, this.faceSize, yaw);
 		baker.destroy();
 
 		// the source panorama is no longer needed once projected into the cube
