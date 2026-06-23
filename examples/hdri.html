@@ -15,7 +15,7 @@
         enableEnvmap: true,    // drives runtime IBL baking from the (HDR) skybox
         enableShadow: true,
         renderingImage: {
-          gamma: 1.1,
+          gamma: 1.2,
           resolutionRatio: 1,
         },
       });
@@ -29,6 +29,7 @@
       // diffuse irradiance map + uses the cube for specular reflections.
       const sky = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
+        rotation: 100,
       });
       scene.skybox = sky;
 
