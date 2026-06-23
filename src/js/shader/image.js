@@ -30,6 +30,7 @@ export class ImageShader extends Shader {
 		
 		this.enableAntialiasUniform = this.bindUniform("enableAntialias", "bool");
 		this.gammaFactorUniform = this.bindUniform("gammaFactor", "float");
+		this.bloomThresholdUniform = this.bindUniform("bloomThreshold", "float");
 		this.projectionMatrix = new Matrix4().ortho(-1, 1, -1, 1, -1, 1);
 
 		this.resetParameters();
@@ -49,6 +50,7 @@ export class ImageShader extends Shader {
 
 		this.enableAntialiasUniform.set(this.enableAntialias);
 		this.gammaFactorUniform.set(this.gammaFactor);
+		this.bloomThresholdUniform.set(this.bloomThreshold);
 		this.filterTypeUniform.set(this.filterType);
  
 		if (this.texture) {
@@ -88,6 +90,7 @@ export class ImageShader extends Shader {
 	resetParameters() {
 		this.enableAntialias = false;
 		this.gammaFactor = 1;
+		this.bloomThreshold = 1.0;
 		this.color = [1, 1, 1];
 		this.alpha = 1;
 		this.tex2 = null;

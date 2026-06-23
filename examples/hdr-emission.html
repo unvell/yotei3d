@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>HDR Emission & Bloom - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.03, 0.04, 0.06, 1.0],   // dark so the glow reads
+        enablePostprocess: true,
+        enableLighting: true,
+        bloomEffect: {
+          enabled: true,
+          luminanceThreshold: 1.0,   // HDR bright-pass: only energy above 1.0 blooms
+          intensity: 0.6,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+      window._renderer = renderer;
+
+      // dark ground for contrast
+      const ground = new Shapes.Plane();
+      ground.scale.set(40, 1, 40);
+      ground.mat.color = [0.10, 0.10, 0.12];
+      ground.mat.roughness = 0.95;
+      scene.add(ground);
+
+      // a row of cubes with increasing emission. emission is a linear HDR
+      // multiplier on the material colour — at 1 it glows about surface-bright,
+      // at 1000 it is far above the display range and blooms strongly.
+      const emissions = [0, 1, 10, 100, 1000];
+      const colors = [
+        [0.7, 0.7, 0.7],   // reference (no emission), lit only
+        [1.0, 0.3, 0.2],   // warm
+        [0.2, 1.0, 0.4],   // green
+        [0.3, 0.5, 1.0],   // blue
+        [1.0, 0.85, 0.4],  // bright gold — the emission=1000 hero
+      ];
+
+      const row = new SceneObject();
+      scene.add(row);
+      for (let i = 0; i < emissions.length; i++) {
+        const cube = new Shapes.Cube();
+        cube.location.set((i - (emissions.length - 1) / 2) * 1.8, 0.6, 0);
+        cube.mat.color = colors[i];
+        cube.mat.emission = emissions[i];
+        row.add(cube);
+      }
+
+      scene.sun.location.set(-0.4, 1, 0.6);
+      scene.sun.mat.color = [0.5, 0.5, 0.55];
+
+      scene.mainCamera.fieldOfView = 55;
+      scene.mainCamera.location.set(0, 2.4, 8.5);
+      scene.mainCamera.angle.set(-12, 0, 0);
+
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>HDR emission: cubes at emission 0, 1, 10, 100, 1000 — the bright ones bloom naturally.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

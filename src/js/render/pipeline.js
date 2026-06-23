@@ -75,7 +75,9 @@ export class SceneToImageRenderer extends PipelineNode {
     this.nodes = [];
     this.buffer = null;
 
-    this.buffer = new FrameBuffer(this.renderer, this.width, this.height);
+    this.buffer = new FrameBuffer(this.renderer, this.width, this.height, {
+      float: options.float,
+    });
   }
 
   resize(width, height) {
@@ -87,7 +89,9 @@ export class SceneToImageRenderer extends PipelineNode {
         this.buffer.destroy();
       }
 
-      this.buffer = new FrameBuffer(this.renderer, this.width, this.height);
+      this.buffer = new FrameBuffer(this.renderer, this.width, this.height, {
+        float: this.options.float,
+      });
     }
   }
 
@@ -210,6 +214,12 @@ export class ImageToScreenRenderer extends PipelineNode {
         imageShader.gammaFactor = this.gammaFactor;
       }
 
+      // HDR final resolve: tonemap (with the scene's exposure) when the scene
+      // was rendered into a floating-point target.
+      imageShader.toneMap = !!this.toneMap;
+      const scene = this.renderer.currentScene;
+      imageShader.exposure = (scene && typeof scene.exposure === "number") ? scene.exposure : 1.0;
+
       this.renderer.setGLViewportSize(this.width, this.height);
       // this.renderer.setGLViewportSize(this.renderer.renderLogicalSize.width,
       //   this.renderer.renderLogicalSize.height);
@@ -276,9 +286,10 @@ export class ImageFilterRenderer extends PipelineNode {
     this.buffer = new FrameBuffer(this.renderer, this.width, this.height, {
       depthBuffer: false,
       clearBackground: false,
+      float: options.float,
     });
   }
-  
+
   set input(node) {
     if (!node.output || (!(node.output instanceof Texture)
      && !(node.output instanceof WebGLTexture))) {
@@ -325,6 +336,11 @@ export class ImageFilterRenderer extends PipelineNode {
 
       if (typeof this.gammaFactor !== "undefined") {
         imageShader.gammaFactor = this.gammaFactor;
+      }
+
+      // bright-pass threshold for HDR bloom (only consulted by the light-pass filter)
+      if (typeof this.bloomThreshold === "number") {
+        imageShader.bloomThreshold = this.bloomThreshold;
       }
 
       this.renderer.useShader(imageShader);

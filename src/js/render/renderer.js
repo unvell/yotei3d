@@ -54,7 +54,8 @@ export class Renderer {
 			},
 			bloomEffect: {
 				enabled: true,
-				threshold: 0.1,
+				threshold: 0.1,            // bloom buffer resolution scale (downsample factor)
+				luminanceThreshold: 1.0,   // HDR bright-pass cutoff: only energy above this blooms
 				gamma: 2.0,
 				intensity: 0.35,
 			},
@@ -542,11 +543,16 @@ export class Renderer {
 			const sceneImageRenderer = new SceneToImageRenderer(this, {
 				width: renderImageWidth,
 				height: renderImageHeight,
+				float: this.extHDR,   // render the scene into a linear HDR target when supported
 			});
 			sceneImageRenderer.shadowMap2DInput = shadowMapCacheNode;
 
 
-			// bloom
+			// bloom — bright-pass (light-pass) extracts the HDR energy above a
+			// luminance threshold, which is then blurred and added back in the
+			// final resolve. The whole chain stays in floating-point so emissive
+			// highlights (e.g. mat.emission = 1000) bloom naturally instead of
+			// clamping to white.
 
 			let bloomBlurNode;
 
@@ -557,14 +563,20 @@ export class Renderer {
 					width: width * (this.options.bloomEffect.threshold || 0.1),
 					height: height * (this.options.bloomEffect.threshold || 0.1),
 					flipTexcoordY: true,
-					filter: "blur3",
+					filter: "light-pass",
+					float: this.extHDR,
 				});
-				bloomSmallImageNode.gammaFactor = (this.options.bloomEffect.gamma || 1.4);
+				bloomSmallImageNode.gammaFactor = 1.0;   // bloom is gathered in linear space
+				bloomSmallImageNode.bloomThreshold = this.extHDR
+					? ((typeof this.options.bloomEffect.luminanceThreshold === "number")
+						? this.options.bloomEffect.luminanceThreshold : 1.0)
+					: 0.7;   // LDR fallback: threshold near-white pixels like before
 				bloomSmallImageNode.input = sceneImageRenderer;
 
 				bloomBlurNode = new BlurRenderer(this, {
 					width: bloomSmallImageNode.width,
 					height: bloomSmallImageNode.height,
+					float: this.extHDR,
 				});
 				bloomBlurNode.input = bloomSmallImageNode;
 			}
@@ -655,6 +667,10 @@ export class Renderer {
 				finalScreenRenderer.tex2Intensity = bloomIntensity;
 				finalScreenRenderer.gammaFactor = this.options.renderingImage.gamma;
 				finalScreenRenderer.enableAntialias = this.options.enableAntialias;
+				// HDR scene → tonemap on the way to the 8-bit screen. Only when the
+				// scene target is actually floating-point; otherwise the colour is
+				// already LDR and tonemapping would just darken it.
+				finalScreenRenderer.toneMap = !!this.extHDR;
 				this.pipelineNodes.push(finalScreenRenderer);
 			}
 
