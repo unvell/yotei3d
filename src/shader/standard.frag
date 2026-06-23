@@ -356,13 +356,22 @@ void main(void) {
 		//////////////// Lights (legacy non-IBL path) ////////////////
 
 		if (receiveLight) {
-			if (lightCount > 0 || glossy > 0.0) {
-				finalColor += traceLight(vertexNormal, cameraNormal);
-			}
-
+			// sun + ambient base: albedo modulated by the directional sun term and
+			// globally tinted by the sun/ambient colour. For sun-only scenes (no
+			// point lights) this is identical to the previous behaviour.
 			float vtos = clamp(dot(vertexNormal, sundir), 0.0, 1.0);
-			finalColor = finalColor * 0.75 + finalColor * (vtos * 0.25);
-			finalColor *= sunlight;
+			finalColor = finalColor * (0.75 + vtos * 0.25) * sunlight;
+
+			// analytic point lights add their illumination ON TOP of that base,
+			// modulated by the surface albedo — so a warm, bright light (a campfire,
+			// a torch) actually lights nearby surfaces instead of being crushed by a
+			// dim, cold ambient (the old code added the light first and then
+			// multiplied everything by the sun colour, cancelling it out). With the
+			// floating-point scene target this energy can push lit surfaces past 1.0
+			// and spill into the bloom.
+			if (lightCount > 0 || glossy > 0.0) {
+				finalColor += albedo * traceLight(vertexNormal, cameraNormal);
+			}
 		}
 
 		//////////////// RefMap ////////////////

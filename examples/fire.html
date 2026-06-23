@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, Fire, Smoke, TouchController } from "@";
+    import { Renderer, Shapes, SceneObject, PointLight, Fire, Smoke, TouchController } from "@";
 
     window.addEventListener("load", function() {
 
@@ -67,7 +67,7 @@
         // pushes the lower, hotter logs past the bloom threshold so they glow
         // like burning coals; the higher logs are cooler.
         const heat = 1.0 - (i % 2) * 0.45;
-        log.mat.emissiveColor = [1.8 * heat, 0.5 * heat, 0.09 * heat];
+        log.mat.emissiveColor = [2.8 * heat, 0.5 * heat, 0.09 * heat];
         logs.add(log);
       }
 
@@ -75,18 +75,30 @@
       // Added after the geometry so the depth buffer already holds the scene;
       // the fire shader tests (but doesn't write) depth, so logs occlude embers.
       const fire = new Fire({
-        count: 1000,
+        count: 500,
         radius: 0.55,
         height: 3.2,
         riseSpeed: 3.4,
         swayAmp: 0.2,
         swayFreq: 6.5,
-        intensity: 2.1,   // HDR over-drive: hot cores blow past 1.0 to feed bloom
+        intensity: 3.5,   // HDR over-drive: hot cores blow past 1.0 to feed bloom
         sizeBase: 30,
-        sizeTip: 12,
+        sizeTip: 10,
       });
       fire.location.y = 0.2;
       scene.add(fire);
+
+      // ---- the firelight ----
+      // Any object with mat.emission > 0 doubles as a point light. This warm
+      // light sits in the flame and is flickered every frame (below), casting
+      // dancing warm light on the ground, the stones and the logs.
+      const firelight = new PointLight();
+      firelight.location.set(0, 0.9, 0);
+      firelight.mat.color = [1.0, 0.55, 0.22];   // warm fire colour
+      firelight.mat.emission = 6.0;
+      firelight.castShadow = false;
+      firelight.castLight = true;
+      scene.add(firelight);
 
       // ---- the smoke, starting where the flame thins out ----
       const smoke = new Smoke({
@@ -105,9 +117,25 @@
       });
       scene.add(smoke);
 
+      let flickerT = 0;
       scene.on("frame", () => {
         fire.update();
         smoke.update();
+
+        // flicker the firelight: layered sines + a little randomness give a
+        // lively, restless flame glow. emission scales both the brightness and
+        // (through the warm colour) the HDR energy that spills onto the scene,
+        // so the ground and stones pulse with the fire.
+        flickerT += 0.05;
+        const flicker = 6.0
+          + Math.sin(flickerT * 13.0) * 1.5
+          + Math.sin(flickerT * 7.3) * 1.0
+          + (Math.random() - 0.5) * 2.0;
+        firelight.mat.emission = Math.max(2.0, flicker);
+
+        // tiny positional jitter so highlights and shadows dance
+        firelight.location.x = Math.sin(flickerT * 9.0) * 0.07;
+        firelight.location.z = Math.cos(flickerT * 11.0) * 0.07;
       });
 
       // dim, cool moonlight so the logs and stones stay just visible
