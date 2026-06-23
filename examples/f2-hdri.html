@@ -71,6 +71,23 @@
               c.mat.color = [0.0, 1.0, 0.1]; c.mat.emission = 2.0;
             } else if (c.name === "light-white") {
               c.mat.color = [1.0, 1.0, 1.0]; c.mat.emission = 3.0;
+            } else if (c.name === "cocpit-glass") {
+              // Canopy glass: a smooth, lightly blue-tinted dielectric. With
+              // IBL on (enableEnvmap), the very low roughness gives it a crisp
+              // sky reflection and a Fresnel rim, while the partial opacity lets
+              // the cockpit interior show through — the renderer's transparency
+              // pass draws it after the opaque airframe, so the seat/HUD read
+              // correctly behind the pane.
+              c.mat.color = [0.55, 0.74, 0.83];
+              c.mat.metallic = 0.1;     // a touch reflective so it reads as glass
+              c.mat.roughness = 0.04;   // smooth → sharp environment reflection
+              c.opacity = 0.42;         // see-through canopy
+            } else if (c.name === "hud-display") {
+              // HUD glass: a phosphor-green glow like a real fighter head-up
+              // display. emission pushes it past 1.0 so it feeds the bloom pass
+              // and reads through the transparent canopy.
+              c.mat.color = [0.15, 1.0, 0.35];
+              c.mat.emission = 2.0;
             }
           });
           scene.requireUpdateFrame();
