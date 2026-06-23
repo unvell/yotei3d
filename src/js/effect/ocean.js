@@ -26,7 +26,9 @@ export class Ocean extends SceneObject {
 		const opt = this.options = Object.assign({
 			size: 400,            // world extent of the water grid (square)
 			segments: 200,        // grid resolution per axis (wave detail)
-			level: 0,             // water plane height (world Y)
+			level: 0,             // initial water plane height (world Y); thereafter
+			                      // location.y is authoritative. Assigning a new
+			                      // options.level still moves the surface live.
 
 			// wave shape (read live every frame by the water shader)
 			wind: [1.0, 0.35],    // primary wave heading [x, z]
@@ -61,6 +63,7 @@ export class Ocean extends SceneObject {
 		this.receiveShadow = false;
 
 		this.location.y = opt.level;
+		this._appliedLevel = opt.level;
 
 		this.mesh = buildGridMesh(opt.size, Math.max(1, Math.floor(opt.segments)));
 		this.addMesh(this.mesh);
@@ -79,7 +82,14 @@ export class Ocean extends SceneObject {
 			this.location.x = tgt.location.x;
 			this.location.z = tgt.location.z;
 		}
-		this.location.y = this.options.level;
+
+		// Height is driven by location.y so `ocean.location.set(...)` sticks.
+		// `level` stays a live knob: only push it into location.y when the caller
+		// actually changes it, instead of clobbering location every frame.
+		if (this.options.level !== this._appliedLevel) {
+			this.location.y = this.options.level;
+			this._appliedLevel = this.options.level;
+		}
 	}
 }
 
