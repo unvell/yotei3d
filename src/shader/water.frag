@@ -25,10 +25,11 @@ uniform vec3 shallowColor; // tint near crests / grazing
 uniform float reflectivity;   // overall strength of the sky reflection (0..1)
 uniform float fresnelPower;   // Fresnel falloff exponent (~5)
 uniform float fresnelBias;    // minimum reflectivity looking straight down
-uniform float shininess;      // sun specular exponent (higher = tighter glint)
-uniform float specStrength;   // sun specular intensity
+uniform float sunGlitter;     // sun-glitter roughness: small = tight glint, large = broad path
+uniform float specStrength;   // sun-glitter intensity (HDR; >1 blooms)
 uniform float rippleScale;    // world units -> ripple frequency
 uniform float rippleStrength; // how hard ripples bend the normal
+uniform float reflectionBlur; // distance-based reflection softening (0 = mirror)
 
 // distance fog, matching standard.frag so the sea melts into the horizon haze
 uniform bool hasFog;
@@ -89,13 +90,30 @@ void main(void) {
 	// keep the normal facing the viewer (handles the underside / steep crests)
 	if (dot(N, V) < 0.0) N = reflect(N, V);
 
+	float ndv = max(dot(N, V), 0.0);
+
 	// sky reflection
 	vec3 R = reflect(-V, N);
-	R.y = abs(R.y) * 0.85 + 0.02;   // bias rays upward so we never sample the void below
-	vec3 sky = hasEnv ? textureCube(envMap, R).rgb : proceduralSky(R);
+	vec3 sky;
+	if (hasEnv) {
+		// Reflect the real environment cubemap directly — it carries full-sphere
+		// HDR radiance (the sun disk, cloud detail, horizon haze), so the water
+		// mirrors the actual sky and the reflected sun blooms through the HDR
+		// pipeline. A mild distance/grazing mip bias softens far ripples so the
+		// surface reads as glossy water rather than a chrome mirror, and stops
+		// the high-frequency wave normals from aliasing into sparkle noise.
+		float dist = length(cameraLoc - vWorldPos);
+		float lod = reflectionBlur * (0.4 + 0.6 * (1.0 - ndv)) * (1.0 - exp(-dist * 0.01));
+		sky = textureCube(envMap, R, lod).rgb;
+	} else {
+		// the procedural fallback only models the upper hemisphere, so fold rays
+		// that dip below the horizon back up before sampling it.
+		vec3 Rp = R;
+		Rp.y = abs(Rp.y) * 0.85 + 0.02;
+		sky = proceduralSky(Rp);
+	}
 
 	// Fresnel: more sky at grazing angles, more body colour looking down
-	float ndv = max(dot(N, V), 0.0);
 	float fres = fresnelBias + (1.0 - fresnelBias) * pow(1.0 - ndv, fresnelPower);
 	fres = clamp(fres * reflectivity, 0.0, 1.0);
 
@@ -104,10 +122,20 @@ void main(void) {
 
 	vec3 color = mix(body, sky, fres);
 
-	// sharp sun glint
+	// --- sun glitter: the bright "sun road" a low sun lays across the water.
+	// A GGX specular lobe catches the many wave facets between the eye and the
+	// sun; `sunGlitter` widens it from a hard glint into a shimmering path, and
+	// the result is HDR-bright so it blooms. It fades out once the sun drops
+	// below the horizon. Strongest near the horizon under the sun, breaking up
+	// into sparkle over the nearer swell.
 	vec3 H = normalize(V + sundir);
-	float spec = pow(max(dot(N, H), 0.0), shininess) * specStrength;
-	color += sunlight * spec;
+	float NoH = max(dot(N, H), 0.0);
+	float a = max(sunGlitter, 0.02);
+	float a2 = a * a;
+	float dterm = NoH * NoH * (a2 - 1.0) + 1.0;
+	float ggx = a2 / (3.14159265 * dterm * dterm);
+	float sunUp = smoothstep(-0.05, 0.15, sundir.y);
+	color += sunlight * ggx * specStrength * sunUp;
 
 	// distance fog toward the horizon
 	if (hasFog) {

@@ -36,10 +36,11 @@ export class WaterShader extends Shader {
 		this.reflectivityUniform = this.bindUniform("reflectivity", "float");
 		this.fresnelPowerUniform = this.bindUniform("fresnelPower", "float");
 		this.fresnelBiasUniform = this.bindUniform("fresnelBias", "float");
-		this.shininessUniform = this.bindUniform("shininess", "float");
+		this.sunGlitterUniform = this.bindUniform("sunGlitter", "float");
 		this.specStrengthUniform = this.bindUniform("specStrength", "float");
 		this.rippleScaleUniform = this.bindUniform("rippleScale", "float");
 		this.rippleStrengthUniform = this.bindUniform("rippleStrength", "float");
+		this.reflectionBlurUniform = this.bindUniform("reflectionBlur", "float");
 
 		// environment cubemap (sky reflection)
 		this.envMapUniform = this.bindUniform("envMap", "texcube", 4);
@@ -56,8 +57,12 @@ export class WaterShader extends Shader {
 		this.emptyCubemap.createEmpty();
 	}
 
-	beginScene(scene) {
-		super.beginScene(scene);
+	// Per-scene uniforms (camera, sun, environment cubemap, fog). The renderer
+	// only calls beginScene() on the main pass shader, not on per-object effect
+	// shaders, so this is driven from beginObject() with the active scene pulled
+	// from the renderer — matching how the other effect shaders work.
+	setSceneUniforms(scene) {
+		if (!scene) return;
 
 		// camera
 		const camera = scene.mainCamera;
@@ -74,7 +79,9 @@ export class WaterShader extends Shader {
 		}
 
 		// sky reflection — reuse the runtime IBL environment cubemap if present,
-		// otherwise the skybox's own cubemap, otherwise a procedural sky.
+		// otherwise the skybox's own cubemap, otherwise a procedural sky. This is
+		// independent of the renderer's enableEnvmap toggle (which only gates IBL
+		// baking): a skybox cubemap is all the ocean needs to mirror the sky.
 		let env = null;
 		if (scene._iblEnvMap instanceof CubeMap && scene._iblEnvMap.loaded) {
 			env = scene._iblEnvMap;
@@ -82,7 +89,7 @@ export class WaterShader extends Shader {
 			env = scene.skybox.cubemap;
 		}
 
-		if (env && this.renderer.options.enableEnvmap !== false) {
+		if (env) {
 			this.envMapUniform.set(env);
 			this.hasEnvUniform.set(true);
 		} else {
@@ -112,6 +119,8 @@ export class WaterShader extends Shader {
 
 		const gl = this.gl;
 
+		this.setSceneUniforms(this.renderer.currentScene);
+
 		this.projectViewMatrixUniform.set(this.renderer.projectionViewMatrixArray);
 		this.modelMatrixUniform.set(obj._transform);
 		this.timeUniform.set(typeof obj.time === "number" ? obj.time : 0);
@@ -129,10 +138,11 @@ export class WaterShader extends Shader {
 		this.reflectivityUniform.set(num(o.reflectivity, 1.0));
 		this.fresnelPowerUniform.set(num(o.fresnelPower, 5.0));
 		this.fresnelBiasUniform.set(num(o.fresnelBias, 0.02));
-		this.shininessUniform.set(num(o.shininess, 400.0));
-		this.specStrengthUniform.set(num(o.specStrength, 2.0));
+		this.sunGlitterUniform.set(num(o.sunGlitter, 0.12));
+		this.specStrengthUniform.set(num(o.specStrength, 1.2));
 		this.rippleScaleUniform.set(num(o.rippleScale, 0.25));
 		this.rippleStrengthUniform.set(num(o.rippleStrength, 0.35));
+		this.reflectionBlurUniform.set(num(o.reflectionBlur, 2.0));
 
 		// the ocean grid is one-sided; show it from below too (e.g. underwater
 		// camera) instead of culling to nothing.

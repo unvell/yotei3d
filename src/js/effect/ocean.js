@@ -42,10 +42,11 @@ export class Ocean extends SceneObject {
 			reflectivity: 1.0,
 			fresnelPower: 5.0,
 			fresnelBias: 0.02,
-			shininess: 400.0,
-			specStrength: 2.0,
+			sunGlitter: 0.12,     // sun-road width: small = tight glint, large = broad shimmering path
+			specStrength: 1.2,    // sun-glitter intensity (HDR; >1 blooms)
 			rippleScale: 0.25,
 			rippleStrength: 0.35,
+			reflectionBlur: 2.0,  // distance/grazing reflection softening (0 = mirror-sharp)
 
 			followTarget: null,   // optional object/camera; grid recentres on its x/z
 		}, options);
