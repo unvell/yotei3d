@@ -16,8 +16,8 @@
         // enableLighting: true,
         enablePostprocess: true,
         enableAntialias: true,
-        // enableEnvmap: true,     // bakes IBL from the skybox + feeds water reflection
-        // enableShadow: true,
+        enableEnvmap: true,     // bakes IBL from the skybox + feeds water reflection
+        enableShadow: false,        // shadows are expensive and not needed for this demo
         // Wide open seascape: push the far plane well out so the ocean reaches
         // the horizon instead of being clipped to sky.
         perspective: { method: "persp", angle: 60, near: 0.5, far: 1200 },
@@ -34,7 +34,7 @@
       scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
       });
-      scene.iblIntensity = 2.0;
+      scene.iblIntensity = 1.0;
       scene.exposure = 1.0;
 
       // haze the sea into the horizon so the water plane's far edge is hidden
@@ -42,18 +42,23 @@
 
       // --- the ocean ---------------------------------------------------------
       const ocean = new Ocean({
-        size: 2000,
+        size: 1000,
         segments: 280,
-        level: 0,
+        level: -50,
         wind: [1.0, 0.4],
         waveAmp: 0.5,
         waveLen: 22,
         waveSpeed: 1.0,
         steepness: 0.75,
+        sunGlitter: 0,
+        specStrength: 0,
+        reflectionBlur: 0.2,
+        reflectivity: 1,
         deepColor: [0.012, 0.07, 0.10],
         shallowColor: [0.10, 0.36, 0.40],
         followTarget: scene.mainCamera,   // endless sea: recentres on the camera
       });
+      ocean.location.set(0, -50, 0);
       scene.add(ocean);
       window._ocean = ocean;
 
@@ -74,12 +79,12 @@
       // scene.add(island);
 
       // --- lighting: warm low sun for long glints across the swell -----------
-      scene.sun.location.set(-6, 5, 9);
-      scene.sun.mat.color = [1.3, 1.18, 0.95];
+      // scene.sun.location.set(-6, 5, 9);
+      // scene.sun.mat.color = [1.3, 1.18, 0.95];
 
       // --- camera + orbit ----------------------------------------------------
       scene.mainCamera.fieldOfView = 60;
-      scene.mainCamera.location.set(0, 14, 60);
+      scene.mainCamera.location.set(0, 50, 60);
       scene.mainCamera.angle.set(0, 0, 0);
 
       const controller = new TouchController(scene);
