@@ -16,8 +16,10 @@
         enableLighting: true,
         enableShadow: true,
         bloomEffect: {
-          threshold: 0.55,   // only the hot ember cores bloom
-          gamma: 1.1,
+          enabled: true,
+          threshold: 0.5,            // bloom buffer resolution scale (downsample)
+          luminanceThreshold: 1.0,   // HDR bright-pass: the flame's hot cores bloom
+          intensity: 0.85,           // strength of the glow added back
         },
         renderingImage: {
           gamma: 1.1,
@@ -61,8 +63,11 @@
         log.angle.set((i % 2) * 8, i * 45, 0);
         log.mat.color = [0.16, 0.09, 0.05];
         log.mat.roughness = 0.85;
-        // faint warm self-illumination as if catching the firelight
-        log.mat.emissiveColor = [0.25, 0.08, 0.02];
+        // glowing embers: a hot HDR self-illumination (emissiveColor > 1.0)
+        // pushes the lower, hotter logs past the bloom threshold so they glow
+        // like burning coals; the higher logs are cooler.
+        const heat = 1.0 - (i % 2) * 0.45;
+        log.mat.emissiveColor = [1.8 * heat, 0.5 * heat, 0.09 * heat];
         logs.add(log);
       }
 
@@ -76,7 +81,7 @@
         riseSpeed: 3.4,
         swayAmp: 0.2,
         swayFreq: 6.5,
-        intensity: 1.0,
+        intensity: 2.1,   // HDR over-drive: hot cores blow past 1.0 to feed bloom
         sizeBase: 30,
         sizeTip: 12,
       });
