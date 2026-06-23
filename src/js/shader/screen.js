@@ -31,6 +31,11 @@ export class ScreenShader extends Shader {
 		this.gammaFactorUniform = this.bindUniform("gammaFactor", "float");
 		this.gammaFactor = 1;
 
+		this.toneMapUniform = this.bindUniform("toneMap", "bool");
+		this.toneMap = false;
+		this.exposureUniform = this.bindUniform("exposure", "float");
+		this.exposure = 1.0;
+
 		this.projectionMatrix = new Matrix4().ortho(-1, 1, -1, 1, -1, 1);
 		this.color = [1, 1, 1];
 		this.alpha = 1;
@@ -53,6 +58,8 @@ export class ScreenShader extends Shader {
 
 		this.enableAntialiasUniform.set(this.enableAntialias);
 		this.gammaFactorUniform.set(this.gammaFactor);
+		this.toneMapUniform.set(this.toneMap);
+		this.exposureUniform.set(typeof this.exposure === "number" ? this.exposure : 1.0);
 
 		if (this.texture) {
 			this.textureUniform.set(this.texture);

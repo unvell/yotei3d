@@ -257,11 +257,6 @@ vec3 tonemap(vec3 hdr) {
 
 void main(void) {
 
-	if (emission > 0.0) {
-		gl_FragColor = vec4(normalize(color) * 1.5, opacity);
-		return;
-	}
-
 	vec2 uv1 = texcoord1 * texTiling;
 	vec4 textureColor = texture2D(texture, uv1);
 
@@ -447,15 +442,25 @@ void main(void) {
 
 	//////////////// Emissive (PBR self-illumination) ////////////////
 
+	// `emission` is a scalar HDR multiplier on the material's base colour: it
+	// adds self-illumination on top of the lit result, so emission = 1 glows at
+	// roughly surface brightness and large values (e.g. 1000) push the fragment
+	// far above the [0,1] display range. With a floating-point scene target that
+	// energy survives to feed the bright-pass bloom and the final tonemap,
+	// instead of clamping to white. emissiveColor / emissiveMap is the separate
+	// glTF emissive channel and is always added.
+	finalColor += albedo * emission;
+
 	vec3 emissive = emissiveColor;
 	if (hasEmissiveMap) {
 		emissive *= texture2D(emissiveMap, uv1).rgb;
 	}
 	finalColor += emissive;
 
-	if (hasIBL) {
-		finalColor = tonemap(finalColor);
-	}
+	// NOTE: tonemapping is no longer done per-fragment. The scene is rendered
+	// into a linear HDR (RGBA16F) target and tonemapped once in the final
+	// screen pass, after bloom is composited. (The `tonemap` helper is kept for
+	// reference / non-postprocess paths.)
 
 	//////////////// Distance fog ////////////////
 	// applied last, in display space, so distant geometry fades into the

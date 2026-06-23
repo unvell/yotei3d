@@ -14,6 +14,12 @@ uniform bool enableAntialias;
 uniform bool hasTex2;
 uniform float tex2Intensity;
 
+// HDR final-resolve: when the scene was rendered into a floating-point target,
+// the incoming colour (and bloom) is linear HDR and must be tonemapped down to
+// the [0,1] display range here, after bloom is composited.
+uniform bool toneMap;
+uniform float exposure;
+
 
 #define BLUR_SAMPLINGS 10
 uniform float samplingWeight[BLUR_SAMPLINGS];
@@ -154,12 +160,20 @@ void main(void) {
 		fc = sample(texture);
 	}
 
-	vec3 t2c = vec3(0);
-	
 	if (hasTex2) {
-		t2c = sample(tex2).rgb;
-		t2c = lighter(fc.rgb, t2c, tex2Intensity);
-		fc.rgb = t2c.rgb;
+		vec3 b = sample(tex2).rgb;
+		if (toneMap) {
+			// HDR bloom is additive in linear space; the tonemap below rolls the
+			// combined energy back into displayable range.
+			fc.rgb += b * tex2Intensity;
+		} else {
+			fc.rgb = lighter(fc.rgb, b, tex2Intensity);
+		}
+	}
+
+	if (toneMap) {
+		// exposure-based exponential tonemap (matches the standard shader's curve)
+		fc.rgb = vec3(1.0) - exp(-fc.rgb * exposure);
 	}
 
 	fc.rgb = gamma(fc.rgb, gammaFactor);

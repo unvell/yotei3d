@@ -10,6 +10,7 @@ uniform vec2 resolution;
 uniform vec2 resStride;
 uniform float gammaFactor;
 uniform float tex2Intensity;
+uniform float bloomThreshold;
 uniform int filterType;
 uniform int tex2FilterType;
 // uniform bool antialias; // TODO
@@ -72,14 +73,18 @@ vec4 guassblur_v(sampler2D tex) {
   return color;
 }
 
+// Bright-pass for HDR bloom: keep only the energy above `bloomThreshold`
+// (a luminance cutoff, typically 1.0 in HDR linear space) and pass it through
+// with its full magnitude so the downstream blur + additive composite produces
+// a glow whose spread scales with how far the source overshoots the threshold.
 vec3 light_pass(vec3 color) {
-  float b = dot(color, vec3(0.3, 0.7152, 0.0722));
-  return (b > 0.7) ? color : vec3(0.0);
+  float b = dot(color, vec3(0.2126, 0.7152, 0.0722));
+  float contrib = max(b - bloomThreshold, 0.0);
+  return (b > 0.0) ? color * (contrib / b) : vec3(0.0);
 }
 
 vec4 light_pass(vec4 color) {
-  float b = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
-  return (b > 0.7) ? color : vec4(0.0, 0.0, 0.0, 1.0);
+  return vec4(light_pass(color.rgb), 1.0);
 }
 
 // 0.0625   0.125   0.0625   

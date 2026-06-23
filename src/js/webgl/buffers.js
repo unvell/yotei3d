@@ -51,16 +51,26 @@ export class FrameBuffer extends CommonBuffer {
 		height = renderer.canvas.height, {
 			depthBuffer = true,
 			clearBackground = true,
+			float = false,
 		} = {}) {
 		super(renderer, width, height);
 
 		this.clearBackground = clearBackground;
-	
+
 		const gl = this.gl;
+
+		// HDR (RGBA16F) colour attachment. Requires WebGL2 + EXT_color_buffer_float
+		// to be *renderable*; when unavailable we silently fall back to RGBA8 so
+		// the pipeline still runs (highlights just clamp to LDR).
+		this.isFloat = !!(float && renderer.extHDR && renderer.isWebGL2);
 
 		this.texture = Texture.create(this.width, this.height);
 		this.texture.enableMipmapped = false;
 		this.texture.enableRepeat = false;
+		if (this.isFloat) {
+			this.texture.hdr = true;
+			this.texture.linearInterpolation = true;
+		}
 
 		gl.activeTexture(gl.TEXTURE0);
 		this.texture.bind(this.renderer);
