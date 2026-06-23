@@ -1,0 +1,154 @@
+
+import { Vec3 } from "@/math";
+import { Shader } from "../webgl/shader.js";
+import { CubeMap } from "../webgl/cubemap.js";
+
+// Shader for the Ocean effect. Selected per-object via `obj.shader = { name:
+// "water" }`. Wave shape is computed entirely on the GPU (see water.vert), so
+// per frame the CPU only updates the `time` uniform. Sky reflection reuses the
+// scene's environment cubemap (the skybox) — the same map IBL is baked from —
+// so the ocean costs no extra render pass.
+export class WaterShader extends Shader {
+	constructor(renderer, vertShaderSrc, fragShaderSrc) {
+		super(renderer, vertShaderSrc, fragShaderSrc);
+
+		this.use();
+
+		this.vertexPositionAttribute = this.findAttribute("vertexPosition");
+
+		this.projectViewMatrixUniform = this.bindUniform("projectViewMatrix", "mat4");
+		this.modelMatrixUniform = this.bindUniform("modelMatrix", "mat4");
+		this.timeUniform = this.bindUniform("time", "float");
+
+		// wave shape
+		this.windDirUniform = this.bindUniform("windDir", "vec2");
+		this.waveAmpUniform = this.bindUniform("waveAmp", "float");
+		this.waveLenUniform = this.bindUniform("waveLen", "float");
+		this.waveSpeedUniform = this.bindUniform("waveSpeed", "float");
+		this.steepnessUniform = this.bindUniform("steepness", "float");
+
+		// shading
+		this.cameraLocUniform = this.bindUniform("cameraLoc", "vec3");
+		this.sundirUniform = this.bindUniform("sundir", "vec3");
+		this.sunlightUniform = this.bindUniform("sunlight", "color3");
+		this.deepColorUniform = this.bindUniform("deepColor", "color3");
+		this.shallowColorUniform = this.bindUniform("shallowColor", "color3");
+		this.reflectivityUniform = this.bindUniform("reflectivity", "float");
+		this.fresnelPowerUniform = this.bindUniform("fresnelPower", "float");
+		this.fresnelBiasUniform = this.bindUniform("fresnelBias", "float");
+		this.shininessUniform = this.bindUniform("shininess", "float");
+		this.specStrengthUniform = this.bindUniform("specStrength", "float");
+		this.rippleScaleUniform = this.bindUniform("rippleScale", "float");
+		this.rippleStrengthUniform = this.bindUniform("rippleStrength", "float");
+
+		// environment cubemap (sky reflection)
+		this.envMapUniform = this.bindUniform("envMap", "texcube", 4);
+		this.hasEnvUniform = this.bindUniform("hasEnv", "bool");
+
+		// distance fog
+		this.hasFogUniform = this.bindUniform("hasFog", "bool");
+		this.fogColorUniform = this.bindUniform("fogColor", "color3");
+		this.fogNearUniform = this.bindUniform("fogNear", "float");
+		this.fogFarUniform = this.bindUniform("fogFar", "float");
+
+		this.emptyCubemap = new CubeMap(renderer);
+		this.emptyCubemap.enableMipmap = false;
+		this.emptyCubemap.createEmpty();
+	}
+
+	beginScene(scene) {
+		super.beginScene(scene);
+
+		// camera
+		const camera = scene.mainCamera;
+		this.cameraLocUniform.set(camera ? camera.worldLocation : Vec3.zero);
+
+		// sun
+		if (scene.sun !== undefined) {
+			const sun = scene.sun;
+			this.sundirUniform.set(Vec3.normalize(sun.worldLocation));
+			this.sunlightUniform.set((sun.mat && sun.mat.color) ? sun.mat.color : Shader.defaultSunColor);
+		} else {
+			this.sundirUniform.set([0.0, 1.0, 0.0]);
+			this.sunlightUniform.set(Shader.defaultSunColor);
+		}
+
+		// sky reflection — reuse the runtime IBL environment cubemap if present,
+		// otherwise the skybox's own cubemap, otherwise a procedural sky.
+		let env = null;
+		if (scene._iblEnvMap instanceof CubeMap && scene._iblEnvMap.loaded) {
+			env = scene._iblEnvMap;
+		} else if (scene.skybox && scene.skybox.cubemap instanceof CubeMap && scene.skybox.cubemap.loaded) {
+			env = scene.skybox.cubemap;
+		}
+
+		if (env && this.renderer.options.enableEnvmap !== false) {
+			this.envMapUniform.set(env);
+			this.hasEnvUniform.set(true);
+		} else {
+			this.envMapUniform.set(this.emptyCubemap);
+			this.hasEnvUniform.set(false);
+		}
+
+		// distance fog (same opt-in convention as the standard shader)
+		const fog = scene.fog;
+		if (fog && fog.enabled !== false) {
+			this.hasFogUniform.set(true);
+			let fogColor = fog.color;
+			if (!fogColor) {
+				const bc = this.renderer.options.backColor;
+				fogColor = bc ? [bc.r, bc.g, bc.b] : [0.8, 0.8, 0.8];
+			}
+			this.fogColorUniform.set(fogColor);
+			this.fogNearUniform.set(typeof fog.near === "number" ? fog.near : 10);
+			this.fogFarUniform.set(typeof fog.far === "number" ? fog.far : 100);
+		} else {
+			this.hasFogUniform.set(false);
+		}
+	}
+
+	beginObject(obj) {
+		super.beginObject(obj);
+
+		const gl = this.gl;
+
+		this.projectViewMatrixUniform.set(this.renderer.projectionViewMatrixArray);
+		this.modelMatrixUniform.set(obj._transform);
+		this.timeUniform.set(typeof obj.time === "number" ? obj.time : 0);
+
+		const o = obj.options || obj;
+		const wind = o.wind || [1.0, 0.35];
+		this.windDirUniform.set(wind);
+		this.waveAmpUniform.set(num(o.waveAmp, 0.6));
+		this.waveLenUniform.set(num(o.waveLen, 16.0));
+		this.waveSpeedUniform.set(num(o.waveSpeed, 1.0));
+		this.steepnessUniform.set(num(o.steepness, 0.7));
+
+		this.deepColorUniform.set(o.deepColor || [0.015, 0.08, 0.11]);
+		this.shallowColorUniform.set(o.shallowColor || [0.10, 0.34, 0.38]);
+		this.reflectivityUniform.set(num(o.reflectivity, 1.0));
+		this.fresnelPowerUniform.set(num(o.fresnelPower, 5.0));
+		this.fresnelBiasUniform.set(num(o.fresnelBias, 0.02));
+		this.shininessUniform.set(num(o.shininess, 400.0));
+		this.specStrengthUniform.set(num(o.specStrength, 2.0));
+		this.rippleScaleUniform.set(num(o.rippleScale, 0.25));
+		this.rippleStrengthUniform.set(num(o.rippleStrength, 0.35));
+
+		// the ocean grid is one-sided; show it from below too (e.g. underwater
+		// camera) instead of culling to nothing.
+		gl.disable(gl.CULL_FACE);
+	}
+
+	endObject(obj) {
+		const gl = this.gl;
+
+		gl.enable(gl.CULL_FACE);
+		this.envMapUniform.unset();
+
+		super.endObject(obj);
+	}
+}
+
+function num(v, def) {
+	return (typeof v === "number" && !isNaN(v)) ? v : def;
+}

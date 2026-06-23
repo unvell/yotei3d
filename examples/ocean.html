@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Ocean - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController } from "@";
+    import { Vec3 } from "@/math";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.70, 0.82, 0.92, 1],
+        // enableLighting: true,
+        enablePostprocess: true,
+        enableAntialias: true,
+        // enableEnvmap: true,     // bakes IBL from the skybox + feeds water reflection
+        // enableShadow: true,
+        // Wide open seascape: push the far plane well out so the ocean reaches
+        // the horizon instead of being clipped to sky.
+        perspective: { method: "persp", angle: 60, near: 0.5, far: 1200 },
+        shadowQuality: { scale: 8, viewDepth: 2, resolution: 1024, intensity: 0.3 },
+        bloomEffect: { enabled: true, threshold: 0.85, gamma: 1.2, intensity: 0.4 },
+        renderingImage: { gamma: 1.1, resolutionRatio: 0.5 },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // --- sky: a cubemap skybox. The renderer bakes IBL from it, and the
+      //     ocean reflects this same cubemap (no extra reflection pass). -------
+      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+        faceSize: 1024,
+      });
+      scene.iblIntensity = 2.0;
+      scene.exposure = 1.0;
+
+      // haze the sea into the horizon so the water plane's far edge is hidden
+      // scene.fog = { near: 10, far: 300, color: [0.74, 0.83, 0.90] };
+
+      // --- the ocean ---------------------------------------------------------
+      const ocean = new Ocean({
+        size: 2000,
+        segments: 280,
+        level: 0,
+        wind: [1.0, 0.4],
+        waveAmp: 0.5,
+        waveLen: 22,
+        waveSpeed: 1.0,
+        steepness: 0.75,
+        deepColor: [0.012, 0.07, 0.10],
+        shallowColor: [0.10, 0.36, 0.40],
+        followTarget: scene.mainCamera,   // endless sea: recentres on the camera
+      });
+      scene.add(ocean);
+      window._ocean = ocean;
+
+      // --- a small rocky island poking out of the water ----------------------
+      const island = new Terrain({
+        width: 80, depth: 80, segments: 120,
+        height: 9, noiseScale: 2.2, octaves: 5, seed: 21,
+        heightFunction: (x, z) => {
+          // a single hill that dips below sea level toward the edges
+          const r = Math.sqrt(x * x + z * z);
+          const falloff = Math.max(0, 1 - r / 34);
+          const n = 0.6 + 0.4 * Math.sin(x * 0.18) * Math.cos(z * 0.21);
+          return (falloff * falloff * 11 * n) - 2.2;
+        },
+        color: [0.42, 0.40, 0.34],
+      });
+      island.location.set(0, 0, 0);
+      // scene.add(island);
+
+      // --- lighting: warm low sun for long glints across the swell -----------
+      scene.sun.location.set(-6, 5, 9);
+      scene.sun.mat.color = [1.3, 1.18, 0.95];
+
+      // --- camera + orbit ----------------------------------------------------
+      scene.mainCamera.fieldOfView = 60;
+      scene.mainCamera.location.set(0, 14, 60);
+      scene.mainCamera.angle.set(0, 0, 0);
+
+      const controller = new TouchController(scene);
+
+      // --- drive the waves ---------------------------------------------------
+      scene.on("frame", () => ocean.update());
+      scene.animation = true;
+
+      scene.show();
+    });
+
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center bg-gray-800/40 text-white">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>GPU Gerstner-wave ocean reflecting the skybox, with a small island. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

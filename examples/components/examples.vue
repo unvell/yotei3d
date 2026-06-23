@@ -174,6 +174,12 @@ const exampleItems = ref([
     desc: 'Procedural heightfield terrain scattered with a low-poly tree model.',
   },
   {
+    title: 'Ocean',
+    thumbnail: '/img/examples/ocean.jpg',
+    link: 'ocean.html',
+    desc: 'GPU Gerstner-wave ocean: waves are summed on the GPU so only a single time value updates per frame. The surface reflects the skybox cubemap (reusing the IBL environment — no extra reflection pass), with a Fresnel sky/water blend and sharp sun glints. A small island sits in the swell.',
+  },
+  {
     title: 'Instancing',
     thumbnail: '/img/examples/instancing.png',
     link: 'instancing.html',

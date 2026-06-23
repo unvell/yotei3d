@@ -319,7 +319,18 @@ export class Mesh {
 
 		if (this.indexed && !this.indexBuffer) {
 			if (Array.isArray(this.indexes)) {
-				this.indexBuffer = new Uint16Array(this.indexes);
+				// A 16-bit index can only address 65535 vertices. Finely
+				// tessellated grids (e.g. a large Ocean surface) exceed that, so
+				// promote to 32-bit indices when available. draw() picks the
+				// matching gl.UNSIGNED_INT type from the buffer class. 32-bit
+				// element indices are core in WebGL2 and the OES_element_index_uint
+				// extension in WebGL1 — both surface as _extElementIndexUint.
+				const needs32 = this.meta && this.meta.vertexCount > 65535;
+				if (needs32 && renderer && renderer._extElementIndexUint) {
+					this.indexBuffer = new Uint32Array(this.indexes);
+				} else {
+					this.indexBuffer = new Uint16Array(this.indexes);
+				}
 			}
 		}
 
