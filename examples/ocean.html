@@ -20,10 +20,10 @@
         enableShadow: false,        // shadows are expensive and not needed for this demo
         // Wide open seascape: push the far plane well out so the ocean reaches
         // the horizon instead of being clipped to sky.
-        perspective: { method: "persp", angle: 60, near: 0.5, far: 1200 },
+        perspective: { method: "persp", angle: 60, near: 0.5, far: 2000 },
         shadowQuality: { scale: 8, viewDepth: 2, resolution: 1024, intensity: 0.3 },
         bloomEffect: { enabled: true, threshold: 0.85, gamma: 1.2, intensity: 0.4 },
-        renderingImage: { gamma: 1.1, resolutionRatio: 0.5 },
+        renderingImage: { gamma: 1.1, resolutionRatio: 0.75 },
       });
 
       const scene = renderer.createScene();
@@ -35,31 +35,31 @@
         faceSize: 1024,
         rotation: 130,
       });
-      scene.iblIntensity = 1.0;
+      scene.iblIntensity = 1.5;
       scene.exposure = 1.0;
 
       // haze the sea into the horizon so the water plane's far edge is hidden
-      scene.fog = { near: 100, far: 500, color: [0.74, 0.83, 0.90] };
+      scene.fog = { near: 1000, far: 2000, color: [0.54, 0.63, 0.70] };
 
       // --- the ocean ---------------------------------------------------------
       const ocean = new Ocean({
-        size: 1000,
+        size: 10000,
         segments: 280,
-        level: -30,
+        level: -50,
         wind: [1.0, 0.4],
-        waveAmp: 0.5,
-        waveLen: 22,
+        waveAmp: 1.0,
+        waveLen: 30,
         waveSpeed: 1.0,
         steepness: 0.75,
         sunGlitter: 0,
         specStrength: 0,
-        reflectionBlur: 0.2,
+        reflectionBlur: 3.5,
         reflectivity: 1,
         deepColor: [0.012, 0.07, 0.10],
         shallowColor: [0.10, 0.36, 0.40],
         followTarget: scene.mainCamera,   // endless sea: recentres on the camera
       });
-      ocean.location.set(0, -30, 0);
+      ocean.location.set(0, -250, 0);
       scene.add(ocean);
       window._ocean = ocean;
 
@@ -86,13 +86,47 @@
       // --- camera + orbit ----------------------------------------------------
       scene.mainCamera.fieldOfView = 60;
       scene.mainCamera.location.set(0, 50, 60);
-      scene.mainCamera.angle.set(0, 0, 0);
+      scene.mainCamera.angle.set(-8, 0, 0);
 
       const controller = new TouchController(scene);
 
       // --- drive the waves ---------------------------------------------------
       scene.on("frame", () => ocean.update());
       scene.animation = true;
+
+      // --- sound -------------------------------------------------------------
+      // Ocean waves loop: Sound Effect from Pixabay
+      const waveSound = new Audio("/audio/ocean-waves.mp3");
+      waveSound.loop = true;
+      waveSound.volume = 0.6;
+
+      let soundOn = true;   // default On
+      const soundBtn = document.getElementById("sound-toggle");
+
+      function setSound(on) {
+        soundOn = on;
+        if (on) {
+          waveSound.play().catch(() => {});
+          soundBtn.textContent = "🔊 Sound: On";
+        } else {
+          waveSound.pause();
+          soundBtn.textContent = "🔈 Sound: Off";
+        }
+      }
+      soundBtn.addEventListener("click", () => setSound(!soundOn));
+
+      // Default On, but browsers block autoplay until a user gesture. Try to
+      // start right away; if blocked, kick it off on the first interaction.
+      setSound(true);
+      waveSound.play().catch(() => {
+        const start = () => {
+          if (soundOn) waveSound.play().catch(() => {});
+          window.removeEventListener("pointerdown", start);
+          window.removeEventListener("keydown", start);
+        };
+        window.addEventListener("pointerdown", start);
+        window.addEventListener("keydown", start);
+      });
 
       scene.show();
     });
@@ -103,6 +137,8 @@
 	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center bg-gray-800/40 text-white">
 		<div class="menu hover:text-sky-600">
 			&lt; <a href="index.html">Back</a>
+			&nbsp;&nbsp;
+			<a id="sound-toggle" href="javascript:void(0)">🔊 Sound: On</a>
 		</div>
     <div>GPU Gerstner-wave ocean reflecting the skybox, with a small island. Drag to orbit, scroll to zoom.</div>
 		<div class="logo">
@@ -111,6 +147,10 @@
 	</div>
 
 	<div id="canvas-container">
+	</div>
+
+	<div class="fixed bottom-0 left-0 z-10 px-4 py-2" style="font-size:11px; opacity:0.55;">
+		Sound Effect from <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a>
 	</div>
 </body>
 </html>

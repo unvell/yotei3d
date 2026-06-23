@@ -111,7 +111,7 @@
       const thunderSound = new Audio("/audio/thunderstorm.mp3");
       thunderSound.volume = 0.8;
 
-      let soundOn = false;
+      let soundOn = true;   // default On
       const soundBtn = document.getElementById("sound-toggle");
 
       function setSound(on) {
@@ -127,6 +127,19 @@
       }
       // browsers block audio until a user gesture — the click counts as one
       soundBtn.addEventListener("click", () => setSound(!soundOn));
+
+      // Default On, but browsers block autoplay until a user gesture. Try to
+      // start right away; if blocked, kick it off on the first interaction.
+      setSound(true);
+      rainSound.play().catch(() => {
+        const start = () => {
+          if (soundOn) rainSound.play().catch(() => {});
+          window.removeEventListener("pointerdown", start);
+          window.removeEventListener("keydown", start);
+        };
+        window.addEventListener("pointerdown", start);
+        window.addEventListener("keydown", start);
+      });
 
       // play thunder just after the flash (sound lags light), no overlap
       lightning.options.onStrike = () => {
@@ -156,7 +169,7 @@
 		<div class="menu hover:text-sky-600">
 			&lt; <a href="index.html">Back</a>
 			&nbsp;&nbsp;
-			<a id="sound-toggle" href="javascript:void(0)">🔈 Sound: Off</a>
+			<a id="sound-toggle" href="javascript:void(0)">🔊 Sound: On</a>
 		</div>
     <div>Real-time rainfall with slanted streak particles. Drag to orbit, scroll to zoom.</div>
 		<div class="logo">
