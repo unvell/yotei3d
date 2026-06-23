@@ -104,7 +104,11 @@ void main(void) {
 		// the high-frequency wave normals from aliasing into sparkle noise.
 		float dist = length(cameraLoc - vWorldPos);
 		float lod = reflectionBlur * (0.4 + 0.6 * (1.0 - ndv)) * (1.0 - exp(-dist * 0.01));
-		sky = textureCube(envMap, R, lod).rgb;
+		// Flip X to match the skybox's sampling convention (panorama.vert negates
+		// texcoord.x, and standard.frag negates the reflection/refraction lookup the
+		// same way), so the reflected sun and clouds line up left-right with the
+		// visible sky instead of mirroring it.
+		sky = textureCube(envMap, vec3(-R.x, R.y, R.z), lod).rgb;
 	} else {
 		// the procedural fallback only models the upper hemisphere, so fold rays
 		// that dip below the horizon back up before sampling it.

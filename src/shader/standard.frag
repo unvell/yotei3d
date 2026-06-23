@@ -342,6 +342,10 @@ void main(void) {
 		if (refMapType == 2) {
 			R = normalize(correctBoundingBoxIntersect(refMapBox, R));
 		}
+		// Flip X to match the skybox sampling convention (panorama.vert negates
+		// texcoord.x; the refraction lookup below negates cameraNormal.x), so
+		// reflections line up left-right with the visible sky.
+		R.x = -R.x;
 		vec3 prefiltered = textureCube(refMap, R, matRoughness * maxEnvLod).rgb;
 		vec2 ab = envBRDFApprox(NdotV, matRoughness);
 		vec3 specularIBL = prefiltered * (F0 * ab.x + ab.y);
@@ -382,6 +386,10 @@ void main(void) {
 		if (refMapType == 2) {
 			refmapLookup = normalize(correctBoundingBoxIntersect(refMapBox, refmapLookup));
 		}
+
+		// Flip X to match the skybox sampling convention (panorama.vert), matching
+		// the refraction lookup below which negates cameraNormal.x.
+		refmapLookup.x = -refmapLookup.x;
 
 		if (glossy > 0.0) {
 			vec3 refColor = textureCube(refMap, refmapLookup, roughdelta).rgb;
