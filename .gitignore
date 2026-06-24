@@ -12,8 +12,9 @@ node_modules
 # Under public/ so the examples build copies them to the deployed site.
 /examples/public/textures/hdr/*.hdr
 /examples/public/textures/hdr/*.exr
-# ...except the clear-sky map the examples ship with
+# ...except the maps the examples ship with
 !/examples/public/textures/hdr/kloppenheim_06_puresky_4k.hdr
+!/examples/public/textures/hdr/kloofendal_48d_partly_cloudy_puresky_4k.hdr
 
 # yotei3d-*.tgz
 # yotei3d-min.js

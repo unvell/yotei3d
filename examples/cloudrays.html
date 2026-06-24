@@ -28,33 +28,34 @@
       // --- sky -----------------------------------------------------------------
       // A clear-sky HDRI for believable cloud lighting + reflections, with a warm
       // haze bled into the lower sky so the horizon behind the rays reads warm.
-      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloofendal_48d_partly_cloudy_puresky_4k.hdr", {
         faceSize: 1024,
         rotation: 130,
       });
       scene.iblIntensity = 1.5;
       scene.exposure = 1.05;
 
-      scene.fog = { near: 200, far: 2200, color: [0.32, 0.32, 0.2] };
+      scene.fog = { near: 10, far: 1200, color: [0.38, 0.34, 0.20] };
       scene.skyFog = {
         color: [0.98, 0.74, 0.46],
         lower: 0.0,
-        upper: 0.30,
-        density: 0.8,
+        upper: 0.10,
+        density: 0.5,
       };
 
       // --- the sun -------------------------------------------------------------
       // Up in the sky and slightly ahead, so the camera looks up *into* it with
       // the cloud layer drifting across — the shafts then rain down through the
       // gaps. Both the flare and the volumetric rays follow this one direction.
-      scene.sun.direction = [0.0, 0.1, -1];
+      scene.sun.direction = [0.0, 1, -0.85];
       scene.sun.mat.color = [1.4, 1.18, 0.92];
 
       // a faint ground far below, just to anchor the horizon
       const ground = new Shapes.Plane(8000, 8000);
       ground.location.set(0, -40, 0);
-      ground.mat.color = [0.10, 0.10, 0.02];
+      ground.mat.color = [0.88, 0.74, 0.46];
       ground.mat.roughness = 0.95;
+      ground.mat.metallic = 0.05;
       scene.add(ground);
 
       // --- the clouds ----------------------------------------------------------
@@ -62,21 +63,21 @@
       // drifting-cumulus demo so it actually shadows the rays; the gaps between
       // clusters are where the light breaks through.
       const clouds = new Clouds({
-        clusters: 90,
-        puffsPerCluster: 64,
+        clusters: 500,
+        puffsPerCluster: 12,
         width: 1700, depth: 1700,
-        height: 100,
+        height: 300,
         heightVariance: 30,
         clusterRadius: 34,
         clusterThickness: 9,
-        puffSizeMin: 40, puffSizeMax: 80,
+        puffSizeMin: 100, puffSizeMax: 300,
         wind: [0.4, 7.5],
-        opacity: 0.92,
+        opacity: 0.22,
         topColor: [1.0, 0.98, 0.94],
         bottomColor: [0.62, 0.66, 0.74],
         selfShadow: 0.05,
         fadeIn: 2.5,
-        fadeMargin: 0.3,
+        fadeMargin: 0.1,
       });
       scene.add(clouds);
       scene.on("frame", () => clouds.update());
@@ -85,10 +86,11 @@
       const lensFlare = new LensFlare(scene, {
         follow: scene.sun,
         color: [1.0, 0.93, 0.82],
-        ghosts: false,         // no chromatic discs — keep the sky clean
+        occluders: [clouds],   // the cloud layer softens the flare's ghosts
+        ghosts: true,         // no chromatic discs — keep the sky clean
         intensity: 1,
-        coreIntensity: 0.1,    // sun point + starburst + streak only
-        scale: 1,
+        coreIntensity: 0.2,    // sun point + starburst + streak only
+        scale: 2.5,
       });
       window._lensFlare = lensFlare;
 
@@ -104,12 +106,12 @@
         // additive 8-bit channels clip at different radii (red→yellow→white
         // rings); keeping it near-white avoids that banding.
         color: [1.0, 0.92, 0.80],
-        intensity: 0.3,
+        intensity: 1.0,   // overall brightness of the shafts
         density: 0.5,   // ray reach
         decay: 0.972,    // tail falloff
         weight: 0.01,
         samples: 72,
-        sunSize: 0.5,    // a defined sun disc the clouds break into shafts
+        sunSize: 5,    // a defined sun disc the clouds break into shafts
       });
       window._godRays = godRays;
 
