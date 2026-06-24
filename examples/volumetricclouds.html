@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, DynamicSky, VolumetricClouds, ObjectViewController } from "@";
+    import { Renderer, Shapes, SceneObject, DynamicSky, VolumetricClouds, TouchController } from "@";
 
     window.addEventListener("load", function() {
 
@@ -79,7 +79,7 @@
       scene.mainCamera.location.set(0, 3.0, 13);
       scene.mainCamera.angle.set(-7, 0, 0);
 
-      const controller = new ObjectViewController(scene, {
+      const controller = new TouchController(scene, {
         enableVerticalRotation: true,
       });
       controller.targetObject = hero;
