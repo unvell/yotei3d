@@ -47,7 +47,7 @@
       // Up in the sky and slightly ahead, so the camera looks up *into* it with
       // the cloud layer drifting across — the shafts then rain down through the
       // gaps. Both the flare and the volumetric rays follow this one direction.
-      scene.sun.direction = [0.0, 1, -0.85];
+      scene.sun.direction = [0.0, 0.3, -0.3];
       scene.sun.mat.color = [1.4, 1.18, 0.92];
 
       // a faint ground far below, just to anchor the horizon
@@ -63,19 +63,19 @@
       // drifting-cumulus demo so it actually shadows the rays; the gaps between
       // clusters are where the light breaks through.
       const clouds = new Clouds({
-        clusters: 250,
-        puffsPerCluster: 14,
-        width: 1700, depth: 1700,
+        clusters: 1,
+        puffsPerCluster: 32,
+        width: 1000, depth: 1000,
         height: 300,
         heightVariance: 30,
         clusterRadius: 40,
         clusterThickness: 9,
-        puffSizeMin: 110, puffSizeMax: 320,
+        puffSizeMin: 100, puffSizeMax: 220,
         wind: [0.4, 7.5],
-        opacity: 0.34,
+        opacity: 0.14,
         topColor: [1.0, 0.98, 0.94],
         bottomColor: [0.62, 0.66, 0.74],
-        selfShadow: 0.05,
+        selfShadow: 0.2,
         fadeIn: 2.5,
         fadeMargin: 0.1,
       });
@@ -86,7 +86,7 @@
       const lensFlare = new LensFlare(scene, {
         follow: scene.sun,
         color: [1.0, 0.93, 0.82],
-        occluders: [clouds],   // the cloud layer softens the flare's ghosts
+        // occluders: [clouds],   // the cloud layer softens the flare's ghosts
         ghosts: true,         // no chromatic discs — keep the sky clean
         intensity: 1,
         coreIntensity: 0.2,    // sun point + starburst + streak only
@@ -106,15 +106,15 @@
         follow: scene.sun,
         // cloud shadow map
         resolution: 1024,
-        density: 0.5,              // optical density: shadow / shaft contrast
+        density: 0.1,              // optical density: shadow / shaft contrast
         groundIntensity: 0.7,      // strength of the dappling on the ground
         // volumetric shafts
         color: [1.0, 0.92, 0.80],
-        intensity: 2.4,
+        intensity: 0.1,
         steps: 100,
         maxDist: 1400,
-        phaseG: 0.7,               // forward-scatter glow toward the sun
-        scatter: 1.0,
+        phaseG: 0.1,               // forward-scatter glow toward the sun
+        scatter: 0.1,
       });
       window._godRays = godRays;
 
