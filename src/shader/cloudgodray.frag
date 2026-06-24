@@ -97,5 +97,12 @@ void main(void) {
 	// modulated by the forward-scatter phase toward the sun
 	float inscatter = (acc / fN) * phase * scatter * intensity;
 
+	// Fade out as the view ray nears the horizon. The pass is confined to sky
+	// pixels by the depth test, so without this it would snap hard against the
+	// ground's silhouette — a moving edge that flickers while the camera turns.
+	// Fading by the ray's upward component dissolves that boundary smoothly (and
+	// the shafts physically live above the horizon anyway).
+	inscatter *= smoothstep(0.0, 0.06, rd.y);
+
 	gl_FragColor = vec4(sunColor * inscatter, 1.0);
 }

@@ -162,9 +162,23 @@ export class CloudVolumetricLight {
 	// Pre-pass: render the cloud puffs from the sun's POV into the density map,
 	// then publish it (and the light matrix) to the standard + godray shaders.
 	_renderShadowMap() {
-		if (!this.enabled) return;
 		const clouds = this.clouds;
-		if (!clouds || clouds.visible === false) return;
+
+		// Without a live cloud field there is no occluder to cast shadows or carve
+		// shafts. Leave the scene completely untouched: hide the shaft pass (so it
+		// can't ray-march a stale / empty map into garbage) and clear the ground
+		// dappling. This is also the guard for clouds that haven't faded in yet.
+		const active = this.enabled && clouds && clouds.visible !== false
+			&& (typeof clouds.cloudOpacity !== "number" || clouds.cloudOpacity > 0.001);
+
+		if (!active) {
+			if (this._godrayObj) this._godrayObj.visible = false;
+			const std0 = ShaderSources.standard.instance;
+			if (std0) std0._cloudShadowMap = undefined;
+			return;
+		}
+
+		if (this._godrayObj) this._godrayObj.visible = this.shaftsEnabled;
 
 		const r = this.renderer, gl = r.gl;
 
