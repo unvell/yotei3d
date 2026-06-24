@@ -22,6 +22,13 @@ export class PanoramaShader extends Shader {
 		this.textureUniform = this.bindUniform("texture", "tex", 0);
 		this.colorUniform = this.bindUniform("color", "color3");
 		this.hdrExposureUniform = this.bindUniform("hdrExposure", "float");
+
+		// horizon haze (scene.skyFog) — fades the lower sky into the fog colour
+		this.hasSkyFogUniform = this.bindUniform("hasSkyFog", "bool");
+		this.skyFogColorUniform = this.bindUniform("skyFogColor", "color3");
+		this.skyFogUpperUniform = this.bindUniform("skyFogUpper", "float");
+		this.skyFogLowerUniform = this.bindUniform("skyFogLower", "float");
+		this.skyFogDensityUniform = this.bindUniform("skyFogDensity", "float");
 		// this.texTilingUniform = this.findUniform("texTiling");
 		// this.opacityUniform = this.bindUniform("opacity", "float");
 
@@ -95,12 +102,33 @@ export class PanoramaShader extends Shader {
 
 		// HDR skies carry values > 1, so tone-map them with the scene exposure to
 		// stay consistent with lit objects. LDR cubemaps pass through unchanged.
+		const scene = this.renderer.currentScene;
 		let hdrExposure = 0.0;
 		if (texture && texture.hdr) {
-			const scene = this.renderer.currentScene;
 			hdrExposure = (scene && typeof scene.exposure === "number") ? scene.exposure : 1.0;
 		}
 		this.hdrExposureUniform.set(hdrExposure);
+
+		// Horizon haze: opt-in via scene.skyFog. Defaults its colour to the
+		// scene fog colour (or the renderer back colour) so it matches a fogged
+		// ocean/ground plane out of the box; the seam between the two dissolves.
+		const skyFog = scene && scene.skyFog;
+		if (skyFog && skyFog.enabled !== false) {
+			this.hasSkyFogUniform.set(true);
+			let c = skyFog.color || (scene.fog && scene.fog.color);
+			if (!c) {
+				const bc = this.renderer.options.backColor;
+				c = bc ? [bc.r !== undefined ? bc.r : bc[0],
+				          bc.g !== undefined ? bc.g : bc[1],
+				          bc.b !== undefined ? bc.b : bc[2]] : [0.8, 0.8, 0.8];
+			}
+			this.skyFogColorUniform.set(c);
+			this.skyFogUpperUniform.set(typeof skyFog.upper === "number" ? skyFog.upper : 0.25);
+			this.skyFogLowerUniform.set(typeof skyFog.lower === "number" ? skyFog.lower : -0.05);
+			this.skyFogDensityUniform.set(typeof skyFog.density === "number" ? skyFog.density : 1.0);
+		} else {
+			this.hasSkyFogUniform.set(false);
+		}
 
 		// color
 		if (color) {
