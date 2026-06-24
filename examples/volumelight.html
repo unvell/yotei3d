@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, HDRSkyBox, ObjectViewController,
+    import { Renderer, Shapes, SceneObject, HDRSkyBox, TouchController,
              LensFlare, VolumetricLight } from "@";
 
     window.addEventListener("load", function() {
@@ -16,11 +16,11 @@
         enablePostprocess: true,
         enableAntialias: true,
         enableEnvmap: true,        // IBL from the HDRI lights the towers
-        enableShadow: false,       // the shafts are the star; towers read as silhouettes
+        enableShadow: true,        // low sun → long shadows raking toward the camera
         perspective: { method: "persp", angle: 55, near: 0.5, far: 4000 },
         shadowQuality: { scale: 12, viewDepth: 2, resolution: 2048, intensity: 0.5 },
         bloomEffect: { enabled: true, threshold: 0.8, gamma: 1.2, intensity: 0.5 },
-        renderingImage: { gamma: 1.12, resolutionRatio: 1 },
+        renderingImage: { gamma: 1.22, resolutionRatio: 1 },
       });
 
       const scene = renderer.createScene();
@@ -33,13 +33,13 @@
       // shafts emerge from reads as a sunset rather than flat blue.
       scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
-        rotation: 15,
+        rotation: 132,
       });
       scene.iblIntensity = 1.6;
       scene.exposure = 1.05;
 
       // distance haze so the far towers melt into the glow instead of ending hard
-      scene.fog = { near: 120, far: 1400, color: [0.62, 0.52, 0.42] };
+      scene.fog = { near: 10, far: 200, color: [0.62, 0.52, 0.42] };
 
       // warm sunset band along the bottom of the sky (where the sun sits)
       scene.skyFog = {
@@ -78,9 +78,9 @@
       const buildings = [];
 
       const perSide = 4;      // tower columns on each side of the avenue
-      const rows = 9;         // depth, marching away toward the sun
-      const spacingX = 12;    // gap between columns
-      const spacingZ = 17;    // gap between rows
+      const rows = 4;         // depth, marching away toward the sun
+      const spacingX = 22;    // gap between columns
+      const spacingZ = 27;    // gap between rows
       const avenue = 14;      // half-width of the clear central avenue
 
       for (const side of [-1, 1]) {
@@ -106,7 +106,7 @@
             // sunward faces.
             const tone = 0.16 + rng() * 0.10;
             b.mat.color = [tone, tone * 1.03, tone * 1.12];
-            b.mat.roughness = 0.55 + rng() * 0.25;
+            b.mat.roughness = 0.75 + rng() * 0.25;
             b.mat.metallic = 0.15;
 
             city.add(b);
@@ -123,8 +123,8 @@
         occluders: buildings,
         color: [1.0, 0.86, 0.62],
         intensity: 0.22,       // ghost chain — kept subtle so the shafts lead
-        coreIntensity: 0.5,    // sun point + starburst + streak (a tasteful accent)
-        scale: 0.7,
+        coreIntensity: 0.7,    // sun point + starburst + streak (a tasteful accent)
+        scale: 1,
       });
       window._lensFlare = lensFlare;
 
@@ -137,26 +137,24 @@
         follow: scene.sun,
         occluders: buildings,
         color: [1.0, 0.80, 0.52],
-        intensity: 0.85,
-        density: 1.05,   // ray reach (k up to ~2× → long shafts)
+        intensity: 0.1,
+        density: 1,   // ray reach (k up to ~2× → long shafts)
         decay: 0.965,    // tail falloff
-        weight: 0.32,
+        weight: 0.1,
         samples: 64,
-        sunSize: 0.15,
+        sunSize: 1,
       });
       window._godRays = godRays;
 
       // --- camera: a hero shot looking down the avenue into the sun -----------
       scene.mainCamera.fieldOfView = 55;
-      scene.mainCamera.location.set(0, 8, 58);
+      scene.mainCamera.location.set(0, 15, 120);
       scene.mainCamera.angle.set(-2.5, 0, 0);
 
       // Orbit the city (the controller spins the holder, the sun stays put), so
       // dragging sweeps the skyline across the sun and the shafts re-carve live.
-      const controller = new ObjectViewController(scene, {
-        enableVerticalRotation: true,
-        minVerticalRotateAngle: -10,
-        maxVerticalRotateAngle: 60,
+      const controller = new TouchController(scene, {
+        speed: 0.15,
       });
       controller.targetObject = city;
 
@@ -164,7 +162,7 @@
       let autoSpin = true;
       window.addEventListener("pointerdown", () => { autoSpin = false; });
       scene.on("frame", () => {
-        if (autoSpin) city.angle.y += 0.05;
+        if (autoSpin) city.angle.y += 0.02;
       });
       scene.animation = true;   // keep rendering so the effect stays live
 
