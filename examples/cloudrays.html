@@ -30,12 +30,12 @@
       // haze bled into the lower sky so the horizon behind the rays reads warm.
       scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
-        rotation: 200,
+        rotation: 130,
       });
       scene.iblIntensity = 1.5;
       scene.exposure = 1.05;
 
-      scene.fog = { near: 200, far: 2200, color: [0.66, 0.70, 0.78] };
+      scene.fog = { near: 200, far: 2200, color: [0.32, 0.32, 0.2] };
       scene.skyFog = {
         color: [0.98, 0.74, 0.46],
         lower: 0.0,
@@ -47,13 +47,13 @@
       // Up in the sky and slightly ahead, so the camera looks up *into* it with
       // the cloud layer drifting across — the shafts then rain down through the
       // gaps. Both the flare and the volumetric rays follow this one direction.
-      scene.sun.direction = [0.05, 0.62, -1];
+      scene.sun.direction = [0.0, 0.1, -1];
       scene.sun.mat.color = [1.4, 1.18, 0.92];
 
       // a faint ground far below, just to anchor the horizon
       const ground = new Shapes.Plane(8000, 8000);
       ground.location.set(0, -40, 0);
-      ground.mat.color = [0.30, 0.34, 0.30];
+      ground.mat.color = [0.10, 0.10, 0.02];
       ground.mat.roughness = 0.95;
       scene.add(ground);
 
@@ -64,17 +64,17 @@
       const clouds = new Clouds({
         clusters: 90,
         puffsPerCluster: 64,
-        width: 680, depth: 680,
-        height: 88,
+        width: 1700, depth: 1700,
+        height: 100,
         heightVariance: 30,
         clusterRadius: 34,
         clusterThickness: 9,
-        puffSizeMin: 22, puffSizeMax: 42,
-        wind: [2.4, 0.5],
+        puffSizeMin: 40, puffSizeMax: 80,
+        wind: [0.4, 7.5],
         opacity: 0.92,
         topColor: [1.0, 0.98, 0.94],
         bottomColor: [0.62, 0.66, 0.74],
-        selfShadow: 0.45,
+        selfShadow: 0.05,
         fadeIn: 2.5,
         fadeMargin: 0.3,
       });
@@ -86,9 +86,9 @@
         follow: scene.sun,
         color: [1.0, 0.93, 0.82],
         ghosts: false,         // no chromatic discs — keep the sky clean
-        intensity: 0,
-        coreIntensity: 0.5,    // sun point + starburst + streak only
-        scale: 0.85,
+        intensity: 1,
+        coreIntensity: 0.1,    // sun point + starburst + streak only
+        scale: 1,
       });
       window._lensFlare = lensFlare;
 
@@ -104,18 +104,18 @@
         // additive 8-bit channels clip at different radii (red→yellow→white
         // rings); keeping it near-white avoids that banding.
         color: [1.0, 0.92, 0.80],
-        intensity: 0.8,
-        density: 1.15,   // ray reach
+        intensity: 0.3,
+        density: 0.5,   // ray reach
         decay: 0.972,    // tail falloff
-        weight: 0.26,
+        weight: 0.01,
         samples: 72,
-        sunSize: 0.2,    // a defined sun disc the clouds break into shafts
+        sunSize: 0.5,    // a defined sun disc the clouds break into shafts
       });
       window._godRays = godRays;
 
       // --- camera: look up into the sun through the clouds --------------------
       scene.mainCamera.fieldOfView = 66;
-      scene.mainCamera.location.set(0, 6, 70);
+      scene.mainCamera.location.set(0, 1.5, 200);
       scene.mainCamera.angle.set(20, 0, 0);   // tilt up toward the sun
 
       const controller = new TouchController(scene, { speed: 0.12 });
