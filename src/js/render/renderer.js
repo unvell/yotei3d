@@ -281,6 +281,12 @@ export class Renderer {
 		this.cachedImages = {};
 		this.resourceManager = new ResourceManager();
 
+		// Pre-passes run each frame after the render matrices are prepared but
+		// before the main pipeline, so an effect can render an auxiliary buffer
+		// (e.g. the sun-POV cloud shadow map) and feed it into the scene pass.
+		// Each entry is a zero-arg callback; it owns binding/unbinding its own FBO.
+		this.prePasses = [];
+
 		// create shader programs
 		for (const [_, define] of Object.entries(ShaderSources)) {
 			this.loadShader(define, define.vert, define.frag);
@@ -480,6 +486,16 @@ export class Renderer {
 				this.updateIBL(scene);
 				this.updateProbes(scene);
 				this.prepareRenderMatrices();
+
+				// auxiliary pre-passes (e.g. cloud shadow map) before the main pipeline
+				for (let i = 0; i < this.prePasses.length; i++) {
+					try {
+						this.prePasses[i]();
+					} catch (e) {
+						console.error("prePass error", e);
+					}
+				}
+
 				this.renderPipeline();
 
 				if (this.options.debugMode && this.debugger) {

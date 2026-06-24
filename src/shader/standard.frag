@@ -59,6 +59,12 @@ uniform int refMapType;
 uniform int shadowMapType;
 uniform float shadowIntensity;
 
+// cloud shadow: sun-POV transmittance map projected onto the scene
+uniform bool hasCloudShadow;
+uniform sampler2D cloudShadowMap;
+uniform float cloudShadowDensity;     // transmittance = exp(-density * tau)
+uniform float cloudShadowIntensity;   // 0 = off .. 1 = full shadow
+
 uniform sampler2D texture;
 uniform sampler2D normalMap;
 uniform sampler2D lightMap;
@@ -72,7 +78,19 @@ varying vec2 texcoord1;
 varying vec2 texcoord2;
 varying vec3 vcolor;
 varying highp vec3 shadowPosition;
+varying highp vec2 cloudShadowUV;
 varying mat3 TBN;
+
+// Sun transmittance through the cloud layer at this fragment (1 = full sun,
+// toward 0 under thick cloud). Returns 1 outside the cloud map footprint.
+float cloudSunTransmittance() {
+	if (!hasCloudShadow) return 1.0;
+	if (cloudShadowUV.x < 0.0 || cloudShadowUV.x > 1.0
+		|| cloudShadowUV.y < 0.0 || cloudShadowUV.y > 1.0) return 1.0;
+	float tau = texture2D(cloudShadowMap, cloudShadowUV).r;
+	float T = exp(-cloudShadowDensity * tau);
+	return mix(1.0, T, cloudShadowIntensity);
+}
 
 #define MAX_LIGHT_COUNT 10
 uniform int lightCount;
@@ -314,10 +332,14 @@ void main(void) {
 		// The analytic sun is only added when scene lighting is enabled; for
 		// IBL-only scenes the environment map already carries the key light, so
 		// adding it again would double-count.
+		float cloudT = cloudSunTransmittance();
+
 		vec3 direct = vec3(0.0);
 		if (receiveLight) {
 			if (useDirectSun) {
-				direct += cookTorrance(N, viewDir, sundir, sunlight, albedo, matRoughness, matMetallic, F0);
+				// the sun is what the clouds occlude; scale its contribution by the
+				// projected cloud transmittance so the gaps cast bright dappled light
+				direct += cookTorrance(N, viewDir, sundir, sunlight, albedo, matRoughness, matMetallic, F0) * cloudT;
 			}
 
 			for (int i = 0; i < MAX_LIGHT_COUNT; i++) {
@@ -350,8 +372,10 @@ void main(void) {
 		vec2 ab = envBRDFApprox(NdotV, matRoughness);
 		vec3 specularIBL = prefiltered * (F0 * ab.x + ab.y);
 
-		// ambient (indirect) light is what AO occludes; direct light is not
-		vec3 ambient = (kD * diffuseIBL + specularIBL) * iblIntensity * ao;
+		// ambient (indirect) light is what AO occludes; direct light is not.
+		// Shadowed ground also loses some skylight, so fade the ambient partially
+		// under cloud cover too (weaker than the full sun attenuation).
+		vec3 ambient = (kD * diffuseIBL + specularIBL) * iblIntensity * ao * mix(1.0, cloudT, 0.4);
 
 		finalColor = direct + ambient;
 
@@ -364,7 +388,8 @@ void main(void) {
 			// globally tinted by the sun/ambient colour. For sun-only scenes (no
 			// point lights) this is identical to the previous behaviour.
 			float vtos = clamp(dot(vertexNormal, sundir), 0.0, 1.0);
-			finalColor = finalColor * (0.75 + vtos * 0.25) * sunlight;
+			float cloudT = cloudSunTransmittance();
+			finalColor = finalColor * (0.75 + vtos * 0.25 * cloudT) * sunlight;
 
 			// analytic point lights add their illumination ON TOP of that base,
 			// modulated by the surface albedo — so a warm, bright light (a campfire,

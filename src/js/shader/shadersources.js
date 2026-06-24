@@ -12,6 +12,8 @@ import { FireShader } from './fire';
 import { SmokeShader } from './smoke';
 import { CloudShader } from './cloud';
 import { CloudShadowShader } from './cloudshadow';
+import { CloudMapShader } from './cloudmap';
+import { CloudGodrayShader } from './cloudgodray';
 import { WaterShader } from './water';
 import { ImageShader } from './image';
 import { ScreenShader } from './screen';
@@ -55,6 +57,10 @@ import cloudVert from '../../shader/cloud.vert';
 import cloudFrag from '../../shader/cloud.frag';
 import cloudShadowVert from '../../shader/cloudshadow.vert';
 import cloudShadowFrag from '../../shader/cloudshadow.frag';
+import cloudMapVert from '../../shader/cloudmap.vert';
+import cloudMapFrag from '../../shader/cloudmap.frag';
+import cloudGodrayVert from '../../shader/cloudgodray.vert';
+import cloudGodrayFrag from '../../shader/cloudgodray.frag';
 import waterVert from '../../shader/water.vert';
 import waterFrag from '../../shader/water.frag';
 import imageVert from '../../shader/image.vert';
@@ -92,6 +98,8 @@ export const ShaderSources = {
   smoke: { vert: smokeVert, frag: smokeFrag, class: SmokeShader },
   cloud: { vert: cloudVert, frag: cloudFrag, class: CloudShader },
   cloudshadow: { vert: cloudShadowVert, frag: cloudShadowFrag, class: CloudShadowShader },
+  cloudmap: { vert: cloudMapVert, frag: cloudMapFrag, class: CloudMapShader },
+  cloudgodray: { vert: cloudGodrayVert, frag: cloudGodrayFrag, class: CloudGodrayShader },
   water: { vert: waterVert, frag: waterFrag, class: WaterShader },
   image: { vert: imageVert, frag: imageFrag, class: ImageShader },
   // blur: { vert: blurVert, frag: blurFrag, class: "ImageShader" },

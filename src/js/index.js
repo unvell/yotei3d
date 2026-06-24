@@ -18,6 +18,7 @@ export * from './effect/cloud.js';
 export * from './effect/ocean.js';
 export * from './effect/lensflare.js';
 export * from './effect/volumetriclight.js';
+export * from './effect/cloudvolume.js';
 export * from './view/modelviewer.js';
 export * from './view/objectcontroller.js';
 export * from './view/touchcontroller.js';

@@ -121,6 +121,15 @@ export class StandardShader extends Shader {
 			tex2d: this.bindUniform("shadowMap2D", "tex", 3),
 			texcube: this.bindUniform("shadowMap", "texcube", 5),
 		};
+
+		// cloud shadow (sun-POV transmittance map, projected onto the scene). Set
+		// per-frame by the CloudVolumetricLight effect via `_cloudShadowMap` etc.;
+		// a no-op when absent. See cloudmap.frag + the CloudVolumetricLight effect.
+		this.hasCloudShadowUniform = this.bindUniform("hasCloudShadow", "bool");
+		this.cloudShadowMapUniform = this.bindUniform("cloudShadowMap", "tex", 10);
+		this.cloudShadowMatrixUniform = this.bindUniform("cloudShadowMatrix", "mat4");
+		this.cloudShadowDensityUniform = this.bindUniform("cloudShadowDensity", "float");
+		this.cloudShadowIntensityUniform = this.bindUniform("cloudShadowIntensity", "float");
 		
 		// empty cubemap
 		this.emptyCubemap = new CubeMap(renderer);
@@ -256,6 +265,19 @@ export class StandardShader extends Shader {
 				this.shadowMapUniform.texcube.set(this.emptyCubemap);
 				this.shadowMapTypeUniform.set(0);
 			}
+		}
+
+		// cloud shadow (projected sun-POV transmittance) — independent of the
+		// hard shadow map above; darkens the sun term where clouds occlude it.
+		if (this._cloudShadowMap && this._cloudShadowMap instanceof Texture) {
+			this.hasCloudShadowUniform.set(true);
+			this.cloudShadowMapUniform.set(this._cloudShadowMap);
+			this.cloudShadowMatrixUniform.set(this._cloudShadowMatrix);
+			this.cloudShadowDensityUniform.set(typeof this._cloudShadowDensity === "number" ? this._cloudShadowDensity : 6.0);
+			this.cloudShadowIntensityUniform.set(typeof this._cloudShadowIntensity === "number" ? this._cloudShadowIntensity : 0.8);
+		} else {
+			this.hasCloudShadowUniform.set(false);
+			this.cloudShadowMapUniform.set(Shader.emptyTexture);
 		}
 
 		// IBL: runtime-baked irradiance (diffuse) + environment cubemap (specular)
