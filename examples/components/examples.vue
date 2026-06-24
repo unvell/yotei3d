@@ -3,15 +3,15 @@
 		<div><img src="/img/logo.png"></img></div>
 		<!-- <div>A lightweight 3D engine designed for ease of use</div> -->
     <div class="max-w-2xl mx-auto py-2 text-center">
-      A lightweight WebGL-based 3D rendering engine designed with simplicity and ease of use in mind—even for users with minimal 3D programming experience.
+      A lightweight WebGL-based 3D rendering engine built for both simplicity and realism—small and fast, yet capable of physically based materials, image-based lighting, and post-processing. Approachable even for developers with minimal 3D experience.
     </div>
 	</header>
 
-  <main class="max-w-2xl mx-auto examples px-4">
-    
-    <div class="separator"></div>
+  <main class="examples px-4">
 
-    <section>
+    <div class="separator max-w-2xl mx-auto"></div>
+
+    <section class="max-w-2xl mx-auto">
       <h1>Features</h1>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 feature-cards">
@@ -28,45 +28,43 @@
         <div>
           <h2>Lightweight &amp; Memory-Efficient</h2>
           <p>
-            Designed to be small and fast, Yotei3D minimizes memory usage and avoids unnecessary rendering overhead, making it ideal for web-based apps and low-power devices.
+            Designed to be small and fast, Yotei3D minimizes memory usage and avoids unnecessary rendering overhead, making it ideal for web-based apps and low-power devices—all without trading away visual quality.
           </p>
         </div>
 
         <div>
-          <h2>Powerful When Needed</h2>
+          <h2>Lightweight, Yet Realistic</h2>
           <p>
-            While easy to start, Yotei3D also offers advanced features like realistic shadow mapping, a flexible particle system, post-processing effects, and more.
+            Staying small doesn't mean cutting corners on looks. Yotei3D pushes toward photoreal results with physically based rendering, HDRI image-based lighting, real-time shadow mapping, a flexible particle system, and post-processing effects like bloom, SSAO, and volumetric god rays.
           </p>
           </div>
         </div>
     </section>
 
-    <div class="separator"></div>
+    <div class="separator max-w-2xl mx-auto"></div>
 
-    <section id="example-app" class="">
+    <section id="example-app" class="max-w-6xl mx-auto">
       <h1>Examples</h1>
 
-      <div class="grid grid-cols-1 gap-y-10 py-6">
-        <div v-for="item of exampleItems" :key="item.title" 
-          class="flex flex-row gap-x-2 transition-colors duration-300 cursor-pointer"
-          :class="{'bg-gray-800': item.isHover, 'bg-black': !item.isHover}"
-          @mouseenter.stop="item.isHover = true"
-          @mouseleave.stop="item.isHover = false"
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 py-6">
+        <div v-for="item of exampleItems" :key="item.title"
+          class="group flex flex-col rounded-lg overflow-hidden bg-gray-950/60 ring-1 ring-white/5 hover:ring-white/20 hover:bg-gray-800/80 transition-all duration-300 cursor-pointer"
           @click="gotoExample(item)">
-          <div class="w-2/5 h-48 overflow-clip">
-              <img class="object-cover transition-transform duration-300 w-full h-full" :class="{'scale-105': item.isHover}" :src="item.thumbnail">
+          <div class="aspect-video overflow-hidden bg-gray-800">
+            <img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              :src="item.thumbnail" :alt="item.title" loading="lazy">
           </div>
-          <div class="w-3/5 p-4">
-            <div class="font-bold pb-4 text-white text-lg">{{ item.title }}</div>
-            <p class="text-sm">{{item.desc}}</p>
+          <div class="flex flex-col flex-1 p-4">
+            <div class="font-bold pb-2 text-white text-base">{{ item.title }}</div>
+            <p class="text-sm leading-relaxed text-gray-400 line-clamp-3">{{ item.desc }}</p>
           </div>
         </div>
       </div>
     </section>
 
-    <div class="separator"></div>
+    <div class="separator max-w-2xl mx-auto"></div>
 
-    <section>
+    <section class="max-w-2xl mx-auto">
       <h1>Getting Started</h1>
 
       <pre><code class="language-js" v-pre>
@@ -87,7 +85,7 @@ scene.show();
 
     </section>
 
-    <div class="separator"></div>
+    <div class="separator max-w-2xl mx-auto"></div>
 
   </main>
 
@@ -106,7 +104,6 @@ const exampleItems = ref([
     thumbnail: '/img/examples/helloworld.png',
     link: 'helloworld.html',
     desc: 'A simple example that shows how to get started with this engine.',
-    isHover: false,
   },
   {
     title: 'Animation',
@@ -125,35 +122,30 @@ const exampleItems = ref([
     thumbnail: '/img/examples/pbr.png',
     link: 'pbr.html',
     desc: 'Physically based rendering: a metallic × roughness sphere grid and a textured glTF model under image-based lighting.',
-    isHover: false,
   },
   {
     title: 'HDRI Environment',
-    thumbnail: '/img/examples/pbr.png',
+    thumbnail: '/img/examples/hdri.jpg',
     link: 'hdri.html',
     desc: 'Equirectangular .hdr (Radiance) panorama used as a skybox and image-based lighting source — projected to a float cubemap with diffuse irradiance + specular reflections.',
-    isHover: false,
   },
   {
     title: 'F-2 under HDRI',
     thumbnail: '/img/examples/f2-hdri.jpg',
     link: 'f2-hdri.html',
     desc: 'A Blender aircraft model lit entirely by a clear-sky HDRI environment map, with an afterburner plume and wingtip vapor trails. Drag to orbit, scroll to zoom.',
-    isHover: false,
   },
   {
     title: 'F-2 in Flight',
     thumbnail: '/img/examples/f2-flight.jpg',
     link: 'f2-flight.html',
     desc: 'Fly the F-2 through a drifting cloud deck — A/D bank, W/S pitch, ←/→ yaw, and the whole cloud field steers with you. A live Fire-particle afterburner throbs with the burner pulse while Smoke wingtip vortices trail off the wings.',
-    isHover: false,
   },
   {
     title: 'WaterBottle (glTF PBR)',
     thumbnail: '/img/examples/waterbottle.png',
     link: 'waterbottle.html',
     desc: 'A textured glTF model with the full PBR map set. Drag to rotate, scroll to zoom.',
-    isHover: false,
   },
   {
     title: 'Showroom',
@@ -238,7 +230,6 @@ const exampleItems = ref([
     thumbnail: '/img/examples/clouds.jpg',
     link: 'cloud.html',
     desc: 'Soft, billowy clouds drifting across a blue sky — with self-shading for volume and gentle shadows cast on the ground below. Includes a live tuning panel.',
-    isHover: false,
   },
   {
     title: 'Panorama',
