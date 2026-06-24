@@ -7,7 +7,7 @@
 	<script type="module">
 
     import { Renderer, Shapes, Clouds, HDRSkyBox, TouchController,
-             LensFlare, CloudVolumetricLight } from "@";
+             LensFlare, VolumetricLight } from "@";
 
     window.addEventListener("load", function() {
 
@@ -47,7 +47,7 @@
       // Up in the sky and slightly ahead, so the camera looks up *into* it with
       // the cloud layer drifting across — the shafts then rain down through the
       // gaps. Both the flare and the volumetric rays follow this one direction.
-      scene.sun.direction = [0.0, 0.3, -0.3];
+      scene.sun.direction = [0.0, 1, -0.85];
       scene.sun.mat.color = [1.4, 1.18, 0.92];
 
       // a faint ground far below, just to anchor the horizon
@@ -63,19 +63,19 @@
       // drifting-cumulus demo so it actually shadows the rays; the gaps between
       // clusters are where the light breaks through.
       const clouds = new Clouds({
-        clusters: 1,
-        puffsPerCluster: 32,
-        width: 1000, depth: 1000,
-        height: 300,
+        clusters: 500,
+        puffsPerCluster: 12,
+        width: 4000, depth: 4000,
+        height: 500,
         heightVariance: 30,
-        clusterRadius: 40,
+        clusterRadius: 34,
         clusterThickness: 9,
-        puffSizeMin: 100, puffSizeMax: 220,
-        wind: [0.4, 7.5],
-        opacity: 0.14,
+        puffSizeMin: 200, puffSizeMax: 1000,
+        wind: [5.4, 17.5],
+        opacity: 0.12,
         topColor: [1.0, 0.98, 0.94],
         bottomColor: [0.62, 0.66, 0.74],
-        selfShadow: 0.2,
+        selfShadow: 0.05,
         fadeIn: 2.5,
         fadeMargin: 0.1,
       });
@@ -86,7 +86,7 @@
       const lensFlare = new LensFlare(scene, {
         follow: scene.sun,
         color: [1.0, 0.93, 0.82],
-        // occluders: [clouds],   // the cloud layer softens the flare's ghosts
+        occluders: [clouds],   // the cloud layer softens the flare's ghosts
         ghosts: true,         // no chromatic discs — keep the sky clean
         intensity: 1,
         coreIntensity: 0.2,    // sun point + starburst + streak only
@@ -95,33 +95,30 @@
       window._lensFlare = lensFlare;
 
       // --- volumetric light (薄明光線) -----------------------------------------
-      // The headline effect: true volumetric god rays driven by a sun's-eye-view
-      // cloud shadow map. Each frame the cloud puffs are rendered from the sun's
-      // orthographic viewpoint into a transmittance map; that map both (a) dapples
-      // the ground with cloud-shaped light/shadow and (b) is ray-marched per pixel
-      // to scatter shafts through the gaps. World-space — not a screen smear — so
-      // the shafts have real depth and the shadows track the drifting clouds.
-      const godRays = new CloudVolumetricLight(scene, {
-        clouds,                    // the cloud field that occludes the sun
+      // The headline effect: god rays cast by the *clouds*. The clouds feed their
+      // clusters in as soft occluders, so the radial scatter streams the light
+      // through the gaps in the cloud field instead of being cut by hard edges.
+      const godRays = new VolumetricLight(scene, {
         follow: scene.sun,
-        // cloud shadow map
-        resolution: 1024,
-        density: 0.1,              // optical density: shadow / shaft contrast
-        groundIntensity: 0.7,      // strength of the dappling on the ground
-        // volumetric shafts
+        softOccluders: [clouds],   // ← cloud field as a soft, volumetric occluder
+        softOcclusion: 8.5,        // boost the thin per-cluster alpha into shadow
+        // a warm-*white* tint: a strongly saturated warm over blue sky makes the
+        // additive 8-bit channels clip at different radii (red→yellow→white
+        // rings); keeping it near-white avoids that banding.
         color: [1.0, 0.92, 0.80],
-        intensity: 0.1,
-        steps: 100,
-        maxDist: 1400,
-        phaseG: 0.1,               // forward-scatter glow toward the sun
-        scatter: 0.1,
+        intensity: 1.0,   // overall brightness of the shafts
+        density: 0.5,   // ray reach
+        decay: 0.972,    // tail falloff
+        weight: 0.01,
+        samples: 32,
+        sunSize: 1.5,    // a defined sun disc the clouds break into shafts
       });
       window._godRays = godRays;
 
       // --- camera: look up into the sun through the clouds --------------------
       scene.mainCamera.fieldOfView = 66;
       scene.mainCamera.location.set(0, 1.5, 200);
-      scene.mainCamera.angle.set(22, 0, 0);   // tilt up toward the sun
+      scene.mainCamera.angle.set(20, 30, 0);   // tilt up toward the sun
 
       const controller = new TouchController(scene, { speed: 0.12 });
 
