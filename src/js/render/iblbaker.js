@@ -101,6 +101,67 @@ export class IBLBaker {
 		return target;
 	}
 
+	// Render the procedural single-scattering sky (atmosky shader) into a cubemap
+	// for the given sun direction + atmosphere params. Reuses an existing target
+	// when provided so the cubemap object identity is stable across re-bakes (the
+	// scene's specular IBL keeps pointing at the same cube as the sun animates);
+	// otherwise creates a fresh HDR, mipmapped cube. Returns the target.
+	bakeProceduralSky(sunDirection, params, size = 256, target = null) {
+		const gl = this.renderer.gl;
+
+		if (!target) {
+			target = new CubeMap(this.renderer);
+			target.enableMipmap = true;
+			target.trilinear = true;
+			target.create(size, size, null, { hdr: true }); // RGBA16F faces on WebGL2
+		}
+
+		const fbo = gl.createFramebuffer();
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+		gl.viewport(0, 0, target.width, target.height);
+		gl.disable(gl.DEPTH_TEST);
+
+		const shader = ShaderSources.atmosky.instance;
+		this.renderer.useShader(shader);
+		shader.setAtmosphere(sunDirection, params);
+
+		const faces = target.getLoadingFaces();
+
+		for (let i = 0; i < 6; i++) {
+			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+				faces[i], target.glTexture, 0);
+
+			const basis = FACE_BASIS[i];
+			shader.setFace(basis.forward, basis.right, basis.up);
+
+			gl.clear(gl.COLOR_BUFFER_BIT);
+
+			shader.beginMesh(this.screenMesh);
+			this.screenMesh.draw(this.renderer);
+			shader.endMesh();
+		}
+
+		this.renderer.disuseCurrentShader();
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		gl.deleteFramebuffer(fbo);
+		gl.enable(gl.DEPTH_TEST);
+
+		// rebuild the mip chain used for roughness-based specular sampling
+		target.use();
+		target.mipmappable = target.enableMipmap;
+		if (target.mipmappable) {
+			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+			target.mipmapped = true;
+		}
+		target.setParameters();
+		target.disuse();
+
+		target.loaded = true;
+
+		return target;
+	}
+
 	// Bake a diffuse irradiance cubemap from the given source environment
 	// cubemap. Returns a CubeMap usable as the diffuse ambient term in the
 	// standard shader — float (RGBA16F) when the source is HDR so highlights

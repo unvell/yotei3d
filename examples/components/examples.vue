@@ -124,6 +124,12 @@ const exampleItems = ref([
     desc: 'Physically based rendering: a metallic × roughness sphere grid and a textured glTF model under image-based lighting.',
   },
   {
+    title: 'Dynamic Sky',
+    thumbnail: '/img/examples/sky.jpg',
+    link: 'sky.html',
+    desc: 'A procedural single-scattering (Rayleigh + Mie) atmosphere baked into an HDR cubemap. The sun cycles through the day and the sky gradient, the metal sphere\'s reflection, and the ambient light all follow — physically-motivated, yet light enough to re-bake every frame.',
+  },
+  {
     title: 'HDRI Environment',
     thumbnail: '/img/examples/hdri.jpg',
     link: 'hdri.html',

@@ -22,6 +22,7 @@ import { AttributeShader } from './attrib';
 import { SSAOShader } from './ssao';
 import { IrradianceShader } from './ibl';
 import { EquirectShader } from './equirect';
+import { AtmosphereSkyShader } from './atmosky';
 
 // import viewerVert from '../../shader/viewer.vert';
 // import viewerFrag from '../../shader/viewer.frag';
@@ -78,6 +79,7 @@ import ssaoFrag from '../../shader/ssao.frag';
 import iblVert from '../../shader/ibl.vert';
 import irradianceFrag from '../../shader/irradiance.frag';
 import equirectFrag from '../../shader/equirect.frag';
+import atmoskyFrag from '../../shader/atmosky.frag';
 
 export const ShaderSources = {
   // viewer: { vert: viewerVert, frag: viewerFrag, class: "ViewerShader" },
@@ -109,5 +111,6 @@ export const ShaderSources = {
   ssao: { vert: ssaoVert, frag: ssaoFrag, class: SSAOShader },
   irradiance: { vert: iblVert, frag: irradianceFrag, class: IrradianceShader },
   equirect: { vert: iblVert, frag: equirectFrag, class: EquirectShader },
+  atmosky: { vert: iblVert, frag: atmoskyFrag, class: AtmosphereSkyShader },
 
 }

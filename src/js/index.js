@@ -26,6 +26,7 @@ export * from './view/floorviewcontroller.js'
 export * from './view/fpscontroller'
 export * from './webgl/cubemap.js';
 export * from './webgl/hdrskybox.js';
+export * from './webgl/dynamicsky.js';
 export * from './webgl/texture';
 export * from './webgl/shader.js';
 export * from './webgl/mesh.js';

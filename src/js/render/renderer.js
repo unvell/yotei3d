@@ -483,6 +483,12 @@ export class Renderer {
 
 				scene.requestedUpdateFrame = false;
 
+				// procedural skyboxes (e.g. DynamicSky) re-bake here when their sun
+				// or parameters changed, before IBL is (re)baked from the result.
+				if (scene.skybox && scene.skybox.update) {
+					scene.skybox.update();
+				}
+
 				this.updateIBL(scene);
 				this.updateProbes(scene);
 				this.prepareRenderMatrices();
@@ -737,6 +743,13 @@ export class Renderer {
 
 		if (!this._iblBaker) {
 			this._iblBaker = new IBLBaker(this);
+		}
+
+		// release the previous irradiance map before re-baking so an animated
+		// (re-baking) skybox like DynamicSky doesn't leak a cubemap per frame.
+		if (scene._iblIrradianceMap && scene._iblIrradianceMap !== src
+			&& scene._iblIrradianceMap.unbind) {
+			scene._iblIrradianceMap.unbind();
 		}
 
 		scene._iblIrradianceMap = this._iblBaker.bakeIrradiance(src);
