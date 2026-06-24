@@ -893,6 +893,23 @@ export class Sun extends SceneObject {
 
     this.visible = false;
   }
+
+  // The Sun is a directional light at infinity, so only its *direction* carries
+  // meaning — the underlying `location` is just storage and its magnitude is
+  // irrelevant. `direction` is the natural way to aim it: a (normalized) vector
+  // pointing toward the sun, the same convention the water shader and LensFlare
+  // read as "sundir".
+  //
+  //   scene.sun.direction = [0, 0.1, -1];   // low sun, straight ahead
+  get direction(): Vec3 {
+    return Vec3.normalize(this.worldLocation);
+  }
+  set direction(v: any) {
+    const x = v.x !== undefined ? v.x : v[0];
+    const y = v.y !== undefined ? v.y : v[1];
+    const z = v.z !== undefined ? v.z : v[2];
+    this._location.set(x, y, z);
+  }
 }
 
 //////////////////// ParticleObject ////////////////////

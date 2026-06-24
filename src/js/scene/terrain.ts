@@ -33,11 +33,13 @@ export interface TerrainOptions {
   /** Seed for the built-in noise (same seed → same terrain). */
   seed?: number;
   /**
-   * Custom height sampler `(x, z) => y` in terrain-local world units
-   * (x ∈ [-width/2, width/2], z ∈ [-depth/2, depth/2]). Overrides the
-   * built-in noise when provided.
+   * Custom height sampler `(x, z, height) => y` in terrain-local world units
+   * (x ∈ [-width/2, width/2], z ∈ [-depth/2, depth/2]). Overrides the built-in
+   * noise when provided. The configured `height` option is passed as the third
+   * argument so the function can scale to it (e.g. `(x, z, h) => shape * h`),
+   * since `height` itself only feeds the built-in noise.
    */
-  heightFunction?: (x: number, z: number) => number;
+  heightFunction?: (x: number, z: number, height: number) => number;
   /** Base diffuse colour ([r,g,b] 0..1 or a Color3). */
   color?: number[] | Color3;
   /** Texture UV repeat count across the whole terrain. */
@@ -90,7 +92,7 @@ export class Terrain extends SceneObject {
     this._gridH = this.segments + 1;
     this._heights = new Float32Array(this._gridW * this._gridH);
 
-    const mesh = this._buildMesh(sampler, options.textureRepeat ?? 1);
+    const mesh = this._buildMesh(sampler, options.textureRepeat ?? 1, height);
     this.addMesh(mesh);
 
     const color = options.color ?? [0.27, 0.42, 0.18];
@@ -104,7 +106,7 @@ export class Terrain extends SceneObject {
     this.receiveShadow = true;
   }
 
-  private _buildMesh(sampler: (x: number, z: number) => number, textureRepeat: number): Mesh {
+  private _buildMesh(sampler: (x: number, z: number, height: number) => number, textureRepeat: number, height: number): Mesh {
     const gw = this._gridW, gh = this._gridH;
     const halfW = this.width * 0.5, halfD = this.depth * 0.5;
     const heights = this._heights;
@@ -119,7 +121,7 @@ export class Terrain extends SceneObject {
       for (let i = 0; i < gw; i++) {
         const tx = i / this.segments;
         const x = -halfW + tx * this.width;
-        const y = sampler(x, z);
+        const y = sampler(x, z, height);
 
         const gi = j * gw + i;
         heights[gi] = y;
