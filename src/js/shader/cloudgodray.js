@@ -77,15 +77,22 @@ export class CloudGodrayShader extends Shader {
 		this.scatterUniform.set(this.scatter);
 		this.startJitterUniform.set(this.startJitter);
 
-		// additive, depth-tested (far plane), no depth write
+		// additive, no depth interaction. The quad would otherwise sit at exactly
+		// the same far-plane depth as the skybox cube, and a LEQUAL test flips
+		// pass/fail on the cube's per-face depth-interpolation epsilon — a z-fight
+		// moiré whose seams trace the cubemap faces. Disabling the depth test kills
+		// it; the shader's horizon fade keeps the shafts off the ground instead
+		// (upward rays are always sky, since the ground is below the camera).
 		gl.enable(gl.BLEND);
 		gl.blendFunc(gl.ONE, gl.ONE);
+		gl.disable(gl.DEPTH_TEST);
 		gl.depthMask(false);
 	}
 
 	endObject(obj) {
 		const gl = this.gl;
 
+		gl.enable(gl.DEPTH_TEST);
 		gl.depthMask(true);
 		gl.disable(gl.BLEND);
 		gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE_MINUS_DST_ALPHA, gl.ONE);
