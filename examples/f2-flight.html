@@ -16,7 +16,7 @@
 	</style>
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, PointLight, HDRSkyBox, ObjectViewController, Texture, Clouds, Fire, Smoke } from "@";
+    import { Renderer, Shapes, SceneObject, PointLight, HDRSkyBox, ObjectViewController, Texture, Clouds, LensFlare, Fire, Smoke } from "@";
 
     window.addEventListener("load", function() {
 
@@ -52,7 +52,7 @@
       // clear-blue-sky HDRI: lights the jet + serves as the sky background
       scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
-        rotation: 100,
+        rotation: 115,
       });
       scene.iblIntensity = 1.0;
       scene.exposure = 1.0;
@@ -61,8 +61,9 @@
       scene.fog = { near: 120, far: 1600, color: [0.74, 0.82, 0.92] };
 
       // warm daylight key light to complement the sky's blue ambient
-      scene.sun.location.set(0.5, 0.9, 0.3);
-      scene.sun.mat.color = [1.15, 1.08, 0.95];
+      scene.sun.direction = [-0.26, 0.1, -1];
+      scene.sun.mat.color = [1.3, 1.18, 0.95];
+
 
       // ---- the clouds we fly through ----------------------------------------
       // A deep layer centred on the jet's altitude (y≈0) with a big vertical
@@ -72,10 +73,10 @@
       // soft and semi-transparent so a near one briefly hazes the view like
       // punching through a real cloud.
       const clouds = new Clouds({
-        clusters: 50,
+        clusters: 20,
         width: 700, depth: 700,
         height: 0,                 // layer centred on the jet
-        heightVariance: 36,        // clusters from well below to well above us
+        heightVariance: 50,        // clusters from well below to well above us
         clusterRadius: 30,
         clusterThickness: 20,
         puffsPerCluster: 64,
@@ -213,7 +214,7 @@
         // campfire orange.
         burnerFire = new Fire({
           count: 80,
-          radius: 0.22,
+          radius: 0.15,
           height: 2.6,          // plume length down the nozzle
           riseSpeed: 7.0,       // fast — it's a jet, not a candle
           riseVariance: 0.3,
@@ -231,7 +232,7 @@
           sizeScale: 40,
         });
         burnerFire.angle.set(-90, 0, 0);   // fire down the exhaust (-Z)
-        burnerFire.location.set(0, -0.5, -1);
+        burnerFire.location.set(0, -0.5, -0.5);
         burner.add(burnerFire);
 
         burnerLight = new PointLight();
@@ -251,21 +252,6 @@
           const trail = new SceneObject();
           trail.location.set(3.89 * side, -0.58, -1.2);
           obj.add(trail);
-
-          // crisp core: thin bright line inside a softer halo
-          // function streak(rad, halfLen, opacity) {
-          //   const p = new Shapes.Sphere(20, 32);
-          //   p.scale.set(rad, rad, halfLen);
-          //   p.location.set(-side * 0.4, 0, -halfLen); // from the tip, back -Z
-          //   p.mat.color = [0.96, 0.98, 1.0];      // cool white
-          //   p.mat.emission = 1.0;
-          //   p.mat.additive = true;
-          //   p.mat.castLight = false;
-          //   p.opacity = opacity;
-          //   trail.add(p);
-          // }
-          // streak(0.075, 9.0, 0.3);    // thin bright core
-          // streak(0.16,  9.0, 0.1);    // soft wider halo
 
           // moving condensation: Smoke rises +Y, so pitch the emitter -90° about
           // X to trail it straight back down -Z off the tip. Thin, cool and
@@ -295,6 +281,54 @@
         }
         wingtip(1.1);
         wingtip(-1.1);
+
+        function wingtip2(side) {   // side: +1 right wingtip, -1 left
+          const trail = new SceneObject();
+          trail.location.set(3.89 * side, -0.58, -1.2);
+          obj.add(trail);
+
+          // moving condensation: Smoke rises +Y, so pitch the emitter -90° about
+          // X to trail it straight back down -Z off the tip. Thin, cool and
+          // faint — it should read as vapor curling off the wing, not exhaust.
+          const vapor = new Smoke({
+            count: 100,         // 5× denser stream
+            radius: 0.1,
+            baseY: 0,
+            height: 3.0,        // trail length back from the tip
+            riseSpeed: 37.5,    // 5× faster — rips back at full flight speed
+            riseVariance: 0.25,
+            wind: [0, 0],
+            swirl: 0.01,        // gentle curl of the vortex core
+            swirlFreq: 2.4,
+            spread: 1.2,
+            color: [0.92, 0.95, 1.0],
+            opacity: 0.16,
+            sizeStart: 10,
+            sizeEnd: 10,
+            sizeScale: 100,
+          });
+          vapor.angle.set(-90, 0, 0);          // trail back down -Z
+          vapor.scale.set(1.5, 1, 1);          // trail back down -Z
+          vapor.location.set(-side * 0.4, 0.1, 2.3);
+          trail.add(vapor);
+          vaporTrails.push(vapor);
+        }
+        wingtip2(0.25);
+        wingtip2(-0.25);
+
+        // --- sun / lens flare (太陽フレア) -------------------------------------
+        // Bound to scene.sun, so the flare tracks the same direction that drives
+        // the water glitter — move scene.sun and the flare follows live.
+        // `occluders: [island]` hides the flare when the island grows tall enough
+        // to block the line of sight to the sun.
+        const lensFlare = new LensFlare(scene, {
+          follow: scene.sun,
+          occluders: [obj],
+          color: [0.5, 0.47, 0.47],
+          intensity: 2,         // strength of the ghost chain (reflection discs)
+          coreIntensity: 0.1,   // sun point + starburst + streak — tune separately
+          scale: 2.0,
+        });
 
         holder.add(obj);
       });
@@ -367,7 +401,7 @@
 
       const controller = new ObjectViewController(scene, {
         enableVerticalRotation: true,
-        minVerticalRotateAngle: -40,
+        minVerticalRotateAngle: -80,
         maxVerticalRotateAngle: 80,
       });
       controller.targetObject = holder;
