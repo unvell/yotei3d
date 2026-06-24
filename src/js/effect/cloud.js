@@ -2,6 +2,7 @@
 import { ParticleObject, SceneObject } from "../scene/object.js";
 import { ParticleMesh } from "../webgl/mesh.js";
 import { PlaneMesh } from "../scene/shapes.js";
+import { Vec4 } from "@/math";
 
 function smoothstep(a, b, x) {
 	const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
@@ -308,5 +309,43 @@ export class Clouds extends ParticleObject {
 
 		this._writeAll();
 		this._updateShadows();
+	}
+
+	// Provide soft, volumetric occluders for the VolumetricLight (god-ray) effect
+	// so the sun's shafts filter through the gaps in the cloud field:
+	//
+	//   const rays = new VolumetricLight(scene, { follow: scene.sun,
+	//                                             softOccluders: [clouds] });
+	//
+	// Reports one fuzzy disc per *cluster* (cheap — clusters, not puffs), in
+	// world space, sized to the cluster and faded at the volume rim to match the
+	// drifting puffs. `cb(x, y, z, radius, alpha)`.
+	forEachVolumetricOccluder(cb, opts = {}) {
+		const o = this.options;
+		const m = this._transform;
+		if (!m) return;
+
+		const radiusScale = (typeof opts.radiusScale === "number") ? opts.radiusScale : 1.25;
+		const r = o.clusterRadius * radiusScale;
+		const fade = o.fadeMargin || 0;
+		const halfW = this.halfW, halfD = this.halfD;
+		const baseAlpha = this.cloudOpacity;   // tracks live opacity + fade-in
+
+		if (baseAlpha <= 0) return;
+
+		for (let ci = 0; ci < o.clusters; ci++) {
+			const cx = this._cx[ci], cy = this._cy[ci], cz = this._cz[ci];
+
+			// match the puff edge-fade so clusters ease in/out at the rim
+			let edge = 1;
+			if (fade > 0) {
+				const e = Math.max(Math.abs(cx) / halfW, Math.abs(cz) / halfD);
+				edge = 1 - smoothstep(1 - fade, 1, e);
+			}
+			if (edge <= 0) continue;
+
+			const w = new Vec4(cx, cy, cz, 1).mulMat(m);
+			cb(w.x, w.y, w.z, r, baseAlpha * edge);
+		}
 	}
 }

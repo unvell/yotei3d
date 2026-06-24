@@ -33,6 +33,16 @@ import { Vec3, Vec4 } from "@/math";
 // scaled into buildings, and a good bounding silhouette for anything else.
 // Override per shape with `obj.volumetricBounds = { min:[x,y,z], max:[x,y,z] }`.
 //
+// For things with no hard silhouette — clouds, smoke, dust — pass `softOccluders`
+// instead: providers that yield a cloud of soft blobs, stamped as fuzzy discs so
+// the light filters through the gaps (e.g. a `Clouds` effect, which exposes
+// `forEachVolumetricOccluder`):
+//
+//   const rays = new VolumetricLight(scene, {
+//     follow: scene.sun,
+//     softOccluders: [clouds],    // sun's shafts break through the cloud gaps
+//   });
+//
 // It hooks the scene's "frame" event itself; call `dispose()` to remove it.
 export class VolumetricLight {
   constructor(scene, options = {}) {
@@ -51,7 +61,21 @@ export class VolumetricLight {
     if (options.follow) this.setFollow(options.follow);
 
     // objects that block the sun and so carve the shafts (the city cubes).
+    // These are *hard* occluders: silhouetted as the convex hull of their
+    // transformed corner box (see `localBounds`).
     this.occluders = Array.isArray(options.occluders) ? options.occluders : [];
+
+    // soft, volumetric occluders — for things with no hard silhouette (clouds,
+    // smoke, dust). Each entry is a *provider* that yields a cloud of soft
+    // blobs, stamped into the mask as fuzzy discs so the light filters through
+    // the gaps instead of being cut by hard edges. A provider is either an
+    // object exposing `forEachVolumetricOccluder(cb)` (e.g. a `Clouds` effect)
+    // or a function `(cb) => …`; `cb` is called `cb(x, y, z, radius, alpha)`
+    // with a world-space centre, world radius and 0..1 occlusion strength.
+    this.softOccluders = Array.isArray(options.softOccluders) ? options.softOccluders : [];
+
+    // global multiplier on every soft blob's occlusion strength.
+    this.softOcclusion = (typeof options.softOcclusion === "number") ? options.softOcclusion : 1.0;
 
     // warm shaft tint (linear-ish RGB 0..1) and overall strength.
     this.color = options.color || [1.0, 0.86, 0.62];
@@ -90,6 +114,10 @@ export class VolumetricLight {
     this._acc = document.createElement("canvas");
     this._accCtx = this._acc.getContext("2d");
 
+    // a reusable soft-edged disc sprite, built on first use, stamped per soft
+    // blob (drawImage is far cheaper than a fresh radial gradient each time).
+    this._softSprite = null;
+
     this._onFrame = () => this.draw();
     this.scene.on("frame", this._onFrame);
   }
@@ -111,6 +139,43 @@ export class VolumetricLight {
   setOccluders(objects) {
     this.occluders = Array.isArray(objects) ? objects : [];
     return this;
+  }
+
+  setSoftOccluders(providers) {
+    this.softOccluders = Array.isArray(providers) ? providers : [];
+    return this;
+  }
+
+  // Build (once) the soft disc sprite: opaque at the core, feathering to zero
+  // at the rim. Its alpha is what `destination-out` reads to erase the sun disc
+  // softly, so overlapping blobs build up a fuzzy, gap-toothed cloud silhouette.
+  _buildSoftSprite() {
+    const S = 128;
+    const c = document.createElement("canvas");
+    c.width = S; c.height = S;
+    const cx = S / 2;
+    const g = c.getContext("2d");
+    const grd = g.createRadialGradient(cx, cx, 0, cx, cx, cx);
+    grd.addColorStop(0.0, "rgba(0,0,0,1)");
+    grd.addColorStop(0.45, "rgba(0,0,0,0.96)");
+    grd.addColorStop(0.75, "rgba(0,0,0,0.5)");
+    grd.addColorStop(1.0, "rgba(0,0,0,0)");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, S, S);
+    this._softSprite = c;
+    return c;
+  }
+
+  // World-space unit "right" axis of the camera, used to turn a blob's world
+  // radius into a screen radius (project the centre and a point one radius to
+  // its side; the pixel gap between them is the on-screen radius).
+  _cameraRightWorld(renderer) {
+    const c2w = renderer.viewMatrix.mul(renderer.cameraMatrix).inverse();
+    const o = new Vec4(0, 0, 0, 1).mulMat(c2w);
+    const rx = new Vec4(1, 0, 0, 1).mulMat(c2w);
+    let dx = rx.x - o.x, dy = rx.y - o.y, dz = rx.z - o.z;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    return { x: dx / len, y: dy / len, z: dz / len };
   }
 
   dispose() {
@@ -245,6 +310,39 @@ export class VolumetricLight {
       mctx.closePath();
       mctx.fill();
     }
+
+    // soft, volumetric occluders (e.g. cloud puffs): stamp each blob as a fuzzy
+    // disc, so the light filters through the gaps and thins at the cloud edges
+    // instead of being cut by a hard outline. Still in destination-out, so the
+    // blobs erase the sun disc; overlapping blobs build up denser shadow.
+    if (this.softOccluders.length) {
+      const sprite = this._softSprite || this._buildSoftSprite();
+      const right = this._cameraRightWorld(renderer);
+      const strength = this.softOcclusion;
+      const maxRad = Math.max(mw, mh) * 2;   // clamp absurd near-camera blobs
+      const stamp = (x, y, z, r, a) => {
+        if (!(r > 0) || !(a > 0)) return;
+        const pc = this._projectPoint({ x, y, z }, renderer);
+        if (pc.behind) return;
+        const pe = this._projectPoint(
+          { x: x + right.x * r, y: y + right.y * r, z: z + right.z * r }, renderer);
+        if (pe.behind) return;
+        let sr = Math.hypot(pe.x - pc.x, pe.y - pc.y) * scale;
+        if (sr < 0.5) return;
+        if (sr > maxRad) sr = maxRad;
+        const gx = pc.x * scale, gy = pc.y * scale;
+        if (gx + sr < 0 || gx - sr > mw || gy + sr < 0 || gy - sr > mh) return;  // off-canvas
+        mctx.globalAlpha = clamp01(a * strength);
+        mctx.drawImage(sprite, gx - sr, gy - sr, sr * 2, sr * 2);
+      };
+      for (const p of this.softOccluders) {
+        if (!p) continue;
+        if (typeof p.forEachVolumetricOccluder === "function") p.forEachVolumetricOccluder(stamp);
+        else if (typeof p === "function") p(stamp);
+      }
+      mctx.globalAlpha = 1;
+    }
+
     mctx.globalCompositeOperation = "source-over";
 
     // --- 2. radial scatter: smear the mask outward from the sun -------------

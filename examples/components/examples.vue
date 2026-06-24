@@ -186,6 +186,12 @@ const exampleItems = ref([
     desc: 'God rays (薄明光線) cast by a city of cubes against a low sun. A 2D-overlay effect projects each tower\'s silhouette, punches it out of a warm sun disc, then radially smears the mask outward from the sun — so the light streams down the avenue and through the gaps between buildings, shadowed by the skyline. Pairs with a lens flare on the same sun. Drag to orbit; the shafts re-carve live.',
   },
   {
+    title: 'Cloud God Rays',
+    thumbnail: '/img/examples/cloudrays.jpg',
+    link: 'cloudrays.html',
+    desc: 'The same volumetric-light effect, but the occluder is a drifting cloud field instead of hard geometry. The Clouds effect feeds its clusters in as soft, fuzzy occluders, so the sun\'s shafts break through the gaps in the cloud cover and rain down — shadowed by the clouds, and re-carving live as they drift. Shows that the god-ray occlusion isn\'t limited to cubes.',
+  },
+  {
     title: 'Instancing',
     thumbnail: '/img/examples/instancing.png',
     link: 'instancing.html',

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Cloud God Rays (雲の薄明光線) - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, Clouds, HDRSkyBox, TouchController,
+             LensFlare, VolumetricLight } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.36, 0.52, 0.74, 1.0],
+        enablePostprocess: true,
+        enableAntialias: true,
+        enableEnvmap: true,        // IBL from the HDRI lights the cloud puffs
+        enableShadow: false,
+        perspective: { method: "persp", angle: 66, near: 0.5, far: 4000 },
+        bloomEffect: { enabled: true, threshold: 0.8, gamma: 1.2, intensity: 0.5 },
+        renderingImage: { gamma: 1.12, resolutionRatio: 1 },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // --- sky -----------------------------------------------------------------
+      // A clear-sky HDRI for believable cloud lighting + reflections, with a warm
+      // haze bled into the lower sky so the horizon behind the rays reads warm.
+      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+        faceSize: 1024,
+        rotation: 200,
+      });
+      scene.iblIntensity = 1.5;
+      scene.exposure = 1.05;
+
+      scene.fog = { near: 200, far: 2200, color: [0.66, 0.70, 0.78] };
+      scene.skyFog = {
+        color: [0.98, 0.74, 0.46],
+        lower: 0.0,
+        upper: 0.30,
+        density: 0.8,
+      };
+
+      // --- the sun -------------------------------------------------------------
+      // Up in the sky and slightly ahead, so the camera looks up *into* it with
+      // the cloud layer drifting across — the shafts then rain down through the
+      // gaps. Both the flare and the volumetric rays follow this one direction.
+      scene.sun.direction = [0.05, 0.62, -1];
+      scene.sun.mat.color = [1.4, 1.18, 0.92];
+
+      // a faint ground far below, just to anchor the horizon
+      const ground = new Shapes.Plane(8000, 8000);
+      ground.location.set(0, -40, 0);
+      ground.mat.color = [0.30, 0.34, 0.30];
+      ground.mat.roughness = 0.95;
+      scene.add(ground);
+
+      // --- the clouds ----------------------------------------------------------
+      // A broken cloud layer straddling the sun. Denser (higher opacity) than the
+      // drifting-cumulus demo so it actually shadows the rays; the gaps between
+      // clusters are where the light breaks through.
+      const clouds = new Clouds({
+        clusters: 90,
+        puffsPerCluster: 64,
+        width: 680, depth: 680,
+        height: 88,
+        heightVariance: 30,
+        clusterRadius: 34,
+        clusterThickness: 9,
+        puffSizeMin: 22, puffSizeMax: 42,
+        wind: [2.4, 0.5],
+        opacity: 0.92,
+        topColor: [1.0, 0.98, 0.94],
+        bottomColor: [0.62, 0.66, 0.74],
+        selfShadow: 0.45,
+        fadeIn: 2.5,
+        fadeMargin: 0.3,
+      });
+      scene.add(clouds);
+      scene.on("frame", () => clouds.update());
+
+      // --- sun / lens flare ----------------------------------------------------
+      const lensFlare = new LensFlare(scene, {
+        follow: scene.sun,
+        color: [1.0, 0.93, 0.82],
+        ghosts: false,         // no chromatic discs — keep the sky clean
+        intensity: 0,
+        coreIntensity: 0.5,    // sun point + starburst + streak only
+        scale: 0.85,
+      });
+      window._lensFlare = lensFlare;
+
+      // --- volumetric light (薄明光線) -----------------------------------------
+      // The headline effect: god rays cast by the *clouds*. The clouds feed their
+      // clusters in as soft occluders, so the radial scatter streams the light
+      // through the gaps in the cloud field instead of being cut by hard edges.
+      const godRays = new VolumetricLight(scene, {
+        follow: scene.sun,
+        softOccluders: [clouds],   // ← cloud field as a soft, volumetric occluder
+        softOcclusion: 8.5,        // boost the thin per-cluster alpha into shadow
+        // a warm-*white* tint: a strongly saturated warm over blue sky makes the
+        // additive 8-bit channels clip at different radii (red→yellow→white
+        // rings); keeping it near-white avoids that banding.
+        color: [1.0, 0.92, 0.80],
+        intensity: 0.8,
+        density: 1.15,   // ray reach
+        decay: 0.972,    // tail falloff
+        weight: 0.26,
+        samples: 72,
+        sunSize: 0.2,    // a defined sun disc the clouds break into shafts
+      });
+      window._godRays = godRays;
+
+      // --- camera: look up into the sun through the clouds --------------------
+      scene.mainCamera.fieldOfView = 66;
+      scene.mainCamera.location.set(0, 6, 70);
+      scene.mainCamera.angle.set(20, 0, 0);   // tilt up toward the sun
+
+      const controller = new TouchController(scene, { speed: 0.12 });
+
+      scene.animation = true;   // continuous redraw for the drifting clouds
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center bg-gray-800/40 text-white">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Volumetric light through a drifting cloud layer — the sun's shafts break through the gaps. Drag to orbit; the clouds carve the rays live.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
