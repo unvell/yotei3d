@@ -180,6 +180,12 @@ const exampleItems = ref([
     desc: 'GPU Gerstner-wave ocean: waves are summed on the GPU so only a single time value updates per frame. The surface reflects the skybox cubemap (reusing the IBL environment — no extra reflection pass), with a Fresnel sky/water blend and sharp sun glints. A small island sits in the swell.',
   },
   {
+    title: 'Volumetric Light',
+    thumbnail: '/img/examples/volumelight.jpg',
+    link: 'volumelight.html',
+    desc: 'God rays (薄明光線) cast by a city of cubes against a low sun. A 2D-overlay effect projects each tower\'s silhouette, punches it out of a warm sun disc, then radially smears the mask outward from the sun — so the light streams down the avenue and through the gaps between buildings, shadowed by the skyline. Pairs with a lens flare on the same sun. Drag to orbit; the shafts re-carve live.',
+  },
+  {
     title: 'Instancing',
     thumbnail: '/img/examples/instancing.png',
     link: 'instancing.html',
