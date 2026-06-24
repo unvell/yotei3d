@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Yotei3D is a lightweight WebGL-based 3D rendering engine for the browser, published as `@unvell/yotei3d` on npm. Pure JavaScript (ES6+), no TypeScript. MIT licensed by UNVELL Inc.
 
+## Development Philosophy
+
+Yotei3D is a **research-oriented engine**. The guiding goals, in priority order:
+
+1. **Enabling new rendering features is the top priority.** We want to boldly bring in and experiment with a wide range of rendering techniques (advanced lighting, atmosphere/sky, volumetrics, etc.). Making an ambitious feature *possible* and visually convincing outranks preserving the current structure.
+2. **Stay lightweight while pursuing realism.** New techniques should respect the engine's small/fast character where reasonable, but realism and capability come first when there is tension.
+3. **Refactoring the existing architecture is welcome when it unblocks a feature.** Do not work around or avoid touching core architecture just to keep it untouched. When a new feature needs the renderer, shader system, scene graph, or pipeline to change, **propose the change, get a quick confirmation, then implement it freely** — large refactors and breaking internal changes are acceptable on that basis.
+
 ## Build & Dev Commands
 
 ```bash
