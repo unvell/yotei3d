@@ -798,8 +798,21 @@ export class Renderer {
 		scene.beforeDrawFrame(this);
 
 		if (scene.skybox && scene.skybox.loaded) {
+			const sky = scene.skybox;
+
+			// Keep the skybox centred on the eye so its finite cube always surrounds
+			// the camera. A cube fixed in world space shows parallax — its faces,
+			// edges and corners become visible — as soon as the camera moves off the
+			// cube's centre; recentring each frame makes it read as infinitely far.
+			// Opt out with `skybox.followCamera = false`.
+			if (sky.cube && sky.followCamera !== false) {
+				const eye = new Vec4(0, 0, 0, 1).mulMat(
+					this.viewMatrix.mul(this.cameraMatrix).inverse()).xyz;
+				sky.cube.location.set(eye.x, eye.y, eye.z);
+			}
+
 			this.useShader("panorama");
-			this.drawObject(scene.skybox.cube);
+			this.drawObject(sky.cube);
 			this.disuseCurrentShader();
 		}
 
