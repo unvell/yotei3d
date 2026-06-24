@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Volumetric Clouds - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject, DynamicSky, VolumetricClouds, ObjectViewController } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        enablePostprocess: true,
+        enableEnvmap: true,    // IBL from the procedural sky
+        enableShadow: true,
+        renderingImage: {
+          gamma: 1.2,
+          resolutionRatio: 1,
+        },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // procedural dynamic sky drives the lighting (and the clouds' sun)
+      const sky = new DynamicSky(renderer, {
+        faceSize: 256,
+        light: scene.sun,
+      });
+      scene.skybox = sky;
+      sky.setSunElevationAzimuth(24, 135);
+
+      scene.iblIntensity = 1.0;
+      scene.exposure = 2.4;
+
+      // ---- ground + a few objects ----
+      const ground = new Shapes.Cube();
+      ground.scale.set(120, 0.2, 120);
+      ground.location.set(0, -1.1, 0);
+      ground.mat.color = [0.58, 0.6, 0.62];
+      ground.mat.roughness = 0.95;
+      ground.mat.metallic = 0.0;
+      scene.add(ground);
+
+      const hero = new Shapes.Sphere(32, 64);
+      hero.mat.color = [0.95, 0.95, 0.97];
+      hero.mat.metallic = 1.0;
+      hero.mat.roughness = 0.12;
+      hero.location.set(0, 0, 0);
+      scene.add(hero);
+
+      const palette = [[0.85, 0.3, 0.24], [0.9, 0.66, 0.2], [0.3, 0.55, 0.85]];
+      for (let i = 0; i < palette.length; i++) {
+        const s = new Shapes.Sphere(24, 48);
+        const a = (i / palette.length) * Math.PI * 2 + 0.5;
+        s.location.set(Math.cos(a) * 3.4, -0.5, Math.sin(a) * 3.4);
+        s.scale.set(0.5, 0.5, 0.5);
+        s.mat.color = palette[i];
+        s.mat.metallic = 0.1;
+        s.mat.roughness = 0.5;
+        scene.add(s);
+      }
+
+      // ray-marched volumetric cloud layer, lit by the sky's sun. Created after
+      // the scene geometry so its full-screen composite is the last object drawn.
+      const clouds = new VolumetricClouds(scene, {
+        cloudBaseY: 600,
+        cloudTopY: 1150,
+        coverage: 0.45,
+        baseFreq: 0.0022,
+        windDir: [1.0, 0.35],
+        windSpeed: 14,
+        sunIntensity: 7.5,
+      });
+      window._clouds = clouds;
+
+      scene.mainCamera.fieldOfView = 58;
+      scene.mainCamera.location.set(0, 3.0, 13);
+      scene.mainCamera.angle.set(-7, 0, 0);
+
+      const controller = new ObjectViewController(scene, {
+        enableVerticalRotation: true,
+      });
+      controller.targetObject = hero;
+
+      // slow day cycle so the clouds relight as the sun moves
+      let t = 0.08;
+      scene.on("frame", () => {
+        t += 0.0004;
+        const elevation = 30 + 26 * Math.sin(t * Math.PI * 2); // ~4°..56°
+        const azimuth = 120 + t * 160;
+        sky.setSunElevationAzimuth(elevation, azimuth);
+        scene.requireUpdateFrame();
+      });
+
+      scene.requireUpdateFrame();
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Volumetric Clouds: a ray-marched cloud layer (procedural 3D noise, single-scattering with sun-ward self-shadowing) lit by the dynamic sky and composited with premultiplied alpha. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>

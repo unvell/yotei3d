@@ -23,6 +23,8 @@ import { SSAOShader } from './ssao';
 import { IrradianceShader } from './ibl';
 import { EquirectShader } from './equirect';
 import { AtmosphereSkyShader } from './atmosky';
+import { VolumetricCloudShader } from './volcloud';
+import { VolumetricCloudCompositeShader } from './volcloudcomposite';
 
 // import viewerVert from '../../shader/viewer.vert';
 // import viewerFrag from '../../shader/viewer.frag';
@@ -80,6 +82,10 @@ import iblVert from '../../shader/ibl.vert';
 import irradianceFrag from '../../shader/irradiance.frag';
 import equirectFrag from '../../shader/equirect.frag';
 import atmoskyFrag from '../../shader/atmosky.frag';
+import volcloudVert from '../../shader/volcloud.vert';
+import volcloudFrag from '../../shader/volcloud.frag';
+import volcloudCompositeVert from '../../shader/volcloudcomposite.vert';
+import volcloudCompositeFrag from '../../shader/volcloudcomposite.frag';
 
 export const ShaderSources = {
   // viewer: { vert: viewerVert, frag: viewerFrag, class: "ViewerShader" },
@@ -112,5 +118,7 @@ export const ShaderSources = {
   irradiance: { vert: iblVert, frag: irradianceFrag, class: IrradianceShader },
   equirect: { vert: iblVert, frag: equirectFrag, class: EquirectShader },
   atmosky: { vert: iblVert, frag: atmoskyFrag, class: AtmosphereSkyShader },
+  volcloud: { vert: volcloudVert, frag: volcloudFrag, class: VolumetricCloudShader },
+  volcloudcomposite: { vert: volcloudCompositeVert, frag: volcloudCompositeFrag, class: VolumetricCloudCompositeShader },
 
 }

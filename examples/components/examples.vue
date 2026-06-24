@@ -130,6 +130,12 @@ const exampleItems = ref([
     desc: 'A procedural single-scattering (Rayleigh + Mie) atmosphere baked into an HDR cubemap. The sun cycles through the day and the sky gradient, the metal sphere\'s reflection, and the ambient light all follow — physically-motivated, yet light enough to re-bake every frame.',
   },
   {
+    title: 'Volumetric Clouds',
+    thumbnail: '/img/examples/volumetricclouds.jpg',
+    link: 'volumetricclouds.html',
+    desc: 'A ray-marched volumetric cloud layer: density from procedural 3D noise, single-scattering with a sun-ward self-shadow march, composited with premultiplied alpha. Lit by the dynamic sky\'s sun, so the clouds relight as the day moves. Rendered at half resolution to stay affordable.',
+  },
+  {
     title: 'HDRI Environment',
     thumbnail: '/img/examples/hdri.jpg',
     link: 'hdri.html',
