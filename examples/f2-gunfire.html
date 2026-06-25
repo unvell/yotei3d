@@ -23,7 +23,7 @@
     window.addEventListener("load", function() {
 
       // ====== tunables — tweak these to re-aim the shot ======================
-      const JET_POS  = [4.7, 0.2, 0];   // parked on the right of the frame
+      const JET_POS  = [4.0, 0.2, 0];   // parked on the right of the frame
       const JET_YAW  = -30;             // deg about Y. 315 = front-three-quarter,
                                         // nose toward the camera's LEFT. Yaw-only
                                         // keeps the gun line = world +Z·Ry(yaw).
@@ -86,9 +86,9 @@
 
       // a slow cloud deck for depth behind the action (drifts gently past)
       const clouds = new Clouds({
-        clusters: 14,
+        clusters: 30,
         width: 700, depth: 700,
-        height: -60, heightVariance: 60,
+        height: -60, heightVariance: 40,
         clusterRadius: 30, clusterThickness: 20,
         puffsPerCluster: 48,
         puffSizeMin: 24, puffSizeMax: 110,
@@ -237,20 +237,20 @@
       //     post-opaque pass (opacity < 1) for the same reason as the fire.
       const muzzleSmoke = new Smoke({
         count: 48,
-        radius: 0.06,
+        radius: 0.3,
         baseY: 0.1,
         height: 2.2,          // how far a puff drifts before it dies
-        riseSpeed: 2.6,       // drift speed down the barrel
+        riseSpeed: 15.6,       // drift speed down the barrel
         riseVariance: 0.4,
         wind: [0, 0],
         swirl: 0.06, swirlFreq: 1.6,
-        spread: 0.5,          // puffs fan out a little as they go
-        color: [0.7, 0.7, 0.72],
-        opacity: 0.14,        // faint
+        spread: 0.7,          // puffs fan out a little as they go
+        color: [0.2, 0.2, 0.2],
+        opacity: 0.6,        // faint
         sizeStart: 8, sizeEnd: 46,   // small at the muzzle, billows as it drifts
         sizeScale: 30,
       });
-      muzzleSmoke.angle.set(90, 0, 0);   // drift forward (+Z)
+      muzzleSmoke.angle.set(-90, -0, 0);   // drift forward (+Z)
       muzzleSmoke.visible = false;
       muzzleSmoke.opacity = 0.999;       // defer to the post-opaque pass
       gunLine.add(muzzleSmoke);
@@ -396,7 +396,7 @@
           jet.angle.set(
             (Math.random() - 0.5) * r * 18,
             jetYaw + (Math.random() - 0.5) * r * 12,
-            (Math.random() - 0.5) * r * 24
+            (Math.random() - 0.5) * r * 12
           );
           jet.location.y = JET_POS[1] + Math.sin(t * 1.5) * 0.03;
           jet.updateTransform();   // refresh the muzzle marker's world position
