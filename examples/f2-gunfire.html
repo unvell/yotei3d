@@ -30,7 +30,7 @@
       // gun muzzle in model-local space: under the cockpit, fuselage left side,
       // forward toward the nose (model nose is +Z, up is +Y). Adjust if the port
       // ends up on the far side or off the airframe.
-      const MUZZLE_LOCAL = [0, 0, 3.0];
+      const MUZZLE_LOCAL = [0, -1, 0.4];
 
       const BULLET_SPEED    = 240;   // units/sec down the gun line
       const BULLET_LIFE     = 3.8;   // seconds before a tracer recycles
@@ -183,7 +183,9 @@
       // ---- muzzle flash: a per-shot pop + a live fire-spark emitter -----------
       // (1) a bright additive bulb that flares and dies in ~50ms each round —
       //     this is the stuttering muzzle flash.
-      const flash = new Shapes.Sphere(1, 1);
+      const flash = new Shapes.Sphere(10, 16);   // segments/rings = tessellation;
+                                                 // (1,1) makes an empty mesh →
+                                                 // "bufferData: no data". size = scale.
       flash.mat.color = [1.0, 0.7, 0.3];
       flash.mat.emission = 9.0;
       flash.mat.additive = true;
