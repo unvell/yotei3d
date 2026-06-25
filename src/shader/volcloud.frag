@@ -66,7 +66,15 @@ float cloudShape(vec3 p, out float h, out vec3 q) {
 	vec3 wind = vec3(windDir.x, 0.0, windDir.y) * time;
 	q = (p + wind) * baseFreq;
 
-	float d = sampleNoise(q) - (1.0 - coverage);   // coverage threshold
+	// Large-scale weather modulation. The base noise tile repeats every ~1/(baseFreq*
+	// noiseInvTile) world units, which reads as an identical grid toward the horizon.
+	// A low-frequency tap of the same volume (much longer period, offset, non-integer
+	// scale ratio) varies the local coverage region to region, so neighbouring tiles
+	// differ — clouds gather into masses with clear lanes between, hiding the grid.
+	float weather = sampleNoise(q * 0.19 + vec3(11.7, 3.3, 5.1));
+	float localCoverage = clamp(coverage * (0.4 + 1.25 * weather), 0.0, 1.0);
+
+	float d = sampleNoise(q) - (1.0 - localCoverage);   // coverage threshold
 	if (d <= 0.0) return 0.0;
 
 	// vertical profile: rounded base, wispy eroded top
@@ -136,6 +144,12 @@ void main(void) {
 	float phase = hgPhase(dot(rd, sunDir), phaseG);
 	float lstep = (cloudTopY - cloudBaseY) / float(lightSteps) * 0.5;
 
+	// Distance fade: dissolve far clouds into the sky (aerial perspective). This
+	// also hides the noise tile repeating toward the horizon — the grazing rays
+	// that stack up many identical tiles are exactly the ones that fade out.
+	float fadeNear = maxDist * 0.18;
+	float fadeFar  = maxDist * 0.7;
+
 	float transmittance = 1.0;
 	vec3 scattered = vec3(0.0);
 
@@ -144,7 +158,7 @@ void main(void) {
 	// shadow march once we're actually inside a cloud. The loop is bounded by
 	// distance/transmittance, not a fixed count, so clear columns finish early.
 	for (int i = 0; i < 192; i++) {
-		if (t > tExit || transmittance < 0.02) break;
+		if (t > tExit || t > fadeFar || transmittance < 0.02) break;
 
 		vec3 p = ro + rd * t;
 		float h;
@@ -157,6 +171,7 @@ void main(void) {
 		}
 
 		float d = cloudDensity(p, h);
+		d *= 1.0 - smoothstep(fadeNear, fadeFar, t);   // fade with distance
 		if (d > 0.002) {
 			// short march toward the sun for self-shadowing (Beer's law), on the
 			// cheap base shape — fine detail isn't needed to read as a shadow.
