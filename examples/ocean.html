@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController, LensFlare, Dolphin, WaterSplash } from "@";
+    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController, LensFlare, Dolphin, WaterSplash, Seabird } from "@";
     import { Vec3 } from "@/math";
 
     window.addEventListener("load", function() {
@@ -134,15 +134,15 @@
       // again from onLeapEnd (while the dolphin is submerged) so each surfacing
       // lands back on the sun road in front of the camera.
       const sunRoadXZ = () => ({
-        x: cam.x + (sunDir[0] / sl) * far + (Math.random() * 2 - 1) * 20,
-        z: cam.z + (sunDir[2] / sl) * far + (Math.random() * 2 - 1) * 20,
+        x: cam.x + (sunDir[0] / sl) * far + (Math.random() * 2 - 1) * 100,
+        z: cam.z + (sunDir[2] / sl) * far + (Math.random() * 2 - 1) * 100,
       });
 
       const mkLeap = (extra) => Object.assign({ level: 0, airTime: 0.7 }, sunRoadXZ(), extra);
       const pod = [
-        new Dolphin({ length: 4.4, leap: mkLeap({ height: 2.0, span: 8, period: 7.5, phase: 0.0 }) }),
-        new Dolphin({ length: 3.4, leap: mkLeap({ height: 2.5, span: 9, period: 6.5, phase: 3.2 }) }),
-        new Dolphin({ length: 3.0, leap: mkLeap({ height: 1.6, span: 6, period: 5.6, phase: 1.6 }) }),
+        new Dolphin({ length: 4.4, leap: mkLeap({ height: 1.2, span: 8, period: 7.5, phase: 0.0 }) }),
+        new Dolphin({ length: 3.4, leap: mkLeap({ height: 1.4, span: 9, period: 6.5, phase: 5.2 }) }),
+        new Dolphin({ length: 3.0, leap: mkLeap({ height: 0.6, span: 6, period: 5.6, phase: 2.6 }) }),
       ];
       pod.forEach(d => {
         // re-place onto the sun road each time it dives under (camera has moved)
@@ -171,6 +171,28 @@
         };
       });
 
+      // --- seabirds ---------------------------------------------------------
+      // A few procedural gulls wheeling over the sea, up against the sky. Each
+      // circles a centre offset along the camera→sun line and follows the camera,
+      // with staggered size / radius / speed / flap so the flock feels alive.
+      const birdC = [
+        (sunDir[0] / sl) * 90, 16, (sunDir[2] / sl) * 90,   // base offset toward the sun, low over the sea
+      ];
+      const bird = (extra, glide) => new Seabird(Object.assign({
+        wingSpan: 5.0, bodyLen: 1.5, flapFreq: 2.4,
+      }, extra, { glide: Object.assign({
+        center: [birdC[0], birdC[1], birdC[2]], radius: 30, speed: 0.2,
+        followTarget: scene.mainCamera,
+      }, glide) }));
+      const flock = [
+        bird({ wingSpan: 6.0, flapPhase: 0.0 }, { center: [birdC[0] - 12, 20, birdC[2] + 8],  radius: 34, speed: 0.17, phase: 0.0 }),
+        bird({ wingSpan: 5.0, flapPhase: 1.7 }, { center: [birdC[0] + 16, 13, birdC[2] - 10], radius: 26, speed: 0.23, phase: 2.1 }),
+        bird({ wingSpan: 4.4, flapPhase: 3.0 }, { center: [birdC[0] + 4,  24, birdC[2] + 20], radius: 30, speed: 0.20, phase: 4.0, dir: -1 }),
+        bird({ wingSpan: 4.0, flapPhase: 0.8 }, { center: [birdC[0] - 22, 11, birdC[2] - 4],  radius: 22, speed: 0.26, phase: 5.2 }),
+      ];
+      flock.forEach(b => scene.add(b));
+      window._flock = flock;
+
       // --- sun / lens flare (太陽フレア) -------------------------------------
       // Bound to scene.sun, so the flare tracks the same direction that drives
       // the water glitter — move scene.sun and the flare follows live.
@@ -191,6 +213,7 @@
         ocean.update();
         pod.forEach(d => d.update());
         splash.update();
+        flock.forEach(b => b.update());
         scene.mainCamera.location.x += 0.003;
       });
       scene.animation = true;

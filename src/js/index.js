@@ -18,6 +18,7 @@ export * from './effect/cloud.js';
 export * from './effect/ocean.js';
 export * from './effect/dolphin.js';
 export * from './effect/splash.js';
+export * from './effect/bird.js';
 export * from './effect/lensflare.js';
 export * from './effect/volumetriclight.js';
 export * from './effect/cloudvolume.js';
