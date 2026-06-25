@@ -34,6 +34,12 @@ export class Splash extends ParticleObject {
 		opacity: 0.85,
 		sizeScale: 22,        // perspective reference depth (see SnowMaterial)
 		maxSize: 90,
+		// per-particle sparkle: each sprite twinkles as if catching the sun, and
+		// flashes HDR-bright (>1) so it blooms. 0 = off.
+		sparkle: 0,           // glint intensity (additive; >0 blooms)
+		sparkleColor: [1, 1, 1],  // glint tint (e.g. the warm sun colour)
+		sparkleSharp: 8,      // flash sharpness (higher = briefer, twinklier)
+		sparkleFreq: [5, 18], // per-particle twinkle rate range
 	};
 
 	constructor(options = {}) {
@@ -54,8 +60,11 @@ export class Splash extends ParticleObject {
 		this._life = new Float32Array(n);     // remaining seconds (<=0 = dead)
 		this._maxLife = new Float32Array(n);
 		this._size0 = new Float32Array(n);    // base size in px
+		this._phase = new Float32Array(n);    // sparkle phase
+		this._freq = new Float32Array(n);     // sparkle rate
 		this._cursor = 0;
 		this._lastTime = 0;
+		this._time = 0;
 
 		this.mesh = new ParticleMesh(n);
 		this.addMesh(this.mesh);
@@ -109,6 +118,9 @@ export class Splash extends ParticleObject {
 			this._maxLife[i] = ml;
 			this._life[i] = ml;
 			this._size0[i] = sizeMin + Math.random() * (sizeMax - sizeMin);
+			const fr = this.options.sparkleFreq;
+			this._phase[i] = Math.random() * Math.PI * 2;
+			this._freq[i] = fr[0] + Math.random() * (fr[1] - fr[0]);
 		}
 	}
 
@@ -122,6 +134,7 @@ export class Splash extends ParticleObject {
 		const n = this.maxParticles;
 		const damp = Math.max(0, 1 - o.drag * dt);
 		const g = o.gravity * dt;
+		this._time += dt;
 
 		for (let i = 0; i < n; i++) {
 			if (this._life[i] <= 0) continue;
@@ -148,20 +161,32 @@ export class Splash extends ParticleObject {
 	_writeAll() {
 		const n = this.maxParticles;
 		const vb = this.mesh.vertexBuffer;
+		const o = this.options;
 		const col = this.mat.color;
 		const c = Array.isArray(col) ? col : [col.r, col.g, col.b];
+		const sp = o.sparkle, sc = o.sparkleColor, sharp = o.sparkleSharp, t = this._time;
 
 		for (let i = 0; i < n; i++) {
-			let size = 0, b = 0;
+			let size = 0, r = 0, g = 0, bl = 0;
 			if (this._life[i] > 0) {
 				const age = 1 - this._life[i] / this._maxLife[i];       // 0..1
 				const popIn = smoothstep(0.0, 0.12, age);               // quick appear
 				const fadeOut = clamp(this._life[i] / (0.4 * this._maxLife[i]), 0, 1);
 				size = this._size0[i] * Math.min(popIn, fadeOut);
-				b = 0.75 + 0.25 * fadeOut;
+				// keep the base spray dim (below the bloom threshold) so the spray
+				// stays translucent and only the sun-glints below flash and bloom
+				const b = 0.40 + 0.25 * fadeOut;
+				r = c[0] * b; g = c[1] * b; bl = c[2] * b;
+				// sun-glint twinkle: a brief HDR flash on each droplet's own phase,
+				// so the spray sparkles and blooms instead of reading as flat foam
+				if (sp > 0) {
+					const tw = Math.pow(Math.max(Math.sin(t * this._freq[i] + this._phase[i]), 0), sharp);
+					const glint = sp * tw * fadeOut;
+					r += sc[0] * glint; g += sc[1] * glint; bl += sc[2] * glint;
+				}
 			}
 			arraySet(vb, i * 3, this._px[i], this._py[i], this._pz[i]);
-			arraySet(vb, (n + i) * 3, c[0] * b, c[1] * b, c[2] * b);
+			arraySet(vb, (n + i) * 3, r, g, bl);
 			arraySet(vb, n * 6 + i, size);
 		}
 
@@ -182,7 +207,11 @@ export class WaterSplash extends Splash {
 		gravity: 22,
 		drag: 0.6,
 		color: [0.93, 0.97, 1.0],
-		opacity: 0.9,
+		opacity: 0.7,
 		killAtLevel: true,
+		// droplets twinkle as they catch the sun
+		sparkle: 2.8,
+		sparkleColor: [1.0, 0.93, 0.8],   // warm sun glint
+		sparkleSharp: 12,
 	});
 }

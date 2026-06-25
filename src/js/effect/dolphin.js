@@ -209,14 +209,17 @@ export class Dolphin extends SceneObject {
 			this.angle.set(0, 0, lp.diveAngle);
 		}
 
-		// fire the splash hook on each surface crossing
+		// Fire the splash hook on each surface crossing. The leap runs from the
+		// launch point (x - span/2) to the landing point (x + span/2), so use those
+		// explicitly — by the time an "enter" is detected the body has already been
+		// parked back at the launch point, so reading location.x would be wrong.
 		if (this.onSplash) {
 			const was = this._prevY - lp.level;
 			const nowRel = this.location.y - lp.level;
 			if (was <= 0 && nowRel > 0) {
-				this.onSplash([this.location.x, lp.level, lp.z], "exit", this);
+				this.onSplash([lp.x - 0.5 * lp.span, lp.level, lp.z], "exit", this);
 			} else if (was > 0 && nowRel <= 0) {
-				this.onSplash([this.location.x, lp.level, lp.z], "enter", this);
+				this.onSplash([lp.x + 0.5 * lp.span, lp.level, lp.z], "enter", this);
 			}
 		}
 		this._prevY = this.location.y;
