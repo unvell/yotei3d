@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController, LensFlare, Dolphin } from "@";
+    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController, LensFlare, Dolphin, WaterSplash } from "@";
     import { Vec3 } from "@/math";
 
     window.addEventListener("load", function() {
@@ -84,19 +84,6 @@
       scene.add(ocean);
       window._ocean = ocean;
 
-      // --- a pod of leaping dolphins ----------------------------------------
-      // Fully procedural (no model) — each arcs out of the water on a ballistic
-      // leap, pitching to follow its path, then waits submerged (hidden by the
-      // opaque water) until the next jump. Staggered timing/size/depth so the
-      // pod feels alive. All leaps run left→right, broadside to the camera.
-      const pod = [
-        new Dolphin({ length: 4.4, leap: { z: 42, x:  2, height: 7.0, span: 26, airTime: 1.7, period: 7.5, phase: 0.0 } }),
-        new Dolphin({ length: 3.4, leap: { z: 48, x: -12, height: 5.5, span: 22, airTime: 1.5, period: 6.5, phase: 3.2 } }),
-        new Dolphin({ length: 3.0, leap: { z: 36, x: 13, height: 4.6, span: 18, airTime: 1.4, period: 5.6, phase: 1.6 } }),
-      ];
-      pod.forEach(d => scene.add(d));
-      window._pod = pod;
-
       // --- a small rocky island poking out of the water ----------------------
       const island = new Terrain({
         width: 100, depth: 100, segments: 120,
@@ -122,7 +109,8 @@
       // it. `direction` points toward the sun (its length doesn't matter); here
       // a low sun dead ahead (small +y, -z) puts a sunset straight in front of
       // the camera, just above the horizon.
-      scene.sun.direction = [0, 0.1, -1];
+      const sunDir = [0, 0.1, -1];
+      scene.sun.direction = sunDir;
       scene.sun.mat.color = [1.3, 1.18, 0.95];
 
       // --- camera + orbit ----------------------------------------------------
@@ -131,6 +119,46 @@
       scene.mainCamera.angle.set(0, -20, 0);
 
       const controller = new TouchController(scene);
+
+      // --- a pod of leaping dolphins ----------------------------------------
+      // Fully procedural (no model). Placed far out along the camera→sun line so
+      // they surface as backlit silhouettes on the sun's glitter road, then arc
+      // out of the water (pitching to follow the leap) and dive back under,
+      // hidden by the opaque water until the next jump. Staggered size/timing.
+      const cam = scene.mainCamera.location;
+      const sl = Math.hypot(sunDir[0], sunDir[1], sunDir[2]) || 1;
+      const far = 100;  // how far down the sun line the pod surfaces
+      // arc centre = camera + sunDir * far  (then jittered per dolphin)
+      const cx = cam.x + (sunDir[0] / sl) * far;
+      const cz = cam.z + (sunDir[2] / sl) * far;
+      const jit = () => (Math.random() * 2 - 1) * 20;
+      const pod = [
+        new Dolphin({ length: 4.4, leap: { level: 0, x: cx + jit(), z: cz + jit(), height: 7.0, span: 26, airTime: 1.7, period: 7.5, phase: 0.0 } }),
+        new Dolphin({ length: 3.4, leap: { level: 0, x: cx + jit(), z: cz + jit(), height: 5.5, span: 22, airTime: 1.5, period: 6.5, phase: 3.2 } }),
+        new Dolphin({ length: 3.0, leap: { level: 0, x: cx + jit(), z: cz + jit(), height: 4.6, span: 18, airTime: 1.4, period: 5.6, phase: 1.6 } }),
+      ];
+      pod.forEach(d => scene.add(d));
+      window._pod = pod;
+
+      // --- water spray ------------------------------------------------------
+      // One shared WaterSplash for the whole pod. Each dolphin fires its onSplash
+      // hook as it crosses the surface — a big crown on entry, a smaller burst as
+      // it launches out. `sizeScale` is pushed out so the distant droplets stay
+      // visible. Added after the ocean so the spray blends over the water.
+      const splash = new WaterSplash({ maxParticles: 1400, level: 0, sizeScale: 80, maxSize: 130 });
+      scene.add(splash);
+      window._splash = splash;
+
+      pod.forEach(d => {
+        d.onSplash = (pos, kind, dolphin) => {
+          const s = dolphin.options.length / 4;   // scale the burst with the dolphin
+          if (kind === "enter") {
+            splash.burst(pos, { count: 110, speed: 13 * s, spread: 0.7, size: [10, 28], life: [0.7, 1.5] });
+          } else {
+            splash.burst(pos, { count: 55, speed: 10 * s, spread: 0.55, size: [8, 22], life: [0.5, 1.1] });
+          }
+        };
+      });
 
       // --- sun / lens flare (太陽フレア) -------------------------------------
       // Bound to scene.sun, so the flare tracks the same direction that drives
@@ -151,6 +179,7 @@
       scene.on("frame", () => {
         ocean.update();
         pod.forEach(d => d.update());
+        splash.update();
         scene.mainCamera.location.x += 0.003;
       });
       scene.animation = true;

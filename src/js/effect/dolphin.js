@@ -60,8 +60,14 @@ export class Dolphin extends SceneObject {
 		this._buildBody();
 		this._buildFins();
 
+		// Optional water-crossing hook: `(pos, kind, dolphin) => {}` where pos is
+		// [x, level, z] and kind is "exit" (launching out) or "enter" (splashing
+		// back in). Wire this to a Splash effect for spray. See the ocean example.
+		this.onSplash = options.onSplash || null;
+
 		this._last = 0;
 		this._clock = 0;
+		this._prevY = this.leap.level - this.leap.submerge;   // starts submerged
 		this.update();   // place it before the first frame
 	}
 
@@ -202,6 +208,18 @@ export class Dolphin extends SceneObject {
 			this.location.set(lp.x - 0.5 * lp.span, lp.level - lp.submerge, lp.z);
 			this.angle.set(0, 0, lp.diveAngle);
 		}
+
+		// fire the splash hook on each surface crossing
+		if (this.onSplash) {
+			const was = this._prevY - lp.level;
+			const nowRel = this.location.y - lp.level;
+			if (was <= 0 && nowRel > 0) {
+				this.onSplash([this.location.x, lp.level, lp.z], "exit", this);
+			} else if (was > 0 && nowRel <= 0) {
+				this.onSplash([this.location.x, lp.level, lp.z], "enter", this);
+			}
+		}
+		this._prevY = this.location.y;
 	}
 }
 
