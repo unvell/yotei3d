@@ -42,17 +42,12 @@ export class FireShader extends Shader {
 		gl.enable(gl.BLEND);
 		gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 		gl.depthMask(false);
-
-		// opt-in overlay: skip the depth test so the flame always draws in front
-		// of geometry (e.g. a muzzle flash that the airframe would otherwise hide).
-		if (mat && mat.alwaysOnTop) gl.disable(gl.DEPTH_TEST);
 	}
 
 	endObject(obj) {
 		const gl = this.gl;
 
 		gl.depthMask(true);
-		gl.enable(gl.DEPTH_TEST);   // restore in case alwaysOnTop disabled it
 		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 		gl.disable(gl.BLEND);
 

@@ -190,7 +190,6 @@
       flash.mat.emission = 9.0;
       flash.mat.additive = true;
       flash.mat.castLight = false;
-      flash.mat.alwaysOnTop = true;     // never let the airframe occlude the flash
       flash.visible = false;
       gunLine.add(flash);
       let flashT = 0;
@@ -216,9 +215,6 @@
       });
       muzzleFire.angle.set(90, 0, 0);    // fire down the gun line (+Z)
       muzzleFire.visible = false;
-      muzzleFire.mat.alwaysOnTop = true; // draw the sparks over the airframe…
-      muzzleFire.opacity = 0.999;        // …and defer to the post-opaque pass so
-                                         //   it paints after (in front of) the jet
       gunLine.add(muzzleFire);
 
       // refs filled in once the model loads
@@ -429,7 +425,7 @@
             const k = Math.max(flashT / 0.05, 0);
             const s = 0.12 + 0.5 * k;
             flash.scale.set(s, s, s * 1.7);
-            flash.opacity = Math.min(k, 0.999);   // <1 → defers to the post-opaque pass
+            flash.opacity = k;
             if (flashT <= 0) flash.visible = false;
           }
         }
