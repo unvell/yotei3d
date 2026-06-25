@@ -24,13 +24,13 @@
 
       // ====== tunables — tweak these to re-aim the shot ======================
       const JET_POS  = [4.7, 0.2, 0];   // parked on the right of the frame
-      const JET_YAW  = -20;             // deg about Y. 315 = front-three-quarter,
+      const JET_YAW  = -30;             // deg about Y. 315 = front-three-quarter,
                                         // nose toward the camera's LEFT. Yaw-only
                                         // keeps the gun line = world +Z·Ry(yaw).
       // gun muzzle in model-local space: under the cockpit, fuselage left side,
       // forward toward the nose (model nose is +Z, up is +Y). Adjust if the port
       // ends up on the far side or off the airframe.
-      const MUZZLE_LOCAL = [0, -1, 0.4];
+      const MUZZLE_LOCAL = [0.5, -0.5, 2];
 
       const BULLET_SPEED    = 240;   // units/sec down the gun line
       const BULLET_LIFE     = 3.8;   // seconds before a tracer recycles
@@ -193,7 +193,7 @@
       flash.visible = false;
       gunLine.add(flash);
       let flashT = 0;
-      function popFlash() { flashT = 0.05; flash.visible = true; }
+      function popFlash() { flashT = 0.05; flash.visible = false; }
 
       // (2) a small Fire emitter spitting hot sparks out the barrel. Fire rises
       //     +Y, so +90° about X aims the embers down +Z (the gun line). Hot
@@ -215,6 +215,14 @@
       });
       muzzleFire.angle.set(90, 0, 0);    // fire down the gun line (+Z)
       muzzleFire.visible = false;
+      // Defer the fire to the post-opaque (transparency) pass so it's drawn AFTER
+      // the airframe — otherwise, being additive (no depth write) and drawn first,
+      // the jet body painted over it even when the muzzle was in front of the
+      // nose. Depth test stays ON (no alwaysOnTop), so the fire still occludes
+      // naturally when the fuselage is genuinely between it and the camera.
+      // opacity < 1 only flags the deferral; the flame's own brightness comes
+      // from the Fire material, so this doesn't dim it.
+      muzzleFire.opacity = 0.999;
       gunLine.add(muzzleFire);
 
       // refs filled in once the model loads
