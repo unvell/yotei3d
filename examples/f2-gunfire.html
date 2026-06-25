@@ -30,7 +30,7 @@
       // gun muzzle in model-local space: under the cockpit, fuselage left side,
       // forward toward the nose (model nose is +Z, up is +Y). Adjust if the port
       // ends up on the far side or off the airframe.
-      const MUZZLE_LOCAL = [0.5, -0.5, 2];
+      const MUZZLE_LOCAL = [0.5, -0.5, 1.6];
 
       const BULLET_SPEED    = 240;   // units/sec down the gun line
       const BULLET_LIFE     = 3.8;   // seconds before a tracer recycles
@@ -183,29 +183,29 @@
       // ---- muzzle flash: a per-shot pop + a live fire-spark emitter -----------
       // (1) a bright additive bulb that flares and dies in ~50ms each round —
       //     this is the stuttering muzzle flash.
-      const flash = new Shapes.Sphere(10, 16);   // segments/rings = tessellation;
-                                                 // (1,1) makes an empty mesh →
-                                                 // "bufferData: no data". size = scale.
-      flash.mat.color = [1.0, 0.7, 0.3];
-      flash.mat.emission = 9.0;
-      flash.mat.additive = true;
-      flash.mat.castLight = false;
-      flash.visible = false;
-      gunLine.add(flash);
-      let flashT = 0;
-      function popFlash() { flashT = 0.05; flash.visible = false; }
+      // const flash = new Shapes.Sphere(10, 16);   // segments/rings = tessellation;
+      //                                            // (1,1) makes an empty mesh →
+      //                                            // "bufferData: no data". size = scale.
+      // flash.mat.color = [1.0, 0.7, 0.3];
+      // flash.mat.emission = 9.0;
+      // flash.mat.additive = true;
+      // flash.mat.castLight = false;
+      // flash.visible = false;
+      // gunLine.add(flash);
+      // let flashT = 0;
+      // function popFlash() { flashT = 0.05; flash.visible = true; }
 
       // (2) a small Fire emitter spitting hot sparks out the barrel. Fire rises
       //     +Y, so +90° about X aims the embers down +Z (the gun line). Hot
       //     white→orange, short and fierce — the burnt-powder fireball.
       const muzzleFire = new Fire({
-        count: 60,
-        radius: 0.08,
+        count: 30,
+        radius: 0.01,
         height: 0.9,
-        riseSpeed: 7.0, riseVariance: 0.4,
+        riseSpeed: 20.0, riseVariance: 0.4,
         spread: 0.18, convergence: 0.4,
         swayAmp: 0.05, swayFreq: 11.0,
-        sizeBase: 34, sizeTip: 6,
+        sizeBase: 30, sizeTip: 6,
         intensity: 3.4,                  // HDR over-drive feeds the bloom pass
         colorHot:  [1.0, 0.95, 0.8],     // white-hot core
         colorMid:  [1.0, 0.55, 0.18],    // orange
@@ -267,12 +267,18 @@
         muzzleMarker.location.set(MUZZLE_LOCAL[0], MUZZLE_LOCAL[1], MUZZLE_LOCAL[2]);
         obj.add(muzzleMarker);
 
-        // a warm point light at the muzzle — flickers on while firing
+        // a warm point light at the muzzle — flickers on while firing, throwing
+        // the gunfire's glow onto the airframe. The scene registers an object as
+        // a light source only if its emission is > 0 at the moment it's added
+        // (scene.whenObjectAdd), so seed a positive emission, add it, then drop it
+        // back to 0 — the per-frame light pass re-checks emission each frame, so
+        // it contributes only while the trigger pulse below drives it up.
         muzzleLight = new PointLight();
         muzzleLight.location.set(MUZZLE_LOCAL[0], MUZZLE_LOCAL[1], MUZZLE_LOCAL[2] + 0.4);
         muzzleLight.mat.color = [1.0, 0.6, 0.25];
-        muzzleLight.mat.emission = 0.0;
+        muzzleLight.mat.emission = 1.0;   // >0 so it registers as a light source
         obj.add(muzzleLight);
+        muzzleLight.mat.emission = 0.0;   // dark until the gun fires
 
         // resolve transforms so the marker's world location is valid, then plant
         // the gun line + muzzle world position right at the barrel.
@@ -394,11 +400,13 @@
             while (fireAcc >= FIRE_INTERVAL) {
               fireAcc -= FIRE_INTERVAL;
               spawnBullet();
-              popFlash();
+              // popFlash();
               recoil = Math.min(recoil + 0.02, 0.06);   // build the shudder
             }
             muzzleFire.visible = true;
-            muzzleLight.mat.emission = 5.0 + Math.random() * 4.0;
+            // strong, restless strobe so the gunfire visibly washes over the
+            // fuselage (it competes with bright daylight IBL, so push it hard).
+            muzzleLight.mat.emission = 9.0 + Math.random() * 7.0;
             if (gun) gun.volume = GUN_VOLUME;
           } else {
             fireAcc = 0;
@@ -423,14 +431,14 @@
           }
 
           // 6) muzzle flash pop: flare up then fade within ~50ms
-          if (flashT > 0) {
-            flashT -= dt;
-            const k = Math.max(flashT / 0.05, 0);
-            const s = 0.12 + 0.5 * k;
-            flash.scale.set(s, s, s * 1.7);
-            flash.opacity = k;
-            if (flashT <= 0) flash.visible = false;
-          }
+          // if (flashT > 0) {
+          //   flashT -= dt;
+          //   const k = Math.max(flashT / 0.05, 0);
+          //   const s = 0.12 + 0.5 * k;
+          //   flash.scale.set(s, s, s * 1.7);
+          //   flash.opacity = k;
+          //   if (flashT <= 0) flash.visible = false;
+          // }
         }
       });
 
