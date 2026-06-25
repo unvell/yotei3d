@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController, LensFlare } from "@";
+    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController, LensFlare, Dolphin } from "@";
     import { Vec3 } from "@/math";
 
     window.addEventListener("load", function() {
@@ -84,6 +84,19 @@
       scene.add(ocean);
       window._ocean = ocean;
 
+      // --- a pod of leaping dolphins ----------------------------------------
+      // Fully procedural (no model) — each arcs out of the water on a ballistic
+      // leap, pitching to follow its path, then waits submerged (hidden by the
+      // opaque water) until the next jump. Staggered timing/size/depth so the
+      // pod feels alive. All leaps run left→right, broadside to the camera.
+      const pod = [
+        new Dolphin({ length: 4.4, leap: { z: 42, x:  2, height: 7.0, span: 26, airTime: 1.7, period: 7.5, phase: 0.0 } }),
+        new Dolphin({ length: 3.4, leap: { z: 48, x: -12, height: 5.5, span: 22, airTime: 1.5, period: 6.5, phase: 3.2 } }),
+        new Dolphin({ length: 3.0, leap: { z: 36, x: 13, height: 4.6, span: 18, airTime: 1.4, period: 5.6, phase: 1.6 } }),
+      ];
+      pod.forEach(d => scene.add(d));
+      window._pod = pod;
+
       // --- a small rocky island poking out of the water ----------------------
       const island = new Terrain({
         width: 100, depth: 100, segments: 120,
@@ -127,9 +140,9 @@
       const lensFlare = new LensFlare(scene, {
         follow: scene.sun,
         occluders: [island],
-        color: [0.5, 0.47, 0.47],
+        color: [1, 1, 0.95],
         intensity: 2,         // strength of the ghost chain (reflection discs)
-        coreIntensity: 0.1,   // sun point + starburst + streak — tune separately
+        coreIntensity: 0.5,   // sun point + starburst + streak — tune separately
         scale: 2.0,
       });
       window._lensFlare = lensFlare;
@@ -137,7 +150,8 @@
       // --- drive the waves ---------------------------------------------------
       scene.on("frame", () => {
         ocean.update();
-        scene.mainCamera.location.x += 0.005;
+        pod.forEach(d => d.update());
+        scene.mainCamera.location.x += 0.003;
       });
       scene.animation = true;
 

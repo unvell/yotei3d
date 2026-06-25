@@ -16,6 +16,7 @@ export * from './effect/fire';
 export * from './effect/smoke';
 export * from './effect/cloud.js';
 export * from './effect/ocean.js';
+export * from './effect/dolphin.js';
 export * from './effect/lensflare.js';
 export * from './effect/volumetriclight.js';
 export * from './effect/cloudvolume.js';
