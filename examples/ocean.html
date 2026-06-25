@@ -185,10 +185,10 @@
         followTarget: scene.mainCamera,
       }, glide) }));
       const flock = [
-        bird({ wingSpan: 2.0, flapPhase: 0.0 }, { center: [birdC[0] - 12, 20, birdC[2] + 8],  radius: 34, speed: 0.82, phase: 0.0 }),
-        bird({ wingSpan: 2.0, flapPhase: 1.7 }, { center: [birdC[0] + 16, 33, birdC[2] - 10], radius: 26, speed: 0.72, phase: 2.1 }),
-        bird({ wingSpan: 3.4, flapPhase: 3.0 }, { center: [birdC[0] + 4,  24, birdC[2] + 20], radius: 50, speed: 1.20, phase: 4.0, dir: -1 }),
-        bird({ wingSpan: 4.0, flapPhase: 0.8 }, { center: [birdC[0] - 22, 31, birdC[2] - 4],  radius: 102, speed: 1.46, phase: 5.2 }),
+        bird({ wingSpan: 2.0, flapPhase: 0.0 }, { center: [birdC[0] - 12, 20, birdC[2] + 8],  radius: 34, speed: 0.52, phase: 0.0 }),
+        bird({ wingSpan: 2.0, flapPhase: 1.7 }, { center: [birdC[0] + 16, 33, birdC[2] - 10], radius: 26, speed: 0.62, phase: 2.1 }),
+        bird({ wingSpan: 3.4, flapPhase: 3.0 }, { center: [birdC[0] + 4,  24, birdC[2] + 20], radius: 50, speed: 1.00, phase: 4.0, dir: -1 }),
+        bird({ wingSpan: 4.0, flapPhase: 0.8 }, { center: [birdC[0] - 22, 31, birdC[2] - 4],  radius: 102, speed: 1.16, phase: 5.2 }),
       ];
       flock.forEach(b => scene.add(b));
       window._flock = flock;
