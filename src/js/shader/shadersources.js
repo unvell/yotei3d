@@ -25,6 +25,7 @@ import { EquirectShader } from './equirect';
 import { AtmosphereSkyShader } from './atmosky';
 import { VolumetricCloudShader } from './volcloud';
 import { VolumetricCloudCompositeShader } from './volcloudcomposite';
+import { FluidShader, FluidRaymarchShader } from './fluidshader';
 
 // import viewerVert from '../../shader/viewer.vert';
 // import viewerFrag from '../../shader/viewer.frag';
@@ -86,6 +87,15 @@ import volcloudVert from '../../shader/volcloud.vert';
 import volcloudFrag from '../../shader/volcloud.frag';
 import volcloudCompositeVert from '../../shader/volcloudcomposite.vert';
 import volcloudCompositeFrag from '../../shader/volcloudcomposite.frag';
+import fluidVert from '../../shader/fluid.vert';
+import fluidAdvectFrag from '../../shader/fluid_advect.frag';
+import fluidForceFrag from '../../shader/fluid_force.frag';
+import fluidEmitFrag from '../../shader/fluid_emit.frag';
+import fluidDivergenceFrag from '../../shader/fluid_divergence.frag';
+import fluidJacobiFrag from '../../shader/fluid_jacobi.frag';
+import fluidProjectFrag from '../../shader/fluid_project.frag';
+import fluidRaymarchVert from '../../shader/fluid_raymarch.vert';
+import fluidRaymarchFrag from '../../shader/fluid_raymarch.frag';
 
 export const ShaderSources = {
   // viewer: { vert: viewerVert, frag: viewerFrag, class: "ViewerShader" },
@@ -120,5 +130,17 @@ export const ShaderSources = {
   atmosky: { vert: iblVert, frag: atmoskyFrag, class: AtmosphereSkyShader },
   volcloud: { vert: volcloudVert, frag: volcloudFrag, class: VolumetricCloudShader },
   volcloudcomposite: { vert: volcloudCompositeVert, frag: volcloudCompositeFrag, class: VolumetricCloudCompositeShader },
+
+  // GPU fluid (smoke/fire) simulation passes. The six sim kernels share one
+  // wrapper class and vertex stage; the raymarch renders the density volume,
+  // and the composite reuses the cloud's premultiplied-blend pass.
+  fluid_advect: { vert: fluidVert, frag: fluidAdvectFrag, class: FluidShader },
+  fluid_force: { vert: fluidVert, frag: fluidForceFrag, class: FluidShader },
+  fluid_emit: { vert: fluidVert, frag: fluidEmitFrag, class: FluidShader },
+  fluid_divergence: { vert: fluidVert, frag: fluidDivergenceFrag, class: FluidShader },
+  fluid_jacobi: { vert: fluidVert, frag: fluidJacobiFrag, class: FluidShader },
+  fluid_project: { vert: fluidVert, frag: fluidProjectFrag, class: FluidShader },
+  fluid_raymarch: { vert: fluidRaymarchVert, frag: fluidRaymarchFrag, class: FluidRaymarchShader },
+  fluidcomposite: { vert: volcloudCompositeVert, frag: volcloudCompositeFrag, class: VolumetricCloudCompositeShader },
 
 }

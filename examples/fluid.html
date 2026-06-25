@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GPU Fluid (Smoke / Fire) - Yotei3D Examples</title>
+  <meta charset="utf-8" />
+  <link href="css/examples.css" rel="stylesheet" type="text/css" />
+  <script type="module">
+    import { Renderer, Shapes, SceneObject, VolumetricFluid, TouchController } from "@";
+
+    window.addEventListener("load", function () {
+
+      const renderer = new Renderer({
+        backColor: [0.04, 0.05, 0.07, 1.0],
+        enablePostprocess: true,
+        enableShadow: false,
+        perspective: { method: "persp", angle: 50, near: 0.1, far: 500 },
+        renderingImage: { gamma: 1.1, resolutionRatio: 1 },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      scene.sun.location.set(20, 40, 30);
+      scene.sun.mat.color = [1.0, 0.98, 0.95];
+      scene.iblIntensity = 0.6;
+      scene.exposure = 1.6;
+
+      // a simple dark ground so the plume has something to sit on
+      const ground = new Shapes.Cube();
+      ground.scale.set(60, 0.2, 60);
+      ground.location.set(0, -0.1, 0);
+      ground.mat.color = [0.12, 0.12, 0.14];
+      ground.mat.roughness = 0.95;
+      scene.add(ground);
+
+      // orbit target at the middle of the smoke box
+      const target = new SceneObject();
+      target.location.set(0, 8, 0);
+      scene.add(target);
+
+      // GPU smoke simulation: a 64^3 grid in a 12 x 18 x 12 world box
+      const fluid = new VolumetricFluid(scene, {
+        resolution: 64,
+        boxSize: [12, 18, 12],
+        boxCenter: [0, 9, 0],
+      });
+      window._fluid = fluid;
+
+      scene.mainCamera.fieldOfView = 50;
+      scene.mainCamera.location.set(0, 10, 34);
+      scene.mainCamera.angle.set(-6, 0, 0);
+
+      const controller = new TouchController(scene, { enableVerticalRotation: true });
+      controller.targetObject = target;
+
+      // the sim advances every frame, so request a frame every tick
+      scene.animation = true;
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+  <div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+    <div class="menu hover:text-sky-600">
+      &lt; <a href="index.html">Back</a>
+    </div>
+    <div>GPU Fluid: a real-time 3D smoke simulation (stable-fluids on a 3D-texture grid). Drag to orbit, scroll to zoom.</div>
+    <div class="logo"><img src="/img/logo.svg"></div>
+  </div>
+  <div id="canvas-container"></div>
+</body>
+</html>
