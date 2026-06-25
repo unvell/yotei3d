@@ -65,6 +65,11 @@ export class Dolphin extends SceneObject {
 		// back in). Wire this to a Splash effect for spray. See the ocean example.
 		this.onSplash = options.onSplash || null;
 
+		// Optional end-of-leap hook: `(dolphin) => {}`, fired once the dolphin has
+		// dived back under (hidden) — the moment to relocate the next leap, e.g. to
+		// keep it on the camera→sun line as the camera moves. See the ocean example.
+		this.onLeapEnd = options.onLeapEnd || null;
+
 		this._last = 0;
 		this._clock = 0;
 		this._prevY = this.leap.level - this.leap.submerge;   // starts submerged
@@ -209,18 +214,20 @@ export class Dolphin extends SceneObject {
 			this.angle.set(0, 0, lp.diveAngle);
 		}
 
-		// Fire the splash hook on each surface crossing. The leap runs from the
-		// launch point (x - span/2) to the landing point (x + span/2), so use those
-		// explicitly — by the time an "enter" is detected the body has already been
-		// parked back at the launch point, so reading location.x would be wrong.
-		if (this.onSplash) {
-			const was = this._prevY - lp.level;
-			const nowRel = this.location.y - lp.level;
-			if (was <= 0 && nowRel > 0) {
-				this.onSplash([lp.x - 0.5 * lp.span, lp.level, lp.z], "exit", this);
-			} else if (was > 0 && nowRel <= 0) {
-				this.onSplash([lp.x + 0.5 * lp.span, lp.level, lp.z], "enter", this);
-			}
+		// Hooks fired on each surface crossing. The leap runs from the launch point
+		// (x - span/2) to the landing point (x + span/2), so use those explicitly —
+		// by the time an "enter" is detected the body has already been parked back at
+		// the launch point, so reading location.x would be wrong.
+		const was = this._prevY - lp.level;
+		const nowRel = this.location.y - lp.level;
+		if (was <= 0 && nowRel > 0) {
+			if (this.onSplash) this.onSplash([lp.x - 0.5 * lp.span, lp.level, lp.z], "exit", this);
+		} else if (was > 0 && nowRel <= 0) {
+			if (this.onSplash) this.onSplash([lp.x + 0.5 * lp.span, lp.level, lp.z], "enter", this);
+			// The leap is done and the body is now hidden underwater — a safe moment
+			// to relocate the next leap (e.g. recompute the arc relative to a moving
+			// camera) without the move being visible.
+			if (this.onLeapEnd) this.onLeapEnd(this);
 		}
 		this._prevY = this.location.y;
 	}

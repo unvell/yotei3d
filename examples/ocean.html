@@ -125,19 +125,30 @@
       // they surface as backlit silhouettes on the sun's glitter road, then arc
       // out of the water (pitching to follow the leap) and dive back under,
       // hidden by the opaque water until the next jump. Staggered size/timing.
-      const cam = scene.mainCamera.location;
+      const cam = scene.mainCamera.location;   // live reference (camera drifts in x)
       const sl = Math.hypot(sunDir[0], sunDir[1], sunDir[2]) || 1;
-      const far = 100;  // how far down the sun line the pod surfaces
-      // arc centre = camera + sunDir * far  (then jittered per dolphin)
-      const cx = cam.x + (sunDir[0] / sl) * far;
-      const cz = cam.z + (sunDir[2] / sl) * far;
-      const jit = () => (Math.random() * 2 - 1) * 20;
+      const far = 150;  // how far down the sun line the pod surfaces
+
+      // A point on the camera→sun line: camera + sunDir * far, jittered ±20.
+      // Read live so it tracks the drifting camera — used for the initial leap and
+      // again from onLeapEnd (while the dolphin is submerged) so each surfacing
+      // lands back on the sun road in front of the camera.
+      const sunRoadXZ = () => ({
+        x: cam.x + (sunDir[0] / sl) * far + (Math.random() * 2 - 1) * 20,
+        z: cam.z + (sunDir[2] / sl) * far + (Math.random() * 2 - 1) * 20,
+      });
+
+      const mkLeap = (extra) => Object.assign({ level: 0, airTime: 0.7 }, sunRoadXZ(), extra);
       const pod = [
-        new Dolphin({ length: 4.4, leap: { level: 0, x: cx + jit(), z: cz + jit(), height: 7.0, span: 26, airTime: 1.7, period: 7.5, phase: 0.0 } }),
-        new Dolphin({ length: 3.4, leap: { level: 0, x: cx + jit(), z: cz + jit(), height: 5.5, span: 22, airTime: 1.5, period: 6.5, phase: 3.2 } }),
-        new Dolphin({ length: 3.0, leap: { level: 0, x: cx + jit(), z: cz + jit(), height: 4.6, span: 18, airTime: 1.4, period: 5.6, phase: 1.6 } }),
+        new Dolphin({ length: 4.4, leap: mkLeap({ height: 2.0, span: 8, period: 7.5, phase: 0.0 }) }),
+        new Dolphin({ length: 3.4, leap: mkLeap({ height: 2.5, span: 9, period: 6.5, phase: 3.2 }) }),
+        new Dolphin({ length: 3.0, leap: mkLeap({ height: 1.6, span: 6, period: 5.6, phase: 1.6 }) }),
       ];
-      pod.forEach(d => scene.add(d));
+      pod.forEach(d => {
+        // re-place onto the sun road each time it dives under (camera has moved)
+        d.onLeapEnd = (dd) => { const p = sunRoadXZ(); dd.leap.x = p.x; dd.leap.z = p.z; };
+        scene.add(d);
+      });
       window._pod = pod;
 
       // --- water spray ------------------------------------------------------
@@ -153,9 +164,9 @@
         d.onSplash = (pos, kind, dolphin) => {
           const s = dolphin.options.length / 4;   // scale the burst with the dolphin
           if (kind === "enter") {
-            splash.burst(pos, { count: 110, speed: 13 * s, spread: 0.7, size: [10, 28], life: [0.7, 1.5] });
+            splash.burst(pos, { count: 130, speed: 13 * s, spread: 0.7, size: [5, 7], life: [0.7, 1.5] });
           } else {
-            splash.burst(pos, { count: 55, speed: 10 * s, spread: 0.55, size: [8, 22], life: [0.5, 1.1] });
+            splash.burst(pos, { count: 110, speed: 10 * s, spread: 0.55, size: [5, 7], life: [0.5, 1.1] });
           }
         };
       });
