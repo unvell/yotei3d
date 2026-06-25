@@ -29,6 +29,7 @@ uniform float sunGlitter;     // sun-glitter roughness: small = tight glint, lar
 uniform float specStrength;   // sun-glitter intensity (HDR; >1 blooms)
 uniform float rippleScale;    // world units -> ripple frequency
 uniform float rippleStrength; // how hard ripples bend the normal
+uniform float rippleDetail;   // strength of the near-camera fine ripple octaves (breaks up "oily" close water)
 uniform float reflectionBlur; // distance-based reflection softening (0 = mirror)
 
 // distance fog, matching standard.frag so the sea melts into the horizon haze
@@ -79,12 +80,24 @@ vec3 proceduralSky(vec3 dir) {
 
 void main(void) {
 	vec3 V = normalize(cameraLoc - vWorldPos);
+	float camDist = length(cameraLoc - vWorldPos);
 
-	// base wave normal, perturbed by two scrolling noise layers for ripples
+	// Wave normal, perturbed by scrolling noise octaves for ripples. The two
+	// coarse octaves run everywhere; two finer/faster octaves are mixed in only
+	// near the camera (`nearDetail`). That is the cure for the "oily" near water:
+	// up close a single coarse ripple scale leaves big smooth mirror blobs, so we
+	// break the surface into many small facets that shatter the reflection into
+	// choppy water — while the distance keeps just the coarse ripples, so the far
+	// sea stays clean instead of aliasing into sparkle noise. All octaves scroll
+	// on the same flow, so their frequency and speed stay tied to the actual swell.
 	vec3 N = normalize(vNormal);
-	vec2 flow1 = vWorldXZ * rippleScale + vec2(0.06, 0.03) * time * 6.0;
-	vec2 flow2 = vWorldXZ * rippleScale * 2.3 - vec2(0.05, 0.08) * time * 6.0;
-	vec2 g = noiseGrad(flow1) + noiseGrad(flow2) * 0.5;
+	vec2 base = vWorldXZ * rippleScale;
+	float t = time * 6.0;
+	float nearDetail = exp(-camDist * 0.02);   // 1 at the camera -> 0 far off
+	vec2 g  = noiseGrad(base                + vec2(0.06,  0.03) * t);
+	g      += noiseGrad(base * 2.3          - vec2(0.05,  0.08) * t) * 0.5;
+	g      += noiseGrad(base * 5.1          + vec2(0.09, -0.07) * t) * (0.6 * rippleDetail * nearDetail);
+	g      += noiseGrad(base * 11.7         - vec2(0.12,  0.10) * t) * (0.4 * rippleDetail * nearDetail);
 	N = normalize(N + vec3(-g.x, 0.0, -g.y) * rippleStrength);
 
 	// keep the normal facing the viewer (handles the underside / steep crests)
@@ -102,8 +115,7 @@ void main(void) {
 		// pipeline. A mild distance/grazing mip bias softens far ripples so the
 		// surface reads as glossy water rather than a chrome mirror, and stops
 		// the high-frequency wave normals from aliasing into sparkle noise.
-		float dist = length(cameraLoc - vWorldPos);
-		float lod = reflectionBlur * (0.4 + 0.6 * (1.0 - ndv)) * (1.0 - exp(-dist * 0.01));
+		float lod = reflectionBlur * (0.4 + 0.6 * (1.0 - ndv)) * (1.0 - exp(-camDist * 0.01));
 		// Flip X to match the skybox's sampling convention (panorama.vert negates
 		// texcoord.x, and standard.frag negates the reflection/refraction lookup the
 		// same way), so the reflected sun and clouds line up left-right with the
@@ -143,8 +155,7 @@ void main(void) {
 
 	// distance fog toward the horizon
 	if (hasFog) {
-		float fogDist = length(cameraLoc - vWorldPos);
-		float fogAmount = clamp((fogDist - fogNear) / max(fogFar - fogNear, 1.0e-4), 0.0, 1.0);
+		float fogAmount = clamp((camDist - fogNear) / max(fogFar - fogNear, 1.0e-4), 0.0, 1.0);
 		color = mix(color, fogColor, fogAmount);
 	}
 

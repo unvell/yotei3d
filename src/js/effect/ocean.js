@@ -48,6 +48,7 @@ export class Ocean extends SceneObject {
 			specStrength: 1.2,    // sun-glitter intensity (HDR; >1 blooms)
 			rippleScale: 0.25,
 			rippleStrength: 0.35,
+			rippleDetail: 1.0,    // near-camera fine ripple octaves: breaks up "oily" close water (0 = off)
 			reflectionBlur: 2.0,  // distance/grazing reflection softening (0 = mirror-sharp)
 
 			followTarget: null,   // optional object/camera; grid recentres on its x/z

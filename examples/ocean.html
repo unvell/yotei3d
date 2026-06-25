@@ -21,8 +21,8 @@
         // Wide open seascape: push the far plane well out so the ocean reaches
         // the horizon instead of being clipped to sky.
         perspective: { method: "persp", angle: 60, near: 0.5, far: 3000 },
-        shadowQuality: { scale: 8, viewDepth: 2, resolution: 1024, intensity: 0.3 },
-        bloomEffect: { enabled: true, threshold: 0.85, gamma: 1.2, intensity: 0.4 },
+        // shadowQuality: { scale: 8, viewDepth: 2, resolution: 1024, intensity: 0.3 },
+        bloomEffect: { enabled: true, threshold: 0.3, gamma: 1.5, intensity: 10.4 },
         renderingImage: { gamma: 1.1, resolutionRatio: 0.5 },
       });
 
@@ -55,7 +55,7 @@
       // --- the ocean ---------------------------------------------------------
       const ocean = new Ocean({
         size: 10000,
-        segments: 10,  // grid resolution per axis (wave detail)
+        segments: 100,  // grid resolution per axis (wave detail)
         level: 0,
         wind: [1.0, 0.4],
         waveAmp: 0.1,  // amplitude of the largest wave
@@ -64,7 +64,7 @@
         steepness: 0.75, // 0 rolling swell .. 1 sharp choppy crests
 
         sunGlitter: 0.2,  // 0 = no glitter, 1 = full glitter
-        specStrength: 0.2,  // 0 = no specular, 1 = full specular
+        specStrength: 0.15,  // 0 = no specular, 1 = full specular
 
         fresnelPower: 5.0,
         fresnelBias: 0.2,
@@ -72,13 +72,15 @@
         reflectionBlur: 1.5,  // distance/grazing reflection softening (0 = mirror-sharp)
 
    			rippleScale: 1.0,
-  			rippleStrength: 0.15,
+  			rippleStrength: 0.5,
+        // breaks up the "oily" near-water into fine choppy facets (0 = off, smooth/oily).
+        rippleDetail: 3.0,
 
         deepColor: [0.012, 0.07, 0.10],
         shallowColor: [0.10, 0.36, 0.40],
         followTarget: scene.mainCamera,   // endless sea: recentres on the camera
       });
-      ocean.location.set(0, -0, 0);
+      ocean.location.set(0, 0, 0);
       scene.add(ocean);
       window._ocean = ocean;
 
@@ -112,7 +114,7 @@
 
       // --- camera + orbit ----------------------------------------------------
       scene.mainCamera.fieldOfView = 60;
-      scene.mainCamera.location.set(0, 10, 60);
+      scene.mainCamera.location.set(-100, 10, 60);
       scene.mainCamera.angle.set(0, -20, 0);
 
       const controller = new TouchController(scene);
@@ -133,7 +135,10 @@
       window._lensFlare = lensFlare;
 
       // --- drive the waves ---------------------------------------------------
-      scene.on("frame", () => ocean.update());
+      scene.on("frame", () => {
+        ocean.update();
+        scene.mainCamera.location.x += 0.005;
+      });
       scene.animation = true;
 
       // --- sound -------------------------------------------------------------

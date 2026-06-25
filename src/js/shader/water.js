@@ -40,6 +40,7 @@ export class WaterShader extends Shader {
 		this.specStrengthUniform = this.bindUniform("specStrength", "float");
 		this.rippleScaleUniform = this.bindUniform("rippleScale", "float");
 		this.rippleStrengthUniform = this.bindUniform("rippleStrength", "float");
+		this.rippleDetailUniform = this.bindUniform("rippleDetail", "float");
 		this.reflectionBlurUniform = this.bindUniform("reflectionBlur", "float");
 
 		// environment cubemap (sky reflection)
@@ -142,6 +143,7 @@ export class WaterShader extends Shader {
 		this.specStrengthUniform.set(num(o.specStrength, 1.2));
 		this.rippleScaleUniform.set(num(o.rippleScale, 0.25));
 		this.rippleStrengthUniform.set(num(o.rippleStrength, 0.35));
+		this.rippleDetailUniform.set(num(o.rippleDetail, 1.0));
 		this.reflectionBlurUniform.set(num(o.reflectionBlur, 2.0));
 
 		// the ocean grid is one-sided; show it from below too (e.g. underwater
