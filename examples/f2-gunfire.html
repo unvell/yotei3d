@@ -18,7 +18,7 @@
 	</style>
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, PointLight, HDRSkyBox, Texture, Clouds, Fire, AudioMixer } from "@";
+    import { Renderer, Shapes, SceneObject, PointLight, HDRSkyBox, Texture, Clouds, Fire, Smoke, AudioMixer } from "@";
 
     window.addEventListener("load", function() {
 
@@ -225,6 +225,30 @@
       muzzleFire.opacity = 0.999;
       gunLine.add(muzzleFire);
 
+      // (3) a wisp of pale gunsmoke drifting off the barrel. Smoke rises +Y, so
+      //     +90° about X pushes it forward down the gun line (+Z). Thin, faint
+      //     and short — a little powder smoke, not a chimney. Deferred to the
+      //     post-opaque pass (opacity < 1) for the same reason as the fire.
+      const muzzleSmoke = new Smoke({
+        count: 48,
+        radius: 0.06,
+        baseY: 0.1,
+        height: 2.2,          // how far a puff drifts before it dies
+        riseSpeed: 2.6,       // drift speed down the barrel
+        riseVariance: 0.4,
+        wind: [0, 0],
+        swirl: 0.06, swirlFreq: 1.6,
+        spread: 0.5,          // puffs fan out a little as they go
+        color: [0.7, 0.7, 0.72],
+        opacity: 0.14,        // faint
+        sizeStart: 8, sizeEnd: 46,   // small at the muzzle, billows as it drifts
+        sizeScale: 30,
+      });
+      muzzleSmoke.angle.set(90, 0, 0);   // drift forward (+Z)
+      muzzleSmoke.visible = false;
+      muzzleSmoke.opacity = 0.999;       // defer to the post-opaque pass
+      gunLine.add(muzzleSmoke);
+
       // refs filled in once the model loads
       let jet = null, muzzleMarker = null, muzzleLight = null;
       let ready = false;
@@ -296,7 +320,7 @@
       // on its vertical axis at the same time — fire while turning to watch the
       // tracer cone sweep with the nose. Yaw re-aims the gun line every frame, so
       // new rounds always follow wherever the nose points.
-      let firing = false, fireAcc = 0, recoil = 0;
+      let firing = false, fireAcc = 0, recoil = 0, smokeLinger = 0;
       let jetYaw = JET_YAW;
       let pointerDown = false, lastX = 0;
       const YAW_SENSITIVITY = 0.45; // deg of yaw per px moved
@@ -408,13 +432,20 @@
             // fuselage (it competes with bright daylight IBL, so push it hard).
             muzzleLight.mat.emission = 9.0 + Math.random() * 7.0;
             if (gun) gun.volume = GUN_VOLUME;
+            smokeLinger = 0.7;              // keep smoke drifting briefly after release
           } else {
             fireAcc = 0;
             muzzleFire.visible = false;
             muzzleLight.mat.emission = 0.0;
             if (gun) gun.volume = 0;
+            smokeLinger = Math.max(0, smokeLinger - dt);
           }
           muzzleFire.update();
+
+          // gunsmoke: drift it whenever it's showing (during fire + the linger
+          // tail), so the last puffs dissipate instead of snapping off.
+          muzzleSmoke.visible = smokeLinger > 0;
+          if (muzzleSmoke.visible) muzzleSmoke.update();
 
           // 5) advance the tracers in world space. distance flown drives both the
           //    forward march and the cone's lateral spread.
