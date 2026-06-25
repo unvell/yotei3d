@@ -30,7 +30,7 @@
       // gun muzzle in model-local space: under the cockpit, fuselage left side,
       // forward toward the nose (model nose is +Z, up is +Y). Adjust if the port
       // ends up on the far side or off the airframe.
-      const MUZZLE_LOCAL = [0.5, -0.5, 1.6];
+      const MUZZLE_LOCAL = [0.5, -0.5, 1.5];
 
       const BULLET_SPEED    = 240;   // units/sec down the gun line
       const BULLET_LIFE     = 3.8;   // seconds before a tracer recycles
@@ -207,11 +207,11 @@
       const muzzleFire = new Fire({
         count: 30,
         radius: 0.01,
-        height: 0.9,
+        height: 0.7,
         riseSpeed: 20.0, riseVariance: 0.4,
-        spread: 0.18, convergence: 0.4,
+        spread: 0.1, convergence: 0.4,
         swayAmp: 0.05, swayFreq: 11.0,
-        sizeBase: 30, sizeTip: 6,
+        sizeBase: 20, sizeTip: 6,
         intensity: 3.4,                  // HDR over-drive feeds the bloom pass
         colorHot:  [1.0, 0.95, 0.8],     // white-hot core
         colorMid:  [1.0, 0.55, 0.18],    // orange
