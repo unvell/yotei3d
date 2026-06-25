@@ -134,8 +134,8 @@
       // again from onLeapEnd (while the dolphin is submerged) so each surfacing
       // lands back on the sun road in front of the camera.
       const sunRoadXZ = () => ({
-        x: cam.x + (sunDir[0] / sl) * far + (Math.random() * 2 - 1) * 100,
-        z: cam.z + (sunDir[2] / sl) * far + (Math.random() * 2 - 1) * 100,
+        x: cam.x + (sunDir[0] / sl) * far + (Math.random() * 2 - 1) * 50,
+        z: cam.z + (sunDir[2] / sl) * far + (Math.random() * 2 - 1) * 50,
       });
 
       const mkLeap = (extra) => Object.assign({ level: 0, airTime: 0.7 }, sunRoadXZ(), extra);
@@ -185,10 +185,10 @@
         followTarget: scene.mainCamera,
       }, glide) }));
       const flock = [
-        bird({ wingSpan: 6.0, flapPhase: 0.0 }, { center: [birdC[0] - 12, 20, birdC[2] + 8],  radius: 34, speed: 0.17, phase: 0.0 }),
-        bird({ wingSpan: 5.0, flapPhase: 1.7 }, { center: [birdC[0] + 16, 13, birdC[2] - 10], radius: 26, speed: 0.23, phase: 2.1 }),
-        bird({ wingSpan: 4.4, flapPhase: 3.0 }, { center: [birdC[0] + 4,  24, birdC[2] + 20], radius: 30, speed: 0.20, phase: 4.0, dir: -1 }),
-        bird({ wingSpan: 4.0, flapPhase: 0.8 }, { center: [birdC[0] - 22, 11, birdC[2] - 4],  radius: 22, speed: 0.26, phase: 5.2 }),
+        bird({ wingSpan: 2.0, flapPhase: 0.0 }, { center: [birdC[0] - 12, 20, birdC[2] + 8],  radius: 34, speed: 0.82, phase: 0.0 }),
+        bird({ wingSpan: 2.0, flapPhase: 1.7 }, { center: [birdC[0] + 16, 33, birdC[2] - 10], radius: 26, speed: 0.72, phase: 2.1 }),
+        bird({ wingSpan: 3.4, flapPhase: 3.0 }, { center: [birdC[0] + 4,  24, birdC[2] + 20], radius: 50, speed: 1.20, phase: 4.0, dir: -1 }),
+        bird({ wingSpan: 4.0, flapPhase: 0.8 }, { center: [birdC[0] - 22, 31, birdC[2] - 4],  radius: 102, speed: 1.46, phase: 5.2 }),
       ];
       flock.forEach(b => scene.add(b));
       window._flock = flock;
@@ -219,10 +219,43 @@
       scene.animation = true;
 
       // --- sound -------------------------------------------------------------
-      // Ocean waves loop: Sound Effect from Pixabay
-      const waveSound = new Audio("/audio/ocean-waves.mp3");
-      waveSound.loop = true;
-      waveSound.volume = 0.6;
+      // Ocean waves + distant gull calls, mixed through ONE Web Audio context.
+      // Why not two <audio> elements? iOS Safari is unreliable playing multiple
+      // HTMLAudioElements at once (it tends to route one to the media channel and
+      // mute/steal the others). The Web Audio API mixes any number of looping
+      // buffers through a single AudioContext that's unlocked by one user gesture,
+      // which plays them together reliably on desktop and mobile alike.
+      //   Ocean waves: Sound Effect from Pixabay
+      //   Gull calls: "flock of seagulls" by flutie8211 (Freesound)
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const actx = new AudioCtx();
+
+      function loadLoop(url, volume) {
+        const gain = actx.createGain();
+        gain.gain.value = volume;
+        gain.connect(actx.destination);
+        const entry = { gain, buffer: null, source: null };
+        fetch(url).then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b)).then(buf => {
+          entry.buffer = buf;
+          if (soundOn) startLoop(entry);   // begin once decoded (plays on resume)
+        }).catch(() => {});
+        return entry;
+      }
+      function startLoop(entry) {
+        if (!entry.buffer || entry.source) return;
+        const src = actx.createBufferSource();
+        src.buffer = entry.buffer;
+        src.loop = true;
+        src.connect(entry.gain);
+        src.start();
+        entry.source = src;
+      }
+      function stopLoop(entry) {
+        if (entry.source) { try { entry.source.stop(); } catch (e) {} entry.source.disconnect(); entry.source = null; }
+      }
+
+      const waves = loadLoop("/audio/ocean-waves.mp3", 0.6);
+      const gulls = loadLoop("/audio/seagulls.mp3", 0.35);
 
       let soundOn = true;   // default On
       const soundBtn = document.getElementById("sound-toggle");
@@ -230,27 +263,26 @@
       function setSound(on) {
         soundOn = on;
         if (on) {
-          waveSound.play().catch(() => {});
+          actx.resume();
+          startLoop(waves); startLoop(gulls);
           soundBtn.textContent = "🔊 Sound: On";
         } else {
-          waveSound.pause();
+          stopLoop(waves); stopLoop(gulls);
           soundBtn.textContent = "🔈 Sound: Off";
         }
       }
       soundBtn.addEventListener("click", () => setSound(!soundOn));
 
-      // Default On, but browsers block autoplay until a user gesture. Try to
-      // start right away; if blocked, kick it off on the first interaction.
+      // Default On, but browsers block audio until a user gesture — resume the
+      // context (and start any already-decoded loops) on the first interaction.
       setSound(true);
-      waveSound.play().catch(() => {
-        const start = () => {
-          if (soundOn) waveSound.play().catch(() => {});
-          window.removeEventListener("pointerdown", start);
-          window.removeEventListener("keydown", start);
-        };
-        window.addEventListener("pointerdown", start);
-        window.addEventListener("keydown", start);
-      });
+      const unlock = () => {
+        if (soundOn) { actx.resume(); startLoop(waves); startLoop(gulls); }
+        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("keydown", unlock);
+      };
+      window.addEventListener("pointerdown", unlock);
+      window.addEventListener("keydown", unlock);
 
       scene.show();
     });
@@ -274,7 +306,8 @@
 	</div>
 
 	<div class="fixed bottom-0 left-0 z-10 px-4 py-2" style="font-size:11px; opacity:0.55;">
-		Sound Effect from <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a>
+		Wave sound from <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a>
+		&middot; Gull calls by flutie8211 (<a href="https://freesound.org" target="_blank" rel="noopener">Freesound</a>)
 	</div>
 </body>
 </html>

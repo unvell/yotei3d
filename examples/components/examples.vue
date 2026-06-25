@@ -181,7 +181,7 @@ const exampleItems = ref([
     title: 'Ocean',
     thumbnail: '/img/examples/ocean.jpg',
     link: 'ocean.html',
-    desc: 'GPU Gerstner-wave ocean: waves are summed on the GPU so only a single time value updates per frame. The surface reflects the skybox cubemap (reusing the IBL environment — no extra reflection pass), with a Fresnel sky/water blend and sharp sun glints. A small island sits in the swell.',
+    desc: 'GPU Gerstner-wave ocean: waves are summed on the GPU so only a single time value updates per frame. The surface reflects the skybox cubemap (reusing the IBL environment — no extra reflection pass), with a Fresnel sky/water blend and sharp sun glints. A pod of procedural dolphins leaps along the sun road throwing sparkling spray, while gulls wheel overhead.',
   },
   {
     title: 'Volumetric Light',
