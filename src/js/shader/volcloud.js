@@ -34,6 +34,11 @@ export class VolumetricCloudShader extends Shader {
 		this.maxDistUniform = this.bindUniform("maxDist", "float");
 		this.stepsUniform = this.bindUniform("steps", "int");
 		this.lightStepsUniform = this.bindUniform("lightSteps", "int");
+
+		// 3D noise volume (sampler3D, WebGL2 / GLSL ES 3.00). Bound manually since
+		// the generic "tex" uniform path assumes TEXTURE_2D.
+		this.noiseInvTileUniform = this.bindUniform("noiseInvTile", "float");
+		this.noiseTexLocation = this.gl.getUniformLocation(this.glShaderProgramId, "noiseTex");
 	}
 
 	// `p` is the VolumetricClouds effect (carries all tunables + per-frame state).
@@ -58,5 +63,14 @@ export class VolumetricCloudShader extends Shader {
 		this.maxDistUniform.set(p.maxDist);
 		this.stepsUniform.set(p.steps | 0);
 		this.lightStepsUniform.set(p.lightSteps | 0);
+
+		// bind the baked 3D noise volume to texture unit 0
+		if (p._noiseTex && this.noiseTexLocation) {
+			const gl = this.gl;
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_3D, p._noiseTex);
+			gl.uniform1i(this.noiseTexLocation, 0);
+		}
+		this.noiseInvTileUniform.set(p._noiseInvTile);
 	}
 }

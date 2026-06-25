@@ -71,6 +71,15 @@ export class VolumetricClouds {
 		this.time = 0;
 		this._t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : 0;
 
+		// Multi-octave value-noise baked once into a tileable 3D texture. The
+		// shader replaces its per-sample FBM (5 octaves of hash noise, evaluated
+		// thousands of times per pixel) with a single hardware-filtered fetch.
+		// noiseInvTile maps q-space (world * baseFreq) to the [0,1) texture tile;
+		// 1/L0 makes the texture's lowest octave match the old FBM's unit lattice.
+		this._noiseTex = null;
+		this._noiseInvTile = 1 / 4;
+		this._buildNoise();
+
 		this._screen = new ScreenMesh();
 		this._fbo = null;
 		this._ensureFBO();
@@ -92,6 +101,76 @@ export class VolumetricClouds {
 	}
 
 	setFollow(target) { this._follow = target || null; return this; }
+
+	// Bake the tileable 3D noise volume (R8, 64^3) the shader samples for the
+	// cloud shape and detail. Done once on the CPU at construction. Requires
+	// WebGL2 (3D textures); on WebGL1 _noiseTex stays null and the clouds are
+	// skipped — the same WebGL2 the dynamic sky / IBL already need.
+	_buildNoise() {
+		const r = this.renderer, gl = r.gl;
+		if (!r.isWebGL2) {
+			this._noiseTex = null;
+			console.warn("VolumetricClouds requires WebGL2 (3D textures / GLSL ES 3.00); clouds disabled.");
+			return;
+		}
+
+		const N = 64;     // texture resolution
+		const L0 = 4;     // lattice cells per tile at octave 0
+		const OCT = 5;
+		this._noiseInvTile = 1 / L0;
+
+		// deterministic PRNG (mulberry32) so the cloud field is stable per reload
+		let s = 0x9e3779b9 >>> 0;
+		const rand = () => {
+			s = (s + 0x6d2b79f5) | 0;
+			let t = Math.imul(s ^ (s >>> 15), 1 | s);
+			t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+			return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+		};
+
+		// per-octave random lattices; period doubles each octave (4,8,16,32,64)
+		// and corners wrap modulo the period, which makes the volume seamless.
+		const grids = [], periods = [];
+		for (let o = 0; o < OCT; o++) {
+			const P = L0 << o;
+			periods.push(P);
+			const g = new Float32Array(P * P * P);
+			for (let i = 0; i < g.length; i++) g[i] = rand();
+			grids.push(g);
+		}
+
+		// FBM with the same amplitude falloff (0.5, 0.25, …) as the old GLSL fbm,
+		// so its value range — and therefore the coverage threshold — is unchanged.
+		const data = new Uint8Array(N * N * N);
+		let idx = 0;
+		for (let z = 0; z < N; z++) {
+			const wz = (z + 0.5) / N;
+			for (let y = 0; y < N; y++) {
+				const wy = (y + 0.5) / N;
+				for (let x = 0; x < N; x++) {
+					const wx = (x + 0.5) / N;
+					let amp = 0.5, sum = 0;
+					for (let o = 0; o < OCT; o++) {
+						sum += amp * valueNoise3D(wx, wy, wz, periods[o], grids[o]);
+						amp *= 0.5;
+					}
+					data[idx++] = Math.max(0, Math.min(255, (sum * 255) | 0));
+				}
+			}
+		}
+
+		const tex = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_3D, tex);
+		gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+		gl.texImage3D(gl.TEXTURE_3D, 0, gl.R8, N, N, N, 0, gl.RED, gl.UNSIGNED_BYTE, data);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+		gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.REPEAT);
+		gl.bindTexture(gl.TEXTURE_3D, null);
+		this._noiseTex = tex;
+	}
 
 	_ensureFBO() {
 		const r = this.renderer;
@@ -118,7 +197,8 @@ export class VolumetricClouds {
 	}
 
 	_renderClouds() {
-		if (!this.enabled) {
+		// no baked noise (WebGL1) → never touch the ES 3.00 raymarch shader
+		if (!this.enabled || !this._noiseTex) {
 			if (this._compositeObj) this._compositeObj.visible = false;
 			return;
 		}
@@ -164,6 +244,11 @@ export class VolumetricClouds {
 		shader.endMesh(this._screen);
 		r.disuseCurrentShader();
 
+		// release the 3D noise from texture unit 0 so it can't shadow a later
+		// 2D bind on the same unit.
+		gl.activeTexture(gl.TEXTURE0);
+		gl.bindTexture(gl.TEXTURE_3D, null);
+
 		this._fbo.disuse();
 
 		// restore the renderer's default GL state + full-size viewport (the FBO
@@ -197,6 +282,10 @@ export class VolumetricClouds {
 			this._screen.destroy();
 			this._screen = null;
 		}
+		if (this._noiseTex) {
+			r.gl.deleteTexture(this._noiseTex);
+			this._noiseTex = null;
+		}
 		const comp = ShaderSources.volcloudcomposite.instance;
 		if (comp) comp.cloudTexture = null;
 	}
@@ -204,6 +293,28 @@ export class VolumetricClouds {
 
 function numberOr(value, fallback) {
 	return (typeof value === "number") ? value : fallback;
+}
+
+// Tileable trilinear value noise sampled from a period-P random lattice. (wx,wy,wz)
+// are in [0,1) tile space; lattice corners wrap modulo P so the result is seamless.
+function valueNoise3D(wx, wy, wz, P, g) {
+	const px = wx * P, py = wy * P, pz = wz * P;
+	const ix = Math.floor(px), iy = Math.floor(py), iz = Math.floor(pz);
+	let fx = px - ix, fy = py - iy, fz = pz - iz;
+	fx = fx * fx * (3 - 2 * fx);
+	fy = fy * fy * (3 - 2 * fy);
+	fz = fz * fz * (3 - 2 * fz);
+	const x0 = ((ix % P) + P) % P, y0 = ((iy % P) + P) % P, z0 = ((iz % P) + P) % P;
+	const x1 = (x0 + 1) % P, y1 = (y0 + 1) % P, z1 = (z0 + 1) % P;
+	const yP0 = y0 * P, yP1 = y1 * P, zPP0 = z0 * P * P, zPP1 = z1 * P * P;
+	const g000 = g[zPP0 + yP0 + x0], g100 = g[zPP0 + yP0 + x1];
+	const g010 = g[zPP0 + yP1 + x0], g110 = g[zPP0 + yP1 + x1];
+	const g001 = g[zPP1 + yP0 + x0], g101 = g[zPP1 + yP0 + x1];
+	const g011 = g[zPP1 + yP1 + x0], g111 = g[zPP1 + yP1 + x1];
+	const c00 = g000 + (g100 - g000) * fx, c10 = g010 + (g110 - g010) * fx;
+	const c01 = g001 + (g101 - g001) * fx, c11 = g011 + (g111 - g011) * fx;
+	const c0 = c00 + (c10 - c00) * fy, c1 = c01 + (c11 - c01) * fy;
+	return c0 + (c1 - c0) * fz;
 }
 
 function clamp(x, a, b) {

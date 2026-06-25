@@ -1,23 +1,27 @@
+#version 300 es
 
 // Volumetric clouds — raymarch fragment stage.
 //
 // For each pixel we reconstruct the world-space view ray and march the slice of
 // it that passes through a flat cloud layer (a slab between cloudBaseY and
-// cloudTopY). Cloud density is evaluated procedurally from hash-based 3D value
-// noise (no 3D textures — this stays within GLSL ES 1.00 / the engine's WebGL
-// feature set), shaped by a coverage threshold and a vertical profile, then
-// eroded by higher-frequency detail. Lighting is single-scattering: a short
-// march toward the sun gives Beer's-law self-shadowing, combined with a
+// cloudTopY). Cloud density is read from a tileable 3D value-noise volume baked
+// once on the CPU (sampler3D, hence GLSL ES 3.00 / WebGL2): a single hardware-
+// filtered fetch replaces the old per-sample multi-octave FBM. The volume is
+// shaped by a coverage threshold and a vertical profile, then eroded by a
+// higher-frequency tap of the same volume. Lighting is single-scattering: a
+// short march toward the sun gives Beer's-law self-shadowing, combined with a
 // Henyey-Greenstein phase (forward silver lining), a powder term for the dark
 // edges, and a sky/ground ambient fill — driven by the (dynamic) sky's sun.
 //
 // Output is PREMULTIPLIED (in-scattered radiance, coverage alpha), composited
 // over the scene later with blend (ONE, ONE_MINUS_SRC_ALPHA). Rendered at
-// reduced resolution in a pre-pass because each step is a multi-octave FBM.
+// reduced resolution in a pre-pass.
 
 precision highp float;
+precision highp sampler3D;
 
-varying vec2 vNdc;
+in vec2 vNdc;
+out vec4 fragColor;
 
 uniform mat4 invViewProj;     // clip -> world
 uniform vec3 cameraPos;
@@ -25,6 +29,9 @@ uniform vec3 sunDir;          // world-space direction toward the sun (normalize
 uniform vec3 sunColor;        // sun radiance (driven by the dynamic sky's sun tint)
 uniform vec3 ambientColor;    // sky fill (cloud tops)
 uniform vec3 groundColor;     // bounce fill (cloud bottoms)
+
+uniform sampler3D noiseTex;   // baked tileable value-noise FBM (R channel)
+uniform float noiseInvTile;   // q-space -> [0,1) texture tile scale
 
 uniform float cloudBaseY;     // altitude of the layer's underside
 uniform float cloudTopY;      // altitude of the layer's top
@@ -42,44 +49,16 @@ uniform int   lightSteps;     // sun-ward samples per lit step
 
 #define PI 3.14159265359
 
-float hash13(vec3 p) {
-	p = fract(p * 0.1031);
-	p += dot(p, p.zyx + 31.32);
-	return fract((p.x + p.y) * p.z);
-}
-
-// 3D value noise (trilinear interpolation of hashed lattice corners)
-float vnoise(vec3 x) {
-	vec3 i = floor(x);
-	vec3 f = fract(x);
-	f = f * f * (3.0 - 2.0 * f);
-	float n000 = hash13(i + vec3(0.0, 0.0, 0.0));
-	float n100 = hash13(i + vec3(1.0, 0.0, 0.0));
-	float n010 = hash13(i + vec3(0.0, 1.0, 0.0));
-	float n110 = hash13(i + vec3(1.0, 1.0, 0.0));
-	float n001 = hash13(i + vec3(0.0, 0.0, 1.0));
-	float n101 = hash13(i + vec3(1.0, 0.0, 1.0));
-	float n011 = hash13(i + vec3(0.0, 1.0, 1.0));
-	float n111 = hash13(i + vec3(1.0, 1.0, 1.0));
-	return mix(mix(mix(n000, n100, f.x), mix(n010, n110, f.x), f.y),
-	           mix(mix(n001, n101, f.x), mix(n011, n111, f.x), f.y), f.z);
-}
-
-float fbm(vec3 p) {
-	float a = 0.5, s = 0.0;
-	for (int i = 0; i < 5; i++) {
-		s += a * vnoise(p);
-		p *= 2.02;
-		a *= 0.5;
-	}
-	return s;
+// One fetch of the baked FBM volume (REPEAT-wrapped, so any coordinate tiles).
+float sampleNoise(vec3 x) {
+	return texture(noiseTex, x * noiseInvTile).r;
 }
 
 // Cheap base cloud shape (low-frequency only, no detail erosion), in [0, 1].
-// One FBM. Used both as the empty-space probe for adaptive stepping and as the
-// density for the sun-ward shadow march (shadows don't need the fine detail).
-// `q` (the wind-advected, frequency-scaled sample point) is handed back so the
-// full-density path can reuse it for the detail octave without recomputing it.
+// One texture fetch. Used both as the empty-space probe for adaptive stepping
+// and as the density for the sun-ward shadow march (shadows don't need the fine
+// detail). `q` (the wind-advected, frequency-scaled sample point) is handed back
+// so the full-density path can reuse it for the detail tap without recomputing.
 float cloudShape(vec3 p, out float h, out vec3 q) {
 	h = (p.y - cloudBaseY) / max(cloudTopY - cloudBaseY, 1.0);
 	if (h < 0.0 || h > 1.0) { q = vec3(0.0); return 0.0; }
@@ -87,7 +66,7 @@ float cloudShape(vec3 p, out float h, out vec3 q) {
 	vec3 wind = vec3(windDir.x, 0.0, windDir.y) * time;
 	q = (p + wind) * baseFreq;
 
-	float d = fbm(q) - (1.0 - coverage);   // coverage threshold
+	float d = sampleNoise(q) - (1.0 - coverage);   // coverage threshold
 	if (d <= 0.0) return 0.0;
 
 	// vertical profile: rounded base, wispy eroded top
@@ -103,17 +82,17 @@ float cloudShape(vec3 p) {
 }
 
 // full shaped density including the high-frequency detail erosion, in [0, 1].
-// Two FBMs — only evaluated once the cheap base shape says we're inside a cloud.
+// A second noise tap — only taken once the cheap base shape says we're in a cloud.
 float cloudDensity(vec3 p, out float h) {
 	vec3 q;
 	float d = cloudShape(p, h, q);
 	if (d <= 0.0) return 0.0;
 
 	// erode edges with higher-frequency detail (more toward the top). The detail
-	// weight fades to zero at the cloud base, so skip the octave entirely there.
+	// weight fades to zero at the cloud base, so skip the tap entirely there.
 	float detailW = detailScale * smoothstep(0.2, 1.0, h);
 	if (detailW > 1e-4) {
-		d -= fbm(q * 3.0 + 19.0) * detailW;
+		d -= sampleNoise(q * 3.0 + 19.0) * detailW;
 	}
 	return clamp(d, 0.0, 1.0);
 }
@@ -210,5 +189,5 @@ void main(void) {
 	alpha *= smoothstep(0.0, 0.05, abs(rd.y));   // soft fade toward the horizon (both above and below the deck)
 	if (alpha < 0.002) discard;
 
-	gl_FragColor = vec4(scattered, alpha);  // premultiplied
+	fragColor = vec4(scattered, alpha);  // premultiplied
 }
