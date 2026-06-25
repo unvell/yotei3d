@@ -54,11 +54,25 @@ float sampleNoise(vec3 x) {
 	return texture(noiseTex, x * noiseInvTile).r;
 }
 
-// Cheap base cloud shape (low-frequency only, no detail erosion), in [0, 1].
-// One texture fetch. Used both as the empty-space probe for adaptive stepping
-// and as the density for the sun-ward shadow march (shadows don't need the fine
-// detail). `q` (the wind-advected, frequency-scaled sample point) is handed back
-// so the full-density path can reuse it for the detail tap without recomputing.
+// vertical density profile: rounded base, wispy eroded top
+float heightProfile(float h) {
+	return smoothstep(0.0, 0.2, h) * (1.0 - smoothstep(0.5, 1.0, h));
+}
+
+// Large-scale weather modulation -> local coverage. A low-frequency tap (long
+// period, offset, non-integer scale) varies coverage region to region so clouds
+// gather into masses with clear lanes between, instead of an even field.
+float localCoverageAt(vec3 q) {
+	float weather = sampleNoise(q * 0.19 + vec3(11.7, 3.3, 5.1));
+	return clamp(coverage * (0.4 + 1.25 * weather), 0.0, 1.0);
+}
+
+// Base cloud shape (low-frequency, no detail erosion), in [0, 1]. The base is the
+// sum of two *incommensurately* scaled taps of the same volume: a single tap
+// repeats every tile (~1/(baseFreq*noiseInvTile) world units) and reads as a
+// grid, but two taps whose periods have no small common multiple only repeat at
+// their (enormous) least-common-multiple — which is what hides the tiling.
+// `q` is returned so the caller can add the high-frequency detail tap.
 float cloudShape(vec3 p, out float h, out vec3 q) {
 	h = (p.y - cloudBaseY) / max(cloudTopY - cloudBaseY, 1.0);
 	if (h < 0.0 || h > 1.0) { q = vec3(0.0); return 0.0; }
@@ -66,43 +80,22 @@ float cloudShape(vec3 p, out float h, out vec3 q) {
 	vec3 wind = vec3(windDir.x, 0.0, windDir.y) * time;
 	q = (p + wind) * baseFreq;
 
-	// Large-scale weather modulation. The base noise tile repeats every ~1/(baseFreq*
-	// noiseInvTile) world units, which reads as an identical grid toward the horizon.
-	// A low-frequency tap of the same volume (much longer period, offset, non-integer
-	// scale ratio) varies the local coverage region to region, so neighbouring tiles
-	// differ — clouds gather into masses with clear lanes between, hiding the grid.
-	float weather = sampleNoise(q * 0.19 + vec3(11.7, 3.3, 5.1));
-	float localCoverage = clamp(coverage * (0.4 + 1.25 * weather), 0.0, 1.0);
-
-	float d = sampleNoise(q) - (1.0 - localCoverage);   // coverage threshold
+	float base = sampleNoise(q) * 0.55 + sampleNoise(q * 0.7 + vec3(8.3, 2.1, 5.9)) * 0.45;
+	float d = base - (1.0 - localCoverageAt(q));
 	if (d <= 0.0) return 0.0;
-
-	// vertical profile: rounded base, wispy eroded top
-	float profile = smoothstep(0.0, 0.2, h) * (1.0 - smoothstep(0.5, 1.0, h));
-	return d * profile;
+	return d * heightProfile(h);
 }
 
-// base shape only (shadow march / probe variant that discards the reused q)
-float cloudShape(vec3 p) {
-	float h;
-	vec3 q;
-	return cloudShape(p, h, q);
-}
-
-// full shaped density including the high-frequency detail erosion, in [0, 1].
-// A second noise tap — only taken once the cheap base shape says we're in a cloud.
-float cloudDensity(vec3 p, out float h) {
-	vec3 q;
-	float d = cloudShape(p, h, q);
+// Cheap single-tap density for the sun-ward shadow march. Tiling and weather
+// aren't perceptible inside a soft self-shadow, so this skips both to stay light.
+float cloudShadowDensity(vec3 p) {
+	float h = (p.y - cloudBaseY) / max(cloudTopY - cloudBaseY, 1.0);
+	if (h < 0.0 || h > 1.0) return 0.0;
+	vec3 wind = vec3(windDir.x, 0.0, windDir.y) * time;
+	vec3 q = (p + wind) * baseFreq;
+	float d = sampleNoise(q) - (1.0 - coverage);
 	if (d <= 0.0) return 0.0;
-
-	// erode edges with higher-frequency detail (more toward the top). The detail
-	// weight fades to zero at the cloud base, so skip the tap entirely there.
-	float detailW = detailScale * smoothstep(0.2, 1.0, h);
-	if (detailW > 1e-4) {
-		d -= sampleNoise(q * 3.0 + 19.0) * detailW;
-	}
-	return clamp(d, 0.0, 1.0);
+	return d * heightProfile(h);
 }
 
 float hgPhase(float c, float g) {
@@ -170,18 +163,27 @@ void main(void) {
 			continue;
 		}
 
-		float d = cloudDensity(p, h);
+		// add the high-frequency detail erosion, reusing the probe's shape and q
+		// (no second cloudShape eval). Two incommensurate detail taps so the fine
+		// structure doesn't tile either. Skipped near the base where its weight ~0.
+		float d = shape;
+		float detailW = detailScale * smoothstep(0.2, 1.0, h);
+		if (detailW > 1e-4) {
+			float detail = sampleNoise(q * 3.0 + 19.0) * 0.6
+			             + sampleNoise(q * 5.3 + vec3(31.0, 13.0, 7.0)) * 0.4;
+			d = clamp(d - detail * detailW, 0.0, 1.0);
+		}
 		d *= 1.0 - smoothstep(fadeNear, fadeFar, t);   // fade with distance
 		if (d > 0.002) {
 			// short march toward the sun for self-shadowing (Beer's law), on the
-			// cheap base shape — fine detail isn't needed to read as a shadow.
+			// cheap shadow density — fine detail isn't needed to read as a shadow.
 			// Bail out once the path to the sun is effectively opaque, since more
 			// samples can no longer lighten exp(-opticalDepth).
 			float lcoef = lstep * extinction * sunAbsorption;
 			float ld = 0.0;
 			for (int j = 0; j < 8; j++) {
 				if (j >= lightSteps) break;
-				ld += cloudShape(p + sunDir * (lstep * (float(j) + 0.5)));
+				ld += cloudShadowDensity(p + sunDir * (lstep * (float(j) + 0.5)));
 				if (ld * lcoef > 5.0) break;
 			}
 			float lightTransmit = exp(-ld * lcoef);
