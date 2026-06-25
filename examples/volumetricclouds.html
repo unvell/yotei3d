@@ -4,6 +4,25 @@
 	<title>Volumetric Clouds - Yotei3D Examples</title>
 	<meta charset="utf-8" />
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<style>
+		#cloud-panel{position:fixed;top:48px;right:12px;z-index:20;width:236px;
+			background:rgba(18,26,38,.72);color:#eaf2ff;
+			font:12px/1.35 system-ui,-apple-system,sans-serif;
+			border-radius:8px;padding:10px 12px;backdrop-filter:blur(4px);
+			max-height:calc(100vh - 64px);overflow:auto;user-select:none}
+		#cloud-panel .cp-title{font-weight:600;margin-bottom:6px;font-size:13px;
+			display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+		#cloud-panel .cp-sec{margin:10px 0 2px;font-size:11px;font-weight:600;
+			letter-spacing:.04em;text-transform:uppercase;opacity:.55}
+		#cloud-panel .cp-row{margin:6px 0}
+		#cloud-panel .cp-row label{display:flex;justify-content:space-between;margin-bottom:2px}
+		#cloud-panel .cp-row .cp-val{opacity:.75;font-variant-numeric:tabular-nums}
+		#cloud-panel input[type=range]{width:100%;accent-color:#7fb3ff;margin:0}
+		#cloud-panel button{margin-top:10px;width:100%;padding:6px;border:0;border-radius:6px;
+			background:#3b6bd6;color:#fff;cursor:pointer;font-size:12px}
+		#cloud-panel button:hover{background:#4f7ce0}
+		#cloud-panel.collapsed .cp-body{display:none}
+	</style>
 	<script type="module">
 
     import { Renderer, Shapes, SceneObject, DynamicSky, VolumetricClouds, TouchController } from "@";
@@ -14,6 +33,14 @@
         enablePostprocess: true,
         enableEnvmap: true,    // IBL from the procedural sky
         enableShadow: true,
+        // push the far plane out so the ground stays visible when we fly up
+        // above the cloud deck (the deck sits ~600+ units overhead)
+        perspective: {
+          method: "persp",
+          angle: 58,
+          near: 0.5,
+          far: 4000,
+        },
         renderingImage: {
           gamma: 1.2,
           resolutionRatio: 1,
@@ -84,18 +111,143 @@
       });
       controller.targetObject = hero;
 
-      // slow day cycle so the clouds relight as the sun moves
-      let t = 0.08;
-      scene.on("frame", () => {
-        t += 0.0004;
-        const elevation = 30 + 26 * Math.sin(t * Math.PI * 2); // ~4°..56°
-        const azimuth = 120 + t * 160;
+      // ---- day cycle: the sun moves so the clouds relight as time passes ----
+      // `dayPhase` is the time-of-day (one full loop = 0..1); `daySpeed` is how
+      // fast it advances per frame (0 = frozen, set it from the panel to scrub).
+      let dayPhase = 0.08;
+      let daySpeed = 0.0004;
+      function applySun() {
+        const elevation = 30 + 26 * Math.sin(dayPhase * Math.PI * 2); // ~4°..56°
+        const azimuth = 120 + dayPhase * 160;
         sky.setSunElevationAzimuth(elevation, azimuth);
+      }
+      applySun();
+
+      // Continuous redraw: the clouds drift (their `time` advances every frame)
+      // and the sun moves, so a frame is needed every tick. requireUpdateFrame()
+      // from inside the "frame" handler won't sustain it — the scene clears the
+      // request right after the event fires — so enable scene.animation instead.
+      scene.animation = true;
+      scene.on("frame", () => {
+        if (daySpeed > 0) {
+          dayPhase += daySpeed;
+          applySun();
+        }
+      });
+
+      scene.show();
+
+      // ---- live tuning panel ------------------------------------------------
+      // Every VolumetricClouds tunable is read fresh each frame (setFrame), and
+      // resScale rebuilds the march buffer on the fly, so all of these can be set
+      // live with no rebuild. resScale / steps / lightSteps are the speed knobs:
+      // resScale (march resolution) is by far the most impactful — drop it for FPS.
+      const CP = [
+        { sec:'Shape & amount' },
+        { label:'coverage 量',   min:0,     max:1,     step:0.01,   set:v=>clouds.coverage=v,    get:()=>clouds.coverage },
+        { label:'density 濃さ',   min:0,     max:0.15,  step:0.005,  set:v=>clouds.extinction=v,  get:()=>clouds.extinction },
+        { label:'base size',     min:0.0006,max:0.006, step:0.0001, set:v=>clouds.baseFreq=v,    get:()=>clouds.baseFreq },
+        { label:'detail',        min:0,     max:1,     step:0.02,   set:v=>clouds.detailScale=v, get:()=>clouds.detailScale },
+        { label:'base Y 下端',    min:100,   max:1600,  step:10,     set:v=>clouds.cloudBaseY=v,  get:()=>clouds.cloudBaseY },
+        { label:'top Y 上端',     min:200,   max:2400,  step:10,     set:v=>clouds.cloudTopY=v,   get:()=>clouds.cloudTopY },
+
+        { sec:'Motion 動き' },
+        { label:'wind speed 速度',min:0,     max:60,    step:1,      set:v=>clouds.windSpeed=v,   get:()=>clouds.windSpeed },
+        { label:'wind dir →',    min:-1,    max:1,     step:0.05,   set:v=>clouds.windDir[0]=v,  get:()=>clouds.windDir[0] },
+        { label:'wind dir ↑',    min:-1,    max:1,     step:0.05,   set:v=>clouds.windDir[1]=v,  get:()=>clouds.windDir[1] },
+
+        { sec:'Time 時間' },
+        { label:'time of day',   min:0,     max:1,     step:0.005,  set:v=>{dayPhase=v;applySun();scene.requireUpdateFrame();}, get:()=>dayPhase % 1 },
+        { label:'day speed',     min:0,     max:0.003, step:0.0001, set:v=>daySpeed=v,           get:()=>daySpeed },
+
+        { sec:'Lighting 光' },
+        { label:'sun intensity', min:0,     max:16,    step:0.5,    set:v=>clouds.sunIntensity=v,  get:()=>clouds.sunIntensity },
+        { label:'sun absorption',min:0,     max:3,     step:0.05,   set:v=>clouds.sunAbsorption=v, get:()=>clouds.sunAbsorption },
+        { label:'forward scatter',min:0,    max:0.95,  step:0.05,   set:v=>clouds.phaseG=v,        get:()=>clouds.phaseG },
+
+        { sec:'Quality / speed 速度↔画質' },
+        { label:'resScale ★',    min:0.25,  max:1,     step:0.05,   set:v=>clouds.resScale=v,    get:()=>clouds.resScale },
+        { label:'march steps',   min:16,    max:96,    step:4,      set:v=>clouds.steps=v,       get:()=>clouds.steps },
+        { label:'light steps',   min:2,     max:16,    step:1,      set:v=>clouds.lightSteps=v,  get:()=>clouds.lightSteps },
+      ];
+
+      const decimals = s => { const t = String(s); const i = t.indexOf('.'); return i < 0 ? 0 : t.length - i - 1; };
+      const fmt = (v, step) => (+v).toFixed(decimals(step));
+      const host = document.getElementById('cp-sliders');
+
+      for (const c of CP) {
+        if (c.sec) {
+          const h = document.createElement('div');
+          h.className = 'cp-sec';
+          h.textContent = c.sec;
+          host.appendChild(h);
+          continue;
+        }
+        const val = c.get();
+        const row = document.createElement('div');
+        row.className = 'cp-row';
+        row.innerHTML = '<label><span>' + c.label + '</span><span class="cp-val"></span></label>'
+          + '<input type="range" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">';
+        const input = row.querySelector('input');
+        const out = row.querySelector('.cp-val');
+        input.value = val;
+        out.textContent = fmt(val, c.step);
+        input.addEventListener('input', () => {
+          const v = parseFloat(input.value);
+          out.textContent = fmt(v, c.step);
+          c.set(v);
+          scene.requireUpdateFrame();
+        });
+        host.appendChild(row);
+      }
+
+      // collapse / expand
+      document.getElementById('cp-toggle').addEventListener('click', () => {
+        document.getElementById('cloud-panel').classList.toggle('collapsed');
+      });
+
+      // camera: jump above the cloud deck (and back). The deck is high overhead,
+      // so flying there by hand is tedious — this snaps the free camera above
+      // cloudTopY looking down at the cloud tops, and toggles back to the ground.
+      // (The shader now marches the slab from above as well as below, so the
+      // tops are visible from up here.) You can still fly manually: drag to look,
+      // wheel to move forward, Shift+W / Shift+S to rise and descend.
+      const groundView = { loc: [0, 3.0, 13], ang: [-7, 0, 0] };
+      let aboveClouds = false;
+      const camBtn = document.getElementById('cp-cam');
+      camBtn.addEventListener('click', () => {
+        const cam = scene.mainCamera;
+        aboveClouds = !aboveClouds;
+        if (aboveClouds) {
+          // Face the sun and pitch down onto the deck. Single-scattering is dark
+          // on the back-scatter side, so looking *toward* the sun shows the
+          // bright, sunlit cloud tops instead of a murky underlit haze.
+          const sunAz = (120 + dayPhase * 160) % 360;   // matches applySun()'s azimuth
+          cam.location.set(0, clouds.cloudTopY + 280, 0);
+          cam.angle.set(-42, sunAz, 0);
+          camBtn.textContent = '🛬 Back to the ground';
+        } else {
+          cam.location.set(groundView.loc[0], groundView.loc[1], groundView.loc[2]);
+          cam.angle.set(groundView.ang[0], groundView.ang[1], groundView.ang[2]);
+          camBtn.textContent = '🛫 Fly above the clouds';
+        }
         scene.requireUpdateFrame();
       });
 
-      scene.requireUpdateFrame();
-      scene.show();
+      // dump the current tuning as a ready-to-paste VolumetricClouds() call
+      document.getElementById('cp-log').addEventListener('click', () => {
+        const dump = {
+          cloudBaseY: clouds.cloudBaseY, cloudTopY: clouds.cloudTopY,
+          coverage: clouds.coverage, extinction: clouds.extinction,
+          baseFreq: clouds.baseFreq, detailScale: clouds.detailScale,
+          windDir: [clouds.windDir[0], clouds.windDir[1]], windSpeed: clouds.windSpeed,
+          sunIntensity: clouds.sunIntensity, sunAbsorption: clouds.sunAbsorption, phaseG: clouds.phaseG,
+          resScale: clouds.resScale, steps: clouds.steps, lightSteps: clouds.lightSteps,
+        };
+        const text = 'new VolumetricClouds(scene, ' + JSON.stringify(dump, null, 2) + ')';
+        console.log(text);
+        if (navigator.clipboard) navigator.clipboard.writeText(text).catch(()=>{});
+      });
     });
   </script>
 </head>
@@ -107,6 +259,15 @@
     <div>Volumetric Clouds: a ray-marched cloud layer (procedural 3D noise, single-scattering with sun-ward self-shadowing) lit by the dynamic sky and composited with premultiplied alpha. Drag to orbit, scroll to zoom.</div>
 		<div class="logo">
       <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="cloud-panel">
+		<div class="cp-title" id="cp-toggle"><span>Cloud parameters</span><span>▾</span></div>
+		<div class="cp-body">
+			<button id="cp-cam">🛫 Fly above the clouds</button>
+			<div id="cp-sliders"></div>
+			<button id="cp-log">Log / copy params</button>
 		</div>
 	</div>
 
