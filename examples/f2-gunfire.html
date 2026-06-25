@@ -23,7 +23,7 @@
     window.addEventListener("load", function() {
 
       // ====== tunables — tweak these to re-aim the shot ======================
-      const JET_POS  = [4.7, 0.2, 0];   // parked on the right of the frame
+      const JET_POS  = [4.7, 0.2, -0.1];   // parked on the right of the frame
       const JET_YAW  = -170;             // deg about Y. 315 = front-three-quarter,
                                         // nose toward the camera's LEFT. Yaw-only
                                         // keeps the gun line = world +Z·Ry(yaw).
@@ -239,7 +239,7 @@
       // ---- trigger: mouse / touch down = fire -------------------------------
       let firing = false, fireAcc = 0, recoil = 0;
       const container = document.getElementById("canvas-container");
-      const startFire = e => { firing = true; if (e.cancelable) e.preventDefault(); };
+      const startFire = e => { ensureAudio(); firing = true; if (e.cancelable) e.preventDefault(); };
       const stopFire  = () => { firing = false; };
       container.addEventListener("mousedown", startFire);
       window.addEventListener("mouseup", stopFire);
@@ -248,22 +248,29 @@
       container.addEventListener("contextmenu", e => e.preventDefault());
 
       // ---- sound: a looping minigun buzz, gated by the trigger --------------
-      // The loop runs continuously (seamless, no per-shot restart clicks); we
-      // just ride its gain to GUN_VOLUME while firing and back to 0 on release,
-      // so holding the button gives one unbroken "brrrt".
+      // Chrome blocks (and warns about) an AudioContext created before a user
+      // gesture, so the mixer is built lazily on the first trigger pull / toggle
+      // click — both are gestures. The loop then runs continuously and we ride
+      // its gain to GUN_VOLUME while firing and back to 0 on release, so holding
+      // the button gives one unbroken "brrrt" with no per-shot clicks.
       //   Minigun: Sound Effect (freesound_community) from Pixabay
       const GUN_VOLUME = 0.6;
-      const mix = new AudioMixer();
-      const gun = mix.loop("/audio/gun-buzz.mp3", { volume: 0 });
-      mix.unlockOnGesture();
+      let mix = null, gun = null, soundOn = true;
+      function ensureAudio() {
+        if (mix) return;                       // build once, inside a gesture
+        mix = new AudioMixer();
+        gun = mix.loop("/audio/gun-buzz.mp3", { volume: 0 });
+        mix.enabled = soundOn;                 // resumes the context + starts loop
+      }
 
       const soundBtn = document.getElementById("sound-toggle");
       function setSound(on) {
-        mix.enabled = on;
+        soundOn = on;
+        if (mix) mix.enabled = on;
         soundBtn.textContent = on ? "🔊 Sound: On" : "🔈 Sound: Off";
       }
-      soundBtn.addEventListener("click", () => setSound(!mix.enabled));
-      setSound(true);   // default On (unlocked on the first gesture)
+      soundBtn.addEventListener("click", () => { ensureAudio(); setSound(!soundOn); });
+      setSound(true);   // default On; the context wakes on the first gesture
 
       // ---- the run, frame by frame ------------------------------------------
       let t = 0;
@@ -285,12 +292,12 @@
             }
             muzzleFire.visible = true;
             muzzleLight.mat.emission = 5.0 + Math.random() * 4.0;
-            gun.volume = GUN_VOLUME;
+            if (gun) gun.volume = GUN_VOLUME;
           } else {
             fireAcc = 0;
             muzzleFire.visible = false;
             muzzleLight.mat.emission = 0.0;
-            gun.volume = 0;
+            if (gun) gun.volume = 0;
           }
           muzzleFire.update();
 
