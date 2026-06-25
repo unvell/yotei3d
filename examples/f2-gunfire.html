@@ -45,6 +45,11 @@
       // that cone, in degrees — bigger = more spread downrange.
       const CONE_HALF_ANGLE = 0.5;
       const MUZZLE_JITTER   = 0.01;  // tiny scatter right at the barrel
+      // per-round forward jitter (world units): with a fixed fire rate + speed the
+      // dashes line up in a rigid, static comb. Shoving each round a random bit
+      // down-range breaks that up so the  - - - -  spacing looks alive. ~half the
+      // dash gap (speed × interval ≈ 13) is a good amount.
+      const TRACER_JITTER   = 7.0;
       // =======================================================================
 
       const renderer = new Renderer({
@@ -155,6 +160,7 @@
         if (!b) return;
         b._active = true; b.visible = true;
         b._age = 0; b._life = BULLET_LIFE;
+        b._d0 = Math.random() * TRACER_JITTER;   // random down-range head start
 
         // bake this round's heading from the live engine-derived basis (aim),
         // so travel direction matches the barrel exactly at any yaw.
@@ -453,7 +459,7 @@
             if (!b._active) continue;
             b._age += dt;
             if (b._age >= b._life) { b._active = false; b.visible = false; continue; }
-            const d = BULLET_SPEED * b._age;
+            const d = BULLET_SPEED * b._age + b._d0;   // + per-round head start
             b.location.set(
               b._ox + (b._fx + b._lx) * d,
               b._oy + (b._fy + b._ly) * d,
