@@ -154,6 +154,12 @@ const exampleItems = ref([
     desc: 'Fly the F-2 through a drifting cloud deck — A/D bank, W/S pitch, ←/→ yaw, and the whole cloud field steers with you. A live Fire-particle afterburner throbs with the burner pulse while Smoke wingtip vortices trail off the wings.',
   },
   {
+    title: 'F-2 Gun Run',
+    thumbnail: '/img/examples/f2-gunfire.jpg',
+    link: 'f2-gunfire.html',
+    desc: 'Hold the mouse to fire the F-2\'s cannon — HDR over-bright tracers streak across the sky as a dashed line through the bloom pass, while a live Fire-particle muzzle flash spits hot sparks and the airframe shudders with recoil.',
+  },
+  {
     title: 'WaterBottle (glTF PBR)',
     thumbnail: '/img/examples/waterbottle.png',
     link: 'waterbottle.html',

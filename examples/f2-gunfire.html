@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>F-2 Gun Run - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<style>
+		#gun-hud{position:fixed;left:12px;bottom:12px;z-index:20;
+			background:rgba(18,26,38,.62);color:#eaf2ff;
+			font:12px/1.5 system-ui,-apple-system,sans-serif;
+			border-radius:8px;padding:8px 12px;backdrop-filter:blur(4px);user-select:none}
+		#gun-hud .gh-title{font-weight:600;margin-bottom:4px;opacity:.85}
+		#gun-hud b{display:inline-block;min-width:30px;text-align:center;
+			padding:0 6px;border-radius:4px;background:rgba(255,150,90,.28);
+			font-weight:600}
+		/* the canvas is the trigger — no text selection / context menu while firing */
+		#canvas-container{cursor:crosshair}
+	</style>
+	<script type="module">
+
+    import { Renderer, Shapes, SceneObject, PointLight, HDRSkyBox, Texture, Clouds, Fire } from "@";
+
+    window.addEventListener("load", function() {
+
+      // ====== tunables — tweak these to re-aim the shot ======================
+      const JET_POS  = [4.7, 0.2, 0];   // parked on the right of the frame
+      const JET_YAW  = -170;             // deg about Y. 315 = front-three-quarter,
+                                        // nose toward the camera's LEFT. Yaw-only
+                                        // keeps the gun line = world +Z·Ry(yaw).
+      // gun muzzle in model-local space: under the cockpit, fuselage left side,
+      // forward toward the nose (model nose is +Z, up is +Y). Adjust if the port
+      // ends up on the far side or off the airframe.
+      const MUZZLE_LOCAL = [0.55, -0.45, 2.6];
+
+      const BULLET_SPEED    = 240;   // units/sec down the gun line
+      const BULLET_LIFE     = 3.8;   // seconds before a tracer recycles
+      const FIRE_INTERVAL   = 0.055; // ~18 rounds/sec — spacing makes the dashes
+      const MAX_BULLETS     = 96;
+      // tracer shape: a thin, long streak. diameter = thickness across the line,
+      // length = how long one dash is along the gun line (both in world units).
+      const BULLET_DIAMETER = 0.035; // thinner reads more like a real tracer
+      const BULLET_LENGTH   = 2.2;   // longer streak
+      // beam divergence: the stream leaves the muzzle converged (a tight point)
+      // and fans out into a cone the farther it flies. This is the half-angle of
+      // that cone, in degrees — bigger = more spread downrange.
+      const CONE_HALF_ANGLE = 0.5;
+      const MUZZLE_JITTER   = 0.01;  // tiny scatter right at the barrel
+      // =======================================================================
+
+      const renderer = new Renderer({
+        enablePostprocess: true,
+        enableEnvmap: true,        // IBL from the HDRI lights the airframe
+        enableShadow: false,       // airborne — nothing on the ground to shade
+        perspective: { method: "persp", angle: 46, near: 0.5, far: 2500 },
+        bloomEffect: {
+          enabled: true,
+          threshold: 0.5,
+          luminanceThreshold: 1.0, // HDR bright-pass: tracer cores blow past 1.0
+          intensity: 1.0,          // strong glow so the tracers haze and streak
+          gamma: 1.3,
+        },
+        renderingImage: { gamma: 1.1, resolutionRatio: 1 },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // clear-blue-sky HDRI: lights the jet + serves as the sky background
+      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+        faceSize: 1024,
+        rotation: 115,
+      });
+      scene.iblIntensity = 1.0;
+      scene.exposure = 1.0;
+      scene.fog = { near: 120, far: 1600, color: [0.74, 0.82, 0.92] };
+
+      // warm daylight key light
+      scene.sun.direction = [-0.26, 0.1, -1];
+      scene.sun.mat.color = [1.3, 1.18, 0.95];
+
+      // a slow cloud deck for depth behind the action (drifts gently past)
+      const clouds = new Clouds({
+        clusters: 14,
+        width: 700, depth: 700,
+        height: -60, heightVariance: 60,
+        clusterRadius: 30, clusterThickness: 20,
+        puffsPerCluster: 48,
+        puffSizeMin: 24, puffSizeMax: 110,
+        wind: [10, 6],
+        opacity: 0.3,
+        bottomColor: [0.84, 0.88, 0.95],
+        selfShadow: 0.3,
+        fadeIn: 2.5, fadeMargin: 0.3,
+      });
+      scene.add(clouds);
+
+      // ---- the gun line ------------------------------------------------------
+      // A world-space node planted at the muzzle and yawed to match the jet, so
+      // its local +Z runs straight down the barrel. Tracers and the muzzle flash
+      // live under it and simply march along +Z — keeping them rock-steady in the
+      // world while the airframe itself can shudder with recoil.
+      const gunLine = new SceneObject();
+      gunLine.angle.set(0, JET_YAW, 0);
+      scene.add(gunLine);
+
+      // ---- tracer pool -------------------------------------------------------
+      // Each round is a short, over-bright additive streak. Spaced out in time at
+      // the fire rate, the stream in flight reads as a dashed  - - - -  line, and
+      // the HDR emission feeds the bloom pass for the hot tracer glow.
+      const bullets = [];
+      function makeBullet() {
+        const b = new Shapes.Sphere(8, 12);
+        // sphere radius is 1, so world half-extent = scale. thin across X/Y,
+        // stretched along Z into a streak.
+        b.scale.set(BULLET_DIAMETER / 2, BULLET_DIAMETER / 2, BULLET_LENGTH / 2);
+        b.mat.color = [1.0, 0.1, 0.1];
+        b.mat.emission = 20.0;            // HDR over-bright → strong bloom streak
+        b.mat.additive = true;           // glowing, non-occluding
+        b.mat.castLight = false;
+        b.visible = false;
+        b._z = 0; b._life = 0; b._active = false;
+        gunLine.add(b);
+        bullets.push(b);
+      }
+      for (let i = 0; i < MAX_BULLETS; i++) makeBullet();
+
+      function spawnBullet() {
+        const b = bullets.find(x => !x._active);
+        if (!b) return;
+        b._active = true; b.visible = true;
+        b._z = 0; b._life = BULLET_LIFE;
+        // give this round a fixed lateral slope: a random direction around the
+        // axis times a random magnitude up to tan(half-angle). The frame loop
+        // multiplies it by distance flown, so every round starts on-axis at the
+        // muzzle and walks outward — together the stream traces a cone.
+        const az = Math.random() * Math.PI * 2;
+        const slope = Math.tan(CONE_HALF_ANGLE * Math.PI / 180) * Math.sqrt(Math.random());
+        b._sx = Math.cos(az) * slope;
+        b._sy = Math.sin(az) * slope;
+        // a hair of scatter right at the barrel so the origin isn't a perfect dot
+        b._ox = (Math.random() - 0.5) * MUZZLE_JITTER;
+        b._oy = (Math.random() - 0.5) * MUZZLE_JITTER;
+      }
+
+      // ---- muzzle flash: a per-shot pop + a live fire-spark emitter -----------
+      // (1) a bright additive bulb that flares and dies in ~50ms each round —
+      //     this is the stuttering muzzle flash.
+      const flash = new Shapes.Sphere(10, 16);
+      flash.mat.color = [1.0, 0.7, 0.3];
+      flash.mat.emission = 9.0;
+      flash.mat.additive = true;
+      flash.mat.castLight = false;
+      flash.visible = false;
+      gunLine.add(flash);
+      let flashT = 0;
+      function popFlash() { flashT = 0.05; flash.visible = true; }
+
+      // (2) a small Fire emitter spitting hot sparks out the barrel. Fire rises
+      //     +Y, so +90° about X aims the embers down +Z (the gun line). Hot
+      //     white→orange, short and fierce — the burnt-powder fireball.
+      const muzzleFire = new Fire({
+        count: 60,
+        radius: 0.08,
+        height: 0.9,
+        riseSpeed: 7.0, riseVariance: 0.4,
+        spread: 0.18, convergence: 0.4,
+        swayAmp: 0.05, swayFreq: 11.0,
+        sizeBase: 34, sizeTip: 6,
+        intensity: 3.4,                  // HDR over-drive feeds the bloom pass
+        colorHot:  [1.0, 0.95, 0.8],     // white-hot core
+        colorMid:  [1.0, 0.55, 0.18],    // orange
+        colorCool: [0.7, 0.12, 0.03],    // dark-red tip
+        opacity: 0.9,
+        sizeScale: 30,
+      });
+      muzzleFire.angle.set(90, 0, 0);    // fire down the gun line (+Z)
+      muzzleFire.visible = false;
+      gunLine.add(muzzleFire);
+
+      // refs filled in once the model loads
+      let jet = null, muzzleMarker = null, muzzleLight = null;
+      let ready = false;
+
+      scene.createObjectFromObjFormat("/models/F2/F2.obj", obj => {
+        if (!obj) { console.error("failed to load F2.obj"); return; }
+        jet = window.jet = obj;
+        scene.add(obj);
+        obj.location.set(JET_POS[0], JET_POS[1], JET_POS[2]);
+        obj.angle.set(0, JET_YAW, 0);    // yaw-only (see gunLine note)
+
+        // paint scheme + lit nav/HUD bits (same wiring as the flight demo)
+        const img = new Image();
+        img.onload = () => {
+          const skin = new Texture(img);
+          skin.flipY = true;
+          obj.eachChild(c => {
+            if (!c.mat) return;
+            if (c.name === "body") {
+              c.mat.tex = skin; c.mat.metallic = 0.1; c.mat.roughness = 0.5;
+            } else if (c.name === "light-side-red") {
+              c.mat.color = [1.0, 0.05, 0.0]; c.mat.emission = 2.0;
+            } else if (c.name === "light-side-green") {
+              c.mat.color = [0.0, 1.0, 0.1]; c.mat.emission = 2.0;
+            } else if (c.name === "light-white") {
+              c.mat.color = [1.0, 1.0, 1.0]; c.mat.emission = 3.0;
+            } else if (c.name === "cocpit-glass") {
+              c.mat.color = [0.55, 0.74, 0.83];
+              c.mat.metallic = 0.1; c.mat.roughness = 0.04; c.opacity = 0.42;
+            } else if (c.name === "hud-display") {
+              c.mat.color = [0.15, 1.0, 0.35]; c.mat.emission = 2.0;
+            }
+          });
+          scene.requireUpdateFrame();
+        };
+        img.src = "/models/F2/skin1.jpg";
+
+        // marker at the muzzle: read its world position to plant the gun line
+        muzzleMarker = new SceneObject();
+        muzzleMarker.location.set(MUZZLE_LOCAL[0], MUZZLE_LOCAL[1], MUZZLE_LOCAL[2]);
+        obj.add(muzzleMarker);
+
+        // a warm point light at the muzzle — flickers on while firing
+        muzzleLight = new PointLight();
+        muzzleLight.location.set(MUZZLE_LOCAL[0], MUZZLE_LOCAL[1], MUZZLE_LOCAL[2] + 0.4);
+        muzzleLight.mat.color = [1.0, 0.6, 0.25];
+        muzzleLight.mat.emission = 0.0;
+        obj.add(muzzleLight);
+
+        // resolve transforms so the marker's world location is valid, then plant
+        // the gun line right at the barrel.
+        obj.updateTransform();
+        const m = muzzleMarker.worldLocation;
+        gunLine.location.set(m.x, m.y, m.z);
+
+        window.jet = obj;
+        ready = true;
+      });
+
+      // ---- trigger: mouse / touch down = fire -------------------------------
+      let firing = false, fireAcc = 0, recoil = 0;
+      const container = document.getElementById("canvas-container");
+      const startFire = e => { firing = true; if (e.cancelable) e.preventDefault(); };
+      const stopFire  = () => { firing = false; };
+      container.addEventListener("mousedown", startFire);
+      window.addEventListener("mouseup", stopFire);
+      container.addEventListener("touchstart", startFire, { passive: false });
+      window.addEventListener("touchend", stopFire);
+      container.addEventListener("contextmenu", e => e.preventDefault());
+
+      // ---- the run, frame by frame ------------------------------------------
+      let t = 0;
+      scene.on("frame", () => {
+        const dt = 0.016;
+        t += dt;
+
+        clouds.update();
+
+        if (ready) {
+          // emit rounds at the fire rate while the trigger is held
+          if (firing) {
+            fireAcc += dt;
+            while (fireAcc >= FIRE_INTERVAL) {
+              fireAcc -= FIRE_INTERVAL;
+              spawnBullet();
+              popFlash();
+              recoil = Math.min(recoil + 0.02, 0.06);   // build the shudder
+            }
+            muzzleFire.visible = true;
+            muzzleLight.mat.emission = 5.0 + Math.random() * 4.0;
+          } else {
+            fireAcc = 0;
+            muzzleFire.visible = false;
+            muzzleLight.mat.emission = 0.0;
+          }
+          muzzleFire.update();
+
+          // advance the tracers down the gun line
+          for (const b of bullets) {
+            if (!b._active) continue;
+            b._z += BULLET_SPEED * dt;
+            b._life -= dt;
+            // lateral offset grows with distance → the beam fans into a cone
+            b.location.set(b._ox + b._z * b._sx, b._oy + b._z * b._sy, b._z);
+            if (b._life <= 0) { b._active = false; b.visible = false; }
+          }
+
+          // muzzle flash pop: flare up then fade within ~50ms
+          if (flashT > 0) {
+            flashT -= dt;
+            const k = Math.max(flashT / 0.05, 0);
+            const s = 0.12 + 0.5 * k;
+            flash.scale.set(s, s, s * 1.7);
+            flash.opacity = k;
+            if (flashT <= 0) flash.visible = false;
+          }
+
+          // recoil shudder on the airframe (the gun line stays planted, so the
+          // tracers don't shake — only the jet does), plus a faint idle bob.
+          recoil *= Math.max(0, 1 - 6 * dt);
+          const r = recoil;
+          jet.angle.set(
+            (Math.random() - 0.5) * r * 18,
+            JET_YAW + (Math.random() - 0.5) * r * 12,
+            (Math.random() - 0.5) * r * 24
+          );
+          jet.location.y = JET_POS[1] + Math.sin(t * 1.5) * 0.03;
+        }
+      });
+
+      // fixed cinematic camera — the airframe sits to the right, firing left
+      scene.mainCamera.fieldOfView = 46;
+      scene.mainCamera.location.set(0, 1.6, 16);
+      scene.mainCamera.angle.set(-4, 0, 0);
+
+      scene.animation = true;
+      scene.show();
+    });
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+		<div>Hold the mouse / tap-and-hold to fire the cannon. HDR tracers streak left; the muzzle flares with fire-sparks.</div>
+		<div class="logo">
+			<img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="gun-hud">
+		<div class="gh-title">Gun controls</div>
+		<div><b>Mouse&nbsp;Down</b> &nbsp;fire</div>
+		<div><b>Hold</b> &nbsp;sustained burst</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
