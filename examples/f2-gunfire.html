@@ -285,34 +285,29 @@
         ready = true;
       });
 
-      // ---- trigger + view: press = fire, drag = orbit the jet's yaw ----------
-      // A press that stays put fires the cannon; once the pointer travels past a
-      // small threshold it becomes a drag that spins the jet on its vertical axis
-      // (and cancels firing), so you can swing the airframe around to inspect it
-      // from any side. Yaw also re-aims the gun line, so new tracers follow the
-      // nose wherever you point it.
+      // ---- trigger + view: press = fire, move = orbit the jet's yaw ----------
+      // Holding the pointer down fires the cannon AND, if you move, spins the jet
+      // on its vertical axis at the same time — fire while turning to watch the
+      // tracer cone sweep with the nose. Yaw re-aims the gun line every frame, so
+      // new rounds always follow wherever the nose points.
       let firing = false, fireAcc = 0, recoil = 0;
       let jetYaw = JET_YAW;
-      let pointerDown = false, dragging = false, downX = 0, lastX = 0;
-      const DRAG_THRESHOLD = 6;     // px before a press turns into a drag
-      const YAW_SENSITIVITY = 0.45; // deg of yaw per px dragged
+      let pointerDown = false, lastX = 0;
+      const YAW_SENSITIVITY = 0.45; // deg of yaw per px moved
 
       const container = document.getElementById("canvas-container");
       function pressStart(x, e) {
         ensureAudio();
-        pointerDown = true; dragging = false; downX = lastX = x;
-        firing = true;       // fire immediately; a later drag cancels it
+        pointerDown = true; lastX = x;
+        firing = true;       // fire for as long as the pointer is held
         if (e && e.cancelable) e.preventDefault();
       }
       function pressMove(x) {
         if (!pointerDown) return;
-        if (!dragging && Math.abs(x - downX) > DRAG_THRESHOLD) {
-          dragging = true; firing = false;   // it's a view drag, not a shot
-        }
-        if (dragging) jetYaw -= (x - lastX) * YAW_SENSITIVITY;
+        jetYaw -= (x - lastX) * YAW_SENSITIVITY;   // turn while firing
         lastX = x;
       }
-      function pressEnd() { pointerDown = false; dragging = false; firing = false; }
+      function pressEnd() { pointerDown = false; firing = false; }
 
       container.addEventListener("mousedown", e => pressStart(e.clientX, e));
       window.addEventListener("mousemove", e => pressMove(e.clientX));
@@ -456,7 +451,7 @@
 			&nbsp;&nbsp;
 			<a id="sound-toggle" href="javascript:void(0)">🔊 Sound: On</a>
 		</div>
-		<div>Press to fire the cannon; drag to swing the jet's yaw and view it from any side. HDR tracers streak from the muzzle fire-sparks.</div>
+		<div>Hold to fire the cannon — move while firing to swing the jet's yaw and watch the HDR tracer cone sweep with the nose.</div>
 		<div class="logo">
 			<img src="/img/logo.svg">
 		</div>
@@ -464,9 +459,8 @@
 
 	<div id="gun-hud">
 		<div class="gh-title">Controls</div>
-		<div><b>Press</b> &nbsp;fire</div>
-		<div><b>Hold</b> &nbsp;sustained burst</div>
-		<div><b>Drag</b> &nbsp;rotate (yaw)</div>
+		<div><b>Hold</b> &nbsp;fire</div>
+		<div><b>Move</b> &nbsp;turn (fire while turning)</div>
 	</div>
 
 	<div id="canvas-container">
