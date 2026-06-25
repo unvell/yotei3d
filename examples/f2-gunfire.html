@@ -23,8 +23,8 @@
     window.addEventListener("load", function() {
 
       // ====== tunables — tweak these to re-aim the shot ======================
-      const JET_POS  = [4.7, 0.2, -0.1];   // parked on the right of the frame
-      const JET_YAW  = -170;             // deg about Y. 315 = front-three-quarter,
+      const JET_POS  = [4.7, 0.2, 0];   // parked on the right of the frame
+      const JET_YAW  = -20;             // deg about Y. 315 = front-three-quarter,
                                         // nose toward the camera's LEFT. Yaw-only
                                         // keeps the gun line = world +Z·Ry(yaw).
       // gun muzzle in model-local space: under the cockpit, fuselage left side,
@@ -107,6 +107,18 @@
       // Each round is a short, over-bright additive streak. Spaced out in time at
       // the fire rate, the stream in flight reads as a dashed  - - - -  line, and
       // the HDR emission feeds the bloom pass for the hot tracer glow.
+      //
+      // Tracers live in this static world-space node (NOT under the jet or the
+      // gun line). Each round bakes in its own world origin + heading at the
+      // instant it leaves the barrel, so rotating the jet's yaw later only aims
+      // *new* rounds — rounds already in flight keep streaking where they were
+      // fired, instead of swinging with the airframe.
+      const tracerSpace = new SceneObject();
+      scene.add(tracerSpace);
+
+      // muzzle world position, refreshed every frame from the marker
+      const muzzleWorld = { x: 0, y: 0, z: 0 };
+
       const bullets = [];
       function makeBullet() {
         const b = new Shapes.Sphere(8, 12);
@@ -118,8 +130,8 @@
         b.mat.additive = true;           // glowing, non-occluding
         b.mat.castLight = false;
         b.visible = false;
-        b._z = 0; b._life = 0; b._active = false;
-        gunLine.add(b);
+        b._age = 0; b._life = 0; b._active = false;
+        tracerSpace.add(b);
         bullets.push(b);
       }
       for (let i = 0; i < MAX_BULLETS; i++) makeBullet();
@@ -128,18 +140,32 @@
         const b = bullets.find(x => !x._active);
         if (!b) return;
         b._active = true; b.visible = true;
-        b._z = 0; b._life = BULLET_LIFE;
-        // give this round a fixed lateral slope: a random direction around the
-        // axis times a random magnitude up to tan(half-angle). The frame loop
-        // multiplies it by distance flown, so every round starts on-axis at the
-        // muzzle and walks outward — together the stream traces a cone.
+        b._age = 0; b._life = BULLET_LIFE;
+
+        // bake this round's world heading from the jet's current yaw. With the
+        // model nose on +Z, Ry(yaw) gives forward F = (sin, 0, cos); a horizontal
+        // "right" perpendicular is R = (cos, 0, -sin).
+        const yr = jetYaw * Math.PI / 180;
+        const sy = Math.sin(yr), cy = Math.cos(yr);
+        b._fx = sy; b._fy = 0; b._fz = cy;          // forward (per unit distance)
+        const rx = cy, rz = -sy;
+
+        // cone divergence: a fixed lateral slope in a random direction around the
+        // axis, scaled by distance in the frame loop — converged at the muzzle,
+        // fanning out downrange.
         const az = Math.random() * Math.PI * 2;
         const slope = Math.tan(CONE_HALF_ANGLE * Math.PI / 180) * Math.sqrt(Math.random());
-        b._sx = Math.cos(az) * slope;
-        b._sy = Math.sin(az) * slope;
-        // a hair of scatter right at the barrel so the origin isn't a perfect dot
-        b._ox = (Math.random() - 0.5) * MUZZLE_JITTER;
-        b._oy = (Math.random() - 0.5) * MUZZLE_JITTER;
+        b._lx = Math.cos(az) * rx * slope;
+        b._ly = Math.sin(az) * slope;
+        b._lz = Math.cos(az) * rz * slope;
+
+        // origin = current muzzle world pos + a hair of scatter across the barrel
+        const j = (Math.random() - 0.5) * MUZZLE_JITTER;
+        b._ox = muzzleWorld.x + rx * j;
+        b._oy = muzzleWorld.y + (Math.random() - 0.5) * MUZZLE_JITTER;
+        b._oz = muzzleWorld.z + rz * j;
+
+        b.angle.set(0, jetYaw, 0);   // stretch the streak along its heading
       }
 
       // ---- muzzle flash: a per-shot pop + a live fire-spark emitter -----------
@@ -227,40 +253,69 @@
         obj.add(muzzleLight);
 
         // resolve transforms so the marker's world location is valid, then plant
-        // the gun line right at the barrel.
+        // the gun line + muzzle world position right at the barrel.
         obj.updateTransform();
         const m = muzzleMarker.worldLocation;
         gunLine.location.set(m.x, m.y, m.z);
+        muzzleWorld.x = m.x; muzzleWorld.y = m.y; muzzleWorld.z = m.z;
 
         window.jet = obj;
         ready = true;
       });
 
-      // ---- trigger: mouse / touch down = fire -------------------------------
+      // ---- trigger + view: press = fire, drag = orbit the jet's yaw ----------
+      // A press that stays put fires the cannon; once the pointer travels past a
+      // small threshold it becomes a drag that spins the jet on its vertical axis
+      // (and cancels firing), so you can swing the airframe around to inspect it
+      // from any side. Yaw also re-aims the gun line, so new tracers follow the
+      // nose wherever you point it.
       let firing = false, fireAcc = 0, recoil = 0;
+      let jetYaw = JET_YAW;
+      let pointerDown = false, dragging = false, downX = 0, lastX = 0;
+      const DRAG_THRESHOLD = 6;     // px before a press turns into a drag
+      const YAW_SENSITIVITY = 0.45; // deg of yaw per px dragged
+
       const container = document.getElementById("canvas-container");
-      const startFire = e => { ensureAudio(); firing = true; if (e.cancelable) e.preventDefault(); };
-      const stopFire  = () => { firing = false; };
-      container.addEventListener("mousedown", startFire);
-      window.addEventListener("mouseup", stopFire);
-      container.addEventListener("touchstart", startFire, { passive: false });
-      window.addEventListener("touchend", stopFire);
+      function pressStart(x, e) {
+        ensureAudio();
+        pointerDown = true; dragging = false; downX = lastX = x;
+        firing = true;       // fire immediately; a later drag cancels it
+        if (e && e.cancelable) e.preventDefault();
+      }
+      function pressMove(x) {
+        if (!pointerDown) return;
+        if (!dragging && Math.abs(x - downX) > DRAG_THRESHOLD) {
+          dragging = true; firing = false;   // it's a view drag, not a shot
+        }
+        if (dragging) jetYaw -= (x - lastX) * YAW_SENSITIVITY;
+        lastX = x;
+      }
+      function pressEnd() { pointerDown = false; dragging = false; firing = false; }
+
+      container.addEventListener("mousedown", e => pressStart(e.clientX, e));
+      window.addEventListener("mousemove", e => pressMove(e.clientX));
+      window.addEventListener("mouseup", pressEnd);
+      container.addEventListener("touchstart", e => pressStart(e.touches[0].clientX, e), { passive: false });
+      window.addEventListener("touchmove", e => { if (pointerDown) pressMove(e.touches[0].clientX); }, { passive: false });
+      window.addEventListener("touchend", pressEnd);
       container.addEventListener("contextmenu", e => e.preventDefault());
 
-      // ---- sound: a looping minigun buzz, gated by the trigger --------------
+      // ---- sound: a flying turbine loop + a trigger-gated minigun buzz -------
       // Chrome blocks (and warns about) an AudioContext created before a user
       // gesture, so the mixer is built lazily on the first trigger pull / toggle
-      // click — both are gestures. The loop then runs continuously and we ride
-      // its gain to GUN_VOLUME while firing and back to 0 on release, so holding
-      // the button gives one unbroken "brrrt" with no per-shot clicks.
-      //   Minigun: Sound Effect (freesound_community) from Pixabay
+      // click — both are gestures. The turbine drones continuously for the flight
+      // ambience; the gun loop runs continuously too but we ride its gain to
+      // GUN_VOLUME only while firing and back to 0 on release, so holding the
+      // button gives one unbroken "brrrt" with no per-shot clicks.
+      //   Jet turbine + Minigun (freesound_community): Sound Effects from Pixabay
       const GUN_VOLUME = 0.6;
       let mix = null, gun = null, soundOn = true;
       function ensureAudio() {
         if (mix) return;                       // build once, inside a gesture
         mix = new AudioMixer();
+        mix.loop("/audio/jet-turbine.mp3", { volume: 0.4 });  // flying ambience
         gun = mix.loop("/audio/gun-buzz.mp3", { volume: 0 });
-        mix.enabled = soundOn;                 // resumes the context + starts loop
+        mix.enabled = soundOn;                 // resumes the context + starts loops
       }
 
       const soundBtn = document.getElementById("sound-toggle");
@@ -301,14 +356,18 @@
           }
           muzzleFire.update();
 
-          // advance the tracers down the gun line
+          // advance the tracers in world space. distance flown drives both the
+          // forward march and the cone's lateral spread.
           for (const b of bullets) {
             if (!b._active) continue;
-            b._z += BULLET_SPEED * dt;
-            b._life -= dt;
-            // lateral offset grows with distance → the beam fans into a cone
-            b.location.set(b._ox + b._z * b._sx, b._oy + b._z * b._sy, b._z);
-            if (b._life <= 0) { b._active = false; b.visible = false; }
+            b._age += dt;
+            if (b._age >= b._life) { b._active = false; b.visible = false; continue; }
+            const d = BULLET_SPEED * b._age;
+            b.location.set(
+              b._ox + (b._fx + b._lx) * d,
+              b._oy + (b._fy + b._ly) * d,
+              b._oz + (b._fz + b._lz) * d
+            );
           }
 
           // muzzle flash pop: flare up then fade within ~50ms
@@ -321,16 +380,25 @@
             if (flashT <= 0) flash.visible = false;
           }
 
-          // recoil shudder on the airframe (the gun line stays planted, so the
-          // tracers don't shake — only the jet does), plus a faint idle bob.
+          // attitude: drag-controlled yaw + a recoil shudder while firing (the
+          // tracers are world-space, so only the airframe shakes), plus idle bob.
           recoil *= Math.max(0, 1 - 6 * dt);
           const r = recoil;
           jet.angle.set(
             (Math.random() - 0.5) * r * 18,
-            JET_YAW + (Math.random() - 0.5) * r * 12,
+            jetYaw + (Math.random() - 0.5) * r * 12,
             (Math.random() - 0.5) * r * 24
           );
           jet.location.y = JET_POS[1] + Math.sin(t * 1.5) * 0.03;
+
+          // re-aim the gun line to the (possibly newly yawed) barrel so the
+          // muzzle flash + next rounds follow the nose. updateTransform refreshes
+          // the marker's world position after the attitude change above.
+          jet.updateTransform();
+          const mw = muzzleMarker.worldLocation;
+          muzzleWorld.x = mw.x; muzzleWorld.y = mw.y; muzzleWorld.z = mw.z;
+          gunLine.location.set(mw.x, mw.y, mw.z);
+          gunLine.angle.set(0, jetYaw, 0);
         }
       });
 
@@ -351,16 +419,17 @@
 			&nbsp;&nbsp;
 			<a id="sound-toggle" href="javascript:void(0)">🔊 Sound: On</a>
 		</div>
-		<div>Hold the mouse / tap-and-hold to fire the cannon. HDR tracers streak left; the muzzle flares with fire-sparks.</div>
+		<div>Press to fire the cannon; drag to swing the jet's yaw and view it from any side. HDR tracers streak from the muzzle fire-sparks.</div>
 		<div class="logo">
 			<img src="/img/logo.svg">
 		</div>
 	</div>
 
 	<div id="gun-hud">
-		<div class="gh-title">Gun controls</div>
-		<div><b>Mouse&nbsp;Down</b> &nbsp;fire</div>
+		<div class="gh-title">Controls</div>
+		<div><b>Press</b> &nbsp;fire</div>
 		<div><b>Hold</b> &nbsp;sustained burst</div>
+		<div><b>Drag</b> &nbsp;rotate (yaw)</div>
 	</div>
 
 	<div id="canvas-container">
