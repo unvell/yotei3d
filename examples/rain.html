@@ -102,14 +102,58 @@
       scene.on("frame", () => lightning.update());
 
       // ---- sound ----
-      // Rain loop: Sound Effect by LIECIO from Pixabay
-      // Thunder:   Sound Effect by Evana Limon from Pixabay
-      const rainSound = new Audio("/audio/calming-rain.mp3");
-      rainSound.loop = true;
-      rainSound.volume = 0.55;
+      // Looping rain + a one-shot thunder clap per lightning strike, mixed
+      // through ONE Web Audio context. Two <audio> elements playing together is
+      // unreliable on iOS Safari (it routes one to the media channel and mutes
+      // the others); a single AudioContext (unlocked by one user gesture) mixes
+      // a looping buffer and fresh one-shot sources reliably everywhere.
+      //   Rain loop:  Sound Effect by LIECIO from Pixabay
+      //   Thunder:    Sound Effect by Evana Limon from Pixabay
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const actx = new AudioCtx();
 
-      const thunderSound = new Audio("/audio/thunderstorm.mp3");
-      thunderSound.volume = 0.8;
+      // a looping source (rain)
+      function loadLoop(url, volume) {
+        const gain = actx.createGain();
+        gain.gain.value = volume;
+        gain.connect(actx.destination);
+        const entry = { gain, buffer: null, source: null };
+        fetch(url).then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b)).then(buf => {
+          entry.buffer = buf;
+          if (soundOn) startLoop(entry);
+        }).catch(() => {});
+        return entry;
+      }
+      function startLoop(entry) {
+        if (!entry.buffer || entry.source) return;
+        const src = actx.createBufferSource();
+        src.buffer = entry.buffer;
+        src.loop = true;
+        src.connect(entry.gain);
+        src.start();
+        entry.source = src;
+      }
+      function stopLoop(entry) {
+        if (entry.source) { try { entry.source.stop(); } catch (e) {} entry.source.disconnect(); entry.source = null; }
+      }
+
+      const rainLoop = loadLoop("/audio/calming-rain.mp3", 0.55);
+
+      // a one-shot source (thunder): decode once, fire a fresh source per strike
+      const thunder = { buffer: null, source: null, gain: actx.createGain() };
+      thunder.gain.gain.value = 0.8;
+      thunder.gain.connect(actx.destination);
+      fetch("/audio/thunderstorm.mp3").then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b))
+        .then(buf => { thunder.buffer = buf; }).catch(() => {});
+      function playThunder() {
+        if (!thunder.buffer || thunder.source) return;   // no overlap with itself
+        const src = actx.createBufferSource();
+        src.buffer = thunder.buffer;
+        src.connect(thunder.gain);
+        src.onended = () => { if (thunder.source === src) thunder.source = null; };
+        thunder.source = src;
+        src.start();
+      }
 
       let soundOn = true;   // default On
       const soundBtn = document.getElementById("sound-toggle");
@@ -117,40 +161,33 @@
       function setSound(on) {
         soundOn = on;
         if (on) {
-          rainSound.play().catch(() => {});
+          actx.resume();
+          startLoop(rainLoop);
           soundBtn.textContent = "🔊 Sound: On";
         } else {
-          rainSound.pause();
-          thunderSound.pause();
+          stopLoop(rainLoop);
+          if (thunder.source) { try { thunder.source.stop(); } catch (e) {} thunder.source = null; }
           soundBtn.textContent = "🔈 Sound: Off";
         }
       }
-      // browsers block audio until a user gesture — the click counts as one
       soundBtn.addEventListener("click", () => setSound(!soundOn));
 
-      // Default On, but browsers block autoplay until a user gesture. Try to
-      // start right away; if blocked, kick it off on the first interaction.
+      // Default On, but browsers block audio until a user gesture — resume the
+      // context (and start the rain loop) on the first interaction.
       setSound(true);
-      rainSound.play().catch(() => {
-        const start = () => {
-          if (soundOn) rainSound.play().catch(() => {});
-          window.removeEventListener("pointerdown", start);
-          window.removeEventListener("keydown", start);
-        };
-        window.addEventListener("pointerdown", start);
-        window.addEventListener("keydown", start);
-      });
+      const unlock = () => {
+        if (soundOn) { actx.resume(); startLoop(rainLoop); }
+        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("keydown", unlock);
+      };
+      window.addEventListener("pointerdown", unlock);
+      window.addEventListener("keydown", unlock);
 
-      // play thunder just after the flash (sound lags light), no overlap
+      // play thunder just after the flash (sound lags light)
       lightning.options.onStrike = () => {
         if (!soundOn) return;
-        if (!thunderSound.paused && !thunderSound.ended) return;  // already rolling
         const delay = 250 + Math.random() * 450;
-        setTimeout(() => {
-          if (!soundOn) return;
-          thunderSound.currentTime = 0;
-          thunderSound.play().catch(() => {});
-        }, delay);
+        setTimeout(() => { if (soundOn) { actx.resume(); playThunder(); } }, delay);
       };
 
       scene.mainCamera.fieldOfView = 50;
