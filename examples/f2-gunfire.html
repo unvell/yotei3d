@@ -30,7 +30,7 @@
       // gun muzzle in model-local space: under the cockpit, fuselage left side,
       // forward toward the nose (model nose is +Z, up is +Y). Adjust if the port
       // ends up on the far side or off the airframe.
-      const MUZZLE_LOCAL = [0.55, -0.45, 2.6];
+      const MUZZLE_LOCAL = [0, 5, 0.0];
 
       const BULLET_SPEED    = 240;   // units/sec down the gun line
       const BULLET_LIFE     = 3.8;   // seconds before a tracer recycles
@@ -51,6 +51,7 @@
         enablePostprocess: true,
         enableEnvmap: true,        // IBL from the HDRI lights the airframe
         enableShadow: false,       // airborne — nothing on the ground to shade
+        enableLighting: true,      // the sun + HDRI light the jet
         perspective: { method: "persp", angle: 46, near: 0.5, far: 2500 },
         bloomEffect: {
           enabled: true,
@@ -103,6 +104,19 @@
       gunLine.angle.set(0, JET_YAW, 0);
       scene.add(gunLine);
 
+      // a marker one unit down the barrel. Reading (gunAhead − gunLine) in world
+      // space gives the TRUE forward vector straight from the engine's transform,
+      // so the tracers travel exactly where the streak points — no hand-rolled
+      // sin/cos that could disagree with the engine's rotation convention.
+      const gunAhead = new SceneObject();
+      gunAhead.location.set(0, 0, 1);
+      gunLine.add(gunAhead);
+
+      // gun-aim orthonormal basis in world space, refreshed every frame:
+      // F = forward down the barrel, R = right, U = up. Cone spread + muzzle
+      // scatter are built from R and U so they stay perpendicular to the shot.
+      const aim = { fx: 0, fy: 0, fz: 1, rx: 1, ry: 0, rz: 0, ux: 0, uy: 1, uz: 0 };
+
       // ---- tracer pool -------------------------------------------------------
       // Each round is a short, over-bright additive streak. Spaced out in time at
       // the fire rate, the stream in flight reads as a dashed  - - - -  line, and
@@ -142,28 +156,26 @@
         b._active = true; b.visible = true;
         b._age = 0; b._life = BULLET_LIFE;
 
-        // bake this round's world heading from the jet's current yaw. With the
-        // model nose on +Z, Ry(yaw) gives forward F = (sin, 0, cos); a horizontal
-        // "right" perpendicular is R = (cos, 0, -sin).
-        const yr = jetYaw * Math.PI / 180;
-        const sy = Math.sin(yr), cy = Math.cos(yr);
-        b._fx = sy; b._fy = 0; b._fz = cy;          // forward (per unit distance)
-        const rx = cy, rz = -sy;
+        // bake this round's heading from the live engine-derived basis (aim),
+        // so travel direction matches the barrel exactly at any yaw.
+        b._fx = aim.fx; b._fy = aim.fy; b._fz = aim.fz;   // forward per unit dist
 
         // cone divergence: a fixed lateral slope in a random direction around the
-        // axis, scaled by distance in the frame loop — converged at the muzzle,
-        // fanning out downrange.
+        // barrel (in the R/U plane), scaled by distance in the frame loop —
+        // converged at the muzzle, fanning out downrange.
         const az = Math.random() * Math.PI * 2;
         const slope = Math.tan(CONE_HALF_ANGLE * Math.PI / 180) * Math.sqrt(Math.random());
-        b._lx = Math.cos(az) * rx * slope;
-        b._ly = Math.sin(az) * slope;
-        b._lz = Math.cos(az) * rz * slope;
+        const cl = Math.cos(az) * slope, sl = Math.sin(az) * slope;
+        b._lx = aim.rx * cl + aim.ux * sl;
+        b._ly = aim.ry * cl + aim.uy * sl;
+        b._lz = aim.rz * cl + aim.uz * sl;
 
         // origin = current muzzle world pos + a hair of scatter across the barrel
-        const j = (Math.random() - 0.5) * MUZZLE_JITTER;
-        b._ox = muzzleWorld.x + rx * j;
-        b._oy = muzzleWorld.y + (Math.random() - 0.5) * MUZZLE_JITTER;
-        b._oz = muzzleWorld.z + rz * j;
+        const jr = (Math.random() - 0.5) * MUZZLE_JITTER;
+        const ju = (Math.random() - 0.5) * MUZZLE_JITTER;
+        b._ox = muzzleWorld.x + aim.rx * jr + aim.ux * ju;
+        b._oy = muzzleWorld.y + aim.ry * jr + aim.uy * ju;
+        b._oz = muzzleWorld.z + aim.rz * jr + aim.uz * ju;
 
         b.angle.set(0, jetYaw, 0);   // stretch the streak along its heading
       }
@@ -171,7 +183,7 @@
       // ---- muzzle flash: a per-shot pop + a live fire-spark emitter -----------
       // (1) a bright additive bulb that flares and dies in ~50ms each round —
       //     this is the stuttering muzzle flash.
-      const flash = new Shapes.Sphere(10, 16);
+      const flash = new Shapes.Sphere(1, 1);
       flash.mat.color = [1.0, 0.7, 0.3];
       flash.mat.emission = 9.0;
       flash.mat.additive = true;
@@ -336,7 +348,42 @@
         clouds.update();
 
         if (ready) {
-          // emit rounds at the fire rate while the trigger is held
+          // 1) attitude: drag-controlled yaw + a recoil shudder while firing (the
+          //    tracers are world-space, so only the airframe shakes) + idle bob.
+          recoil *= Math.max(0, 1 - 6 * dt);
+          const r = recoil;
+          jet.angle.set(
+            (Math.random() - 0.5) * r * 18,
+            jetYaw + (Math.random() - 0.5) * r * 12,
+            (Math.random() - 0.5) * r * 24
+          );
+          jet.location.y = JET_POS[1] + Math.sin(t * 1.5) * 0.03;
+          jet.updateTransform();   // refresh the muzzle marker's world position
+
+          // 2) plant the gun line at the barrel and aim it down the nose (pure
+          //    yaw, so recoil jitter never leaks into the shot direction).
+          const mw = muzzleMarker.worldLocation;
+          muzzleWorld.x = mw.x; muzzleWorld.y = mw.y; muzzleWorld.z = mw.z;
+          gunLine.location.set(mw.x, mw.y, mw.z);
+          gunLine.angle.set(0, jetYaw, 0);
+          gunLine.updateTransform();
+
+          // 3) read the TRUE forward straight from the engine (gunAhead − gunLine)
+          //    and build a perpendicular right/up basis for spread + scatter.
+          const g = gunLine.worldLocation, a = gunAhead.worldLocation;
+          let fx = a.x - g.x, fy = a.y - g.y, fz = a.z - g.z;
+          const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+          // right = forward × worldUp(0,1,0) = (-fz, 0, fx), then normalize
+          let rx = -fz, rz = fx;
+          const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;
+          // up = right × forward, with R = (rx, 0, rz)
+          aim.fx = fx; aim.fy = fy; aim.fz = fz;
+          aim.rx = rx; aim.ry = 0;  aim.rz = rz;
+          aim.ux = -rz * fy;             // cross(R,F).x
+          aim.uy = rz * fx - rx * fz;    // cross(R,F).y
+          aim.uz = rx * fy;              // cross(R,F).z
+
+          // 4) emit rounds at the fire rate while the trigger is held
           if (firing) {
             fireAcc += dt;
             while (fireAcc >= FIRE_INTERVAL) {
@@ -356,8 +403,8 @@
           }
           muzzleFire.update();
 
-          // advance the tracers in world space. distance flown drives both the
-          // forward march and the cone's lateral spread.
+          // 5) advance the tracers in world space. distance flown drives both the
+          //    forward march and the cone's lateral spread.
           for (const b of bullets) {
             if (!b._active) continue;
             b._age += dt;
@@ -370,7 +417,7 @@
             );
           }
 
-          // muzzle flash pop: flare up then fade within ~50ms
+          // 6) muzzle flash pop: flare up then fade within ~50ms
           if (flashT > 0) {
             flashT -= dt;
             const k = Math.max(flashT / 0.05, 0);
@@ -379,26 +426,6 @@
             flash.opacity = k;
             if (flashT <= 0) flash.visible = false;
           }
-
-          // attitude: drag-controlled yaw + a recoil shudder while firing (the
-          // tracers are world-space, so only the airframe shakes), plus idle bob.
-          recoil *= Math.max(0, 1 - 6 * dt);
-          const r = recoil;
-          jet.angle.set(
-            (Math.random() - 0.5) * r * 18,
-            jetYaw + (Math.random() - 0.5) * r * 12,
-            (Math.random() - 0.5) * r * 24
-          );
-          jet.location.y = JET_POS[1] + Math.sin(t * 1.5) * 0.03;
-
-          // re-aim the gun line to the (possibly newly yawed) barrel so the
-          // muzzle flash + next rounds follow the nose. updateTransform refreshes
-          // the marker's world position after the attitude change above.
-          jet.updateTransform();
-          const mw = muzzleMarker.worldLocation;
-          muzzleWorld.x = mw.x; muzzleWorld.y = mw.y; muzzleWorld.z = mw.z;
-          gunLine.location.set(mw.x, mw.y, mw.z);
-          gunLine.angle.set(0, jetYaw, 0);
         }
       });
 
