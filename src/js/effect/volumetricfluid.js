@@ -55,15 +55,29 @@ export class VolumetricFluid {
 		this.ambientTemp = numberOr(options.ambientTemp, 0.0);
 
 		// ---- render parameters ----
-		this.densityScale = numberOr(options.densityScale, 8.0);
-		this.emissionStrength = numberOr(options.emissionStrength, 0.0);
-		this.smokeColor = options.smokeColor || [0.85, 0.86, 0.9];
+		this.densityScale = numberOr(options.densityScale, 4.5);   // extinction
+		this.smokeColor = options.smokeColor || [0.9, 0.9, 0.92];  // albedo
 		this.renderSteps = options.renderSteps || 80;
 		this.resScale = numberOr(options.resScale, 0.5);
+
+		// lighting: a sun (self-shadowed single scattering) + sky ambient fill
+		this._follow = options.follow || scene.sun || null;
+		this.sunIntensity = numberOr(options.sunIntensity, 2.0);
+		this.ambientColor = options.ambientColor || [0.18, 0.21, 0.28];
+		this.shadowDensity = numberOr(options.shadowDensity, 1.0);
+		this.lightSteps = options.lightSteps || 6;
+		this.phaseG = numberOr(options.phaseG, 0.3);
+
+		// fire: HDR emission mapped from the temperature channel (0 = pure smoke)
+		this.fireGain = numberOr(options.fireGain, 0.0);
+		this.fireTempScale = numberOr(options.fireTempScale, 4.0);
 
 		// per-frame state read by the raymarch shader via setFrame()
 		this.invViewProj = null;
 		this.cameraPos = new Vec3(0, 0, 0);
+		this.sunDir = new Vec3(0, 1, 0);
+		this.sunColor = [1, 1, 1];
+		this.lightStepLen = 1;
 
 		this._screen = new ScreenMesh();
 		this._fbo = null;
@@ -211,6 +225,22 @@ export class VolumetricFluid {
 		T.unbind();
 	}
 
+	setFollow(target) { this._follow = target || null; return this; }
+
+	// unit direction toward the sun (world space), from the follow target
+	_sunDir() {
+		const f = this._follow;
+		const d = f && (f.direction || f.worldLocation || f.location);
+		if (d) {
+			const x = d.x !== undefined ? d.x : d[0];
+			const y = d.y !== undefined ? d.y : d[1];
+			const z = d.z !== undefined ? d.z : d[2];
+			const len = Math.hypot(x, y, z) || 1;
+			return new Vec3(x / len, y / len, z / len);
+		}
+		return new Vec3(0, 1, 0);
+	}
+
 	_render() {
 		const r = this.renderer, gl = r.gl;
 
@@ -218,6 +248,16 @@ export class VolumetricFluid {
 		this.invViewProj = r.projectionViewMatrix.clone().inverse();
 		const cam = this.scene.mainCamera;
 		this.cameraPos = cam ? cam.worldLocation : new Vec3(0, 0, 0);
+
+		// sun direction + HDR colour from the follow target (default: scene sun)
+		this.sunDir = this._sunDir();
+		const sc = (this._follow && this._follow.mat && this._follow.mat.color) || [1.0, 0.96, 0.9];
+		const k = this.sunIntensity;
+		this.sunColor = [sc[0] * k, sc[1] * k, sc[2] * k];
+
+		// one sun-march step ≈ a couple of grid cells in world units
+		const cw = (this.boxMax[1] - this.boxMin[1]) / this.N;
+		this.lightStepLen = cw * 2.0;
 
 		gl.clearColor(0, 0, 0, 0);
 		this._fbo.use();

@@ -49,9 +49,17 @@ export class FluidRaymarchShader extends Shader {
 		this.boxMinUniform = this.bindUniform("boxMin", "vec3");
 		this.boxMaxUniform = this.bindUniform("boxMax", "vec3");
 		this.densityScaleUniform = this.bindUniform("densityScale", "float");
-		this.emissionStrengthUniform = this.bindUniform("emissionStrength", "float");
-		this.smokeColorUniform = this.bindUniform("smokeColor", "color3");
 		this.stepsUniform = this.bindUniform("steps", "int");
+		this.lightStepsUniform = this.bindUniform("lightSteps", "int");
+		this.lightStepLenUniform = this.bindUniform("lightStepLen", "float");
+		this.shadowDensityUniform = this.bindUniform("shadowDensity", "float");
+		this.sunDirUniform = this.bindUniform("sunDir", "vec3");
+		this.sunColorUniform = this.bindUniform("sunColor", "color3");
+		this.ambientColorUniform = this.bindUniform("ambientColor", "color3");
+		this.smokeColorUniform = this.bindUniform("smokeColor", "color3");
+		this.phaseGUniform = this.bindUniform("phaseG", "float");
+		this.fireGainUniform = this.bindUniform("fireGain", "float");
+		this.fireTempScaleUniform = this.bindUniform("fireTempScale", "float");
 
 		this.densityTexLocation = this.gl.getUniformLocation(this.glShaderProgramId, "densityTex");
 	}
@@ -63,9 +71,17 @@ export class FluidRaymarchShader extends Shader {
 		this.boxMinUniform.set(p.boxMin);
 		this.boxMaxUniform.set(p.boxMax);
 		this.densityScaleUniform.set(p.densityScale);
-		this.emissionStrengthUniform.set(p.emissionStrength);
-		this.smokeColorUniform.set(p.smokeColor);
 		this.stepsUniform.set(p.renderSteps | 0);
+		this.lightStepsUniform.set(p.lightSteps | 0);
+		this.lightStepLenUniform.set(p.lightStepLen);
+		this.shadowDensityUniform.set(p.shadowDensity);
+		this.sunDirUniform.set(p.sunDir);
+		this.sunColorUniform.set(p.sunColor);
+		this.ambientColorUniform.set(p.ambientColor);
+		this.smokeColorUniform.set(p.smokeColor);
+		this.phaseGUniform.set(p.phaseG);
+		this.fireGainUniform.set(p.fireGain);
+		this.fireTempScaleUniform.set(p.fireTempScale);
 
 		if (p._density && this.densityTexLocation) {
 			const gl = this.gl;
