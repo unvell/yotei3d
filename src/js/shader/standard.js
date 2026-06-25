@@ -535,6 +535,13 @@ export class StandardShader extends Shader {
 			this.opacityUniform.set(1);
 		}
 
+		// opt-in overlay: skip the depth test so this object always draws in front
+		// of geometry (e.g. a muzzle flash the airframe would otherwise occlude).
+		// endObject re-enables DEPTH_TEST, so the override is per-object.
+		if (obj.mat && obj.mat.alwaysOnTop) {
+			gl.disable(gl.DEPTH_TEST);
+		}
+
 		// shadow
 		if (this.renderer.options.enableShadow && this._shadowMap2D) {
 			const shadowMapShader = ShaderSources.shadowmap.instance;
