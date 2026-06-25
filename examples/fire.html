@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, PointLight, Fire, Smoke, TouchController } from "@";
+    import { Renderer, Shapes, SceneObject, PointLight, Fire, Smoke, TouchController, AudioMixer } from "@";
 
     window.addEventListener("load", function() {
 
@@ -149,38 +149,19 @@
       const controller = new TouchController(scene);
 
       // --- sound -------------------------------------------------------------
-      // Campfire loop: Sound Effect from Pixabay
-      const fireSound = new Audio("/audio/campfire.mp3");
-      fireSound.loop = true;
-      fireSound.volume = 0.6;
+      // Campfire loop (Web Audio: seamless loop, reliable on mobile).
+      //   Campfire: Sound Effect from Pixabay
+      const mix = new AudioMixer();
+      mix.loop("/audio/campfire.mp3", { volume: 0.6 });
+      mix.unlockOnGesture();
 
-      let soundOn = true;   // default On
       const soundBtn = document.getElementById("sound-toggle");
-
       function setSound(on) {
-        soundOn = on;
-        if (on) {
-          fireSound.play().catch(() => {});
-          soundBtn.textContent = "🔊 Sound: On";
-        } else {
-          fireSound.pause();
-          soundBtn.textContent = "🔈 Sound: Off";
-        }
+        mix.enabled = on;
+        soundBtn.textContent = on ? "🔊 Sound: On" : "🔈 Sound: Off";
       }
-      soundBtn.addEventListener("click", () => setSound(!soundOn));
-
-      // Default On, but browsers block autoplay until a user gesture. Try to
-      // start right away; if blocked, kick it off on the first interaction.
-      setSound(true);
-      fireSound.play().catch(() => {
-        const start = () => {
-          if (soundOn) fireSound.play().catch(() => {});
-          window.removeEventListener("pointerdown", start);
-          window.removeEventListener("keydown", start);
-        };
-        window.addEventListener("pointerdown", start);
-        window.addEventListener("keydown", start);
-      });
+      soundBtn.addEventListener("click", () => setSound(!mix.enabled));
+      setSound(true);   // default On (unlocked on the first gesture)
 
       scene.animation = true;   // continuous redraw for the live flame
       scene.show();

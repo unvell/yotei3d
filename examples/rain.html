@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Scene, Shapes, SceneObject, Rain, GroundFog, LightningFlash, TouchController } from "@";
+    import { Renderer, Scene, Shapes, SceneObject, Rain, GroundFog, LightningFlash, TouchController, AudioMixer } from "@";
 
     window.addEventListener("load", function() {
 
@@ -103,91 +103,28 @@
 
       // ---- sound ----
       // Looping rain + a one-shot thunder clap per lightning strike, mixed
-      // through ONE Web Audio context. Two <audio> elements playing together is
-      // unreliable on iOS Safari (it routes one to the media channel and mutes
-      // the others); a single AudioContext (unlocked by one user gesture) mixes
-      // a looping buffer and fresh one-shot sources reliably everywhere.
+      // through one AudioMixer (a single Web Audio context — seamless loops and
+      // reliable simultaneous playback on mobile, unlike multiple <audio> tags).
       //   Rain loop:  Sound Effect by LIECIO from Pixabay
       //   Thunder:    Sound Effect by Evana Limon from Pixabay
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      const actx = new AudioCtx();
+      const mix = new AudioMixer();
+      mix.loop("/audio/calming-rain.mp3", { volume: 0.55 });
+      const thunder = mix.sound("/audio/thunderstorm.mp3", { volume: 0.8 });
+      mix.unlockOnGesture();
 
-      // a looping source (rain)
-      function loadLoop(url, volume) {
-        const gain = actx.createGain();
-        gain.gain.value = volume;
-        gain.connect(actx.destination);
-        const entry = { gain, buffer: null, source: null };
-        fetch(url).then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b)).then(buf => {
-          entry.buffer = buf;
-          if (soundOn) startLoop(entry);
-        }).catch(() => {});
-        return entry;
-      }
-      function startLoop(entry) {
-        if (!entry.buffer || entry.source) return;
-        const src = actx.createBufferSource();
-        src.buffer = entry.buffer;
-        src.loop = true;
-        src.connect(entry.gain);
-        src.start();
-        entry.source = src;
-      }
-      function stopLoop(entry) {
-        if (entry.source) { try { entry.source.stop(); } catch (e) {} entry.source.disconnect(); entry.source = null; }
-      }
-
-      const rainLoop = loadLoop("/audio/calming-rain.mp3", 0.55);
-
-      // a one-shot source (thunder): decode once, fire a fresh source per strike
-      const thunder = { buffer: null, source: null, gain: actx.createGain() };
-      thunder.gain.gain.value = 0.8;
-      thunder.gain.connect(actx.destination);
-      fetch("/audio/thunderstorm.mp3").then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b))
-        .then(buf => { thunder.buffer = buf; }).catch(() => {});
-      function playThunder() {
-        if (!thunder.buffer || thunder.source) return;   // no overlap with itself
-        const src = actx.createBufferSource();
-        src.buffer = thunder.buffer;
-        src.connect(thunder.gain);
-        src.onended = () => { if (thunder.source === src) thunder.source = null; };
-        thunder.source = src;
-        src.start();
-      }
-
-      let soundOn = true;   // default On
       const soundBtn = document.getElementById("sound-toggle");
-
       function setSound(on) {
-        soundOn = on;
-        if (on) {
-          actx.resume();
-          startLoop(rainLoop);
-          soundBtn.textContent = "🔊 Sound: On";
-        } else {
-          stopLoop(rainLoop);
-          if (thunder.source) { try { thunder.source.stop(); } catch (e) {} thunder.source = null; }
-          soundBtn.textContent = "🔈 Sound: Off";
-        }
+        mix.enabled = on;
+        if (!on) thunder.stop();
+        soundBtn.textContent = on ? "🔊 Sound: On" : "🔈 Sound: Off";
       }
-      soundBtn.addEventListener("click", () => setSound(!soundOn));
-
-      // Default On, but browsers block audio until a user gesture — resume the
-      // context (and start the rain loop) on the first interaction.
-      setSound(true);
-      const unlock = () => {
-        if (soundOn) { actx.resume(); startLoop(rainLoop); }
-        window.removeEventListener("pointerdown", unlock);
-        window.removeEventListener("keydown", unlock);
-      };
-      window.addEventListener("pointerdown", unlock);
-      window.addEventListener("keydown", unlock);
+      soundBtn.addEventListener("click", () => setSound(!mix.enabled));
+      setSound(true);   // default On (unlocked on the first gesture)
 
       // play thunder just after the flash (sound lags light)
       lightning.options.onStrike = () => {
-        if (!soundOn) return;
         const delay = 250 + Math.random() * 450;
-        setTimeout(() => { if (soundOn) { actx.resume(); playThunder(); } }, delay);
+        setTimeout(() => thunder.play(), delay);   // play() is a no-op when muted
       };
 
       scene.mainCamera.fieldOfView = 50;

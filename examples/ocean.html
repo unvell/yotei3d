@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController, LensFlare, Dolphin, WaterSplash, Seabird } from "@";
+    import { Renderer, Ocean, Terrain, SkyBox, HDRSkyBox, TouchController, LensFlare, Dolphin, WaterSplash, Seabird, AudioMixer } from "@";
     import { Vec3 } from "@/math";
 
     window.addEventListener("load", function() {
@@ -219,70 +219,23 @@
       scene.animation = true;
 
       // --- sound -------------------------------------------------------------
-      // Ocean waves + distant gull calls, mixed through ONE Web Audio context.
-      // Why not two <audio> elements? iOS Safari is unreliable playing multiple
-      // HTMLAudioElements at once (it tends to route one to the media channel and
-      // mute/steal the others). The Web Audio API mixes any number of looping
-      // buffers through a single AudioContext that's unlocked by one user gesture,
-      // which plays them together reliably on desktop and mobile alike.
+      // Ocean waves + distant gull calls, mixed through one AudioMixer (a single
+      // Web Audio context — seamless loops, reliable simultaneous playback on
+      // mobile, unlike multiple <audio> elements).
       //   Ocean waves: Sound Effect from Pixabay
       //   Gull calls: "flock of seagulls" by flutie8211 (Freesound)
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      const actx = new AudioCtx();
+      const mix = new AudioMixer();
+      mix.loop("/audio/ocean-waves.mp3", { volume: 0.6 });
+      mix.loop("/audio/seagulls.mp3", { volume: 0.35 });
+      mix.unlockOnGesture();
 
-      function loadLoop(url, volume) {
-        const gain = actx.createGain();
-        gain.gain.value = volume;
-        gain.connect(actx.destination);
-        const entry = { gain, buffer: null, source: null };
-        fetch(url).then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b)).then(buf => {
-          entry.buffer = buf;
-          if (soundOn) startLoop(entry);   // begin once decoded (plays on resume)
-        }).catch(() => {});
-        return entry;
-      }
-      function startLoop(entry) {
-        if (!entry.buffer || entry.source) return;
-        const src = actx.createBufferSource();
-        src.buffer = entry.buffer;
-        src.loop = true;
-        src.connect(entry.gain);
-        src.start();
-        entry.source = src;
-      }
-      function stopLoop(entry) {
-        if (entry.source) { try { entry.source.stop(); } catch (e) {} entry.source.disconnect(); entry.source = null; }
-      }
-
-      const waves = loadLoop("/audio/ocean-waves.mp3", 0.6);
-      const gulls = loadLoop("/audio/seagulls.mp3", 0.35);
-
-      let soundOn = true;   // default On
       const soundBtn = document.getElementById("sound-toggle");
-
       function setSound(on) {
-        soundOn = on;
-        if (on) {
-          actx.resume();
-          startLoop(waves); startLoop(gulls);
-          soundBtn.textContent = "🔊 Sound: On";
-        } else {
-          stopLoop(waves); stopLoop(gulls);
-          soundBtn.textContent = "🔈 Sound: Off";
-        }
+        mix.enabled = on;
+        soundBtn.textContent = on ? "🔊 Sound: On" : "🔈 Sound: Off";
       }
-      soundBtn.addEventListener("click", () => setSound(!soundOn));
-
-      // Default On, but browsers block audio until a user gesture — resume the
-      // context (and start any already-decoded loops) on the first interaction.
-      setSound(true);
-      const unlock = () => {
-        if (soundOn) { actx.resume(); startLoop(waves); startLoop(gulls); }
-        window.removeEventListener("pointerdown", unlock);
-        window.removeEventListener("keydown", unlock);
-      };
-      window.addEventListener("pointerdown", unlock);
-      window.addEventListener("keydown", unlock);
+      soundBtn.addEventListener("click", () => setSound(!mix.enabled));
+      setSound(true);   // default On (unlocked on the first gesture)
 
       scene.show();
     });

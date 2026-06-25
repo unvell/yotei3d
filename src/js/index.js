@@ -41,6 +41,7 @@ export * from './utility/gltfloader.js';
 export * from './utility/objloader';
 export * from './utility/hdrloader.js';
 export * from './utility/utility';
+export * from './utility/audiomixer.js';
 
 import * as Shapes from './scene/shapes';
 export { Shapes };
