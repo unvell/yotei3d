@@ -136,6 +136,12 @@ const exampleItems = ref([
     desc: 'A ray-marched volumetric cloud layer: density from procedural 3D noise, single-scattering with a sun-ward self-shadow march, composited with premultiplied alpha. Lit by the dynamic sky\'s sun, so the clouds relight as the day moves. Rendered at half resolution to stay affordable.',
   },
   {
+    title: 'GPU Fluid (Smoke / Fire)',
+    thumbnail: '/img/examples/fluid.jpg',
+    link: 'fluid.html',
+    desc: 'A real-time 3D fluid simulation run entirely on the GPU: velocity, density and temperature live in writable 3D textures (rendered into one Z-slice at a time) and are updated every frame by the classic stable-fluids steps — advection, buoyancy, vorticity confinement, and a Jacobi pressure solve for incompressibility — then ray-marched with sun self-shadowing and blackbody fire emission that feeds the bloom. Toggle smoke ↔ fire, or turn on Stir and drag to inject.',
+  },
+  {
     title: 'HDRI Environment',
     thumbnail: '/img/examples/hdri.jpg',
     link: 'hdri.html',

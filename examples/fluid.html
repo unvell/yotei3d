@@ -4,6 +4,28 @@
   <title>GPU Fluid (Smoke / Fire) - Yotei3D Examples</title>
   <meta charset="utf-8" />
   <link href="css/examples.css" rel="stylesheet" type="text/css" />
+  <style>
+    #fluid-panel{position:fixed;top:48px;right:12px;z-index:20;width:236px;
+      background:rgba(18,26,38,.72);color:#eaf2ff;
+      font:12px/1.35 system-ui,-apple-system,sans-serif;
+      border-radius:8px;padding:10px 12px;backdrop-filter:blur(4px);
+      max-height:calc(100vh - 64px);overflow:auto;user-select:none}
+    #fluid-panel .cp-title{font-weight:600;margin-bottom:6px;font-size:13px;
+      display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+    #fluid-panel .cp-sec{margin:10px 0 2px;font-size:11px;font-weight:600;
+      letter-spacing:.04em;text-transform:uppercase;opacity:.55}
+    #fluid-panel .cp-row{margin:6px 0}
+    #fluid-panel .cp-row label{display:flex;justify-content:space-between;margin-bottom:2px}
+    #fluid-panel .cp-row .cp-val{opacity:.75;font-variant-numeric:tabular-nums}
+    #fluid-panel input[type=range]{width:100%;accent-color:#ff9b5a;margin:0}
+    #fluid-panel button{margin-top:8px;width:100%;padding:6px;border:0;border-radius:6px;
+      background:#3b6bd6;color:#fff;cursor:pointer;font-size:12px}
+    #fluid-panel button:hover{background:#4f7ce0}
+    #fluid-panel button.on{background:#d6643b}
+    #fluid-panel .cp-2{display:flex;gap:6px}
+    #fluid-panel .cp-2 button{margin-top:8px}
+    #fluid-panel.collapsed .cp-body{display:none}
+  </style>
   <script type="module">
     import { Renderer, Shapes, SceneObject, VolumetricFluid, TouchController } from "@";
 
@@ -25,7 +47,6 @@
       scene.iblIntensity = 0.6;
       scene.exposure = 1.6;
 
-      // a simple dark ground so the plume has something to sit on
       const ground = new Shapes.Cube();
       ground.scale.set(60, 0.2, 60);
       ground.location.set(0, -0.1, 0);
@@ -33,12 +54,11 @@
       ground.mat.roughness = 0.95;
       scene.add(ground);
 
-      // orbit target at the middle of the smoke box
       const target = new SceneObject();
       target.location.set(0, 8, 0);
       scene.add(target);
 
-      // GPU smoke simulation: a 64^3 grid in a 12 x 18 x 12 world box
+      // GPU smoke/fire simulation: a 64^3 grid in a 12 x 18 x 12 world box
       const fluid = new VolumetricFluid(scene, {
         resolution: 64,
         boxSize: [12, 18, 12],
@@ -53,9 +73,128 @@
       const controller = new TouchController(scene, { enableVerticalRotation: true });
       controller.targetObject = target;
 
-      // the sim advances every frame, so request a frame every tick
       scene.animation = true;
       scene.show();
+
+      // ---- mouse "stir": drag to inject smoke + velocity --------------------
+      // While stir mode is on we disable the orbit controller, so a drag only
+      // stirs the fluid; toggle it off to orbit/zoom again.
+      const canvas = renderer.canvas;
+      let stir = false, dragging = false, prevNx = 0, prevNy = 0;
+      const toNDC = (e) => {
+        const r = canvas.getBoundingClientRect();
+        return [
+          (e.clientX - r.left) / r.width * 2 - 1,
+          -((e.clientY - r.top) / r.height * 2 - 1),
+        ];
+      };
+      canvas.addEventListener("pointerdown", (e) => {
+        if (!stir) return;
+        dragging = true;
+        [prevNx, prevNy] = toNDC(e);
+        fluid.pointerDrag(prevNx, prevNy);
+        scene.requireUpdateFrame();
+      });
+      window.addEventListener("pointermove", (e) => {
+        if (!stir || !dragging) return;
+        const [nx, ny] = toNDC(e);
+        fluid.pointerDrag(nx, ny, prevNx, prevNy);
+        prevNx = nx; prevNy = ny;
+        scene.requireUpdateFrame();
+      });
+      window.addEventListener("pointerup", () => {
+        if (!dragging) return;
+        dragging = false;
+        fluid.pointerEnd();
+      });
+
+      // ---- presets ----------------------------------------------------------
+      const PRESETS = {
+        smoke: { fireGain: 0.0, emitTemp: 1.5, emitDensity: 1.0, emitRadius: 3.6,
+          buoyancy: 2.1, densityScale: 4.5, smokeColor: [0.9, 0.9, 0.92] },
+        fire: { fireGain: 3.2, emitTemp: 5.0, fireTempScale: 3.5, emitDensity: 0.9,
+          emitRadius: 4.0, buoyancy: 2.6, densityScale: 4.0, smokeColor: [0.32, 0.32, 0.34] },
+      };
+      const applyPreset = (p) => { Object.assign(fluid, PRESETS[p]); syncAll(); scene.requireUpdateFrame(); };
+
+      // ---- tuning panel -----------------------------------------------------
+      const CP = [
+        { sec: 'Emitter 噴出' },
+        { label: 'density 濃さ', min: 0, max: 3, step: 0.05, set: v => fluid.emitDensity = v, get: () => fluid.emitDensity },
+        { label: 'buoyancy 浮力', min: 0, max: 5, step: 0.05, set: v => fluid.buoyancy = v, get: () => fluid.buoyancy },
+        { label: 'radius 半径', min: 1, max: 10, step: 0.2, set: v => fluid.emitRadius = v, get: () => fluid.emitRadius },
+
+        { sec: 'Turbulence 乱流' },
+        { label: 'vorticity 渦', min: 0, max: 1.2, step: 0.02, set: v => fluid.vorticity = v, get: () => fluid.vorticity },
+        { label: 'seed 種', min: 0, max: 24, step: 0.5, set: v => fluid.seedStrength = v, get: () => fluid.seedStrength },
+
+        { sec: 'Fire 炎' },
+        { label: 'fire 量', min: 0, max: 6, step: 0.1, set: v => fluid.fireGain = v, get: () => fluid.fireGain },
+        { label: 'heat 温度', min: 0, max: 8, step: 0.1, set: v => fluid.emitTemp = v, get: () => fluid.emitTemp },
+        { label: 'fire temp', min: 1, max: 8, step: 0.1, set: v => fluid.fireTempScale = v, get: () => fluid.fireTempScale },
+
+        { sec: 'Look 見た目' },
+        { label: 'density scale', min: 1, max: 12, step: 0.2, set: v => fluid.densityScale = v, get: () => fluid.densityScale },
+        { label: 'sun 強さ', min: 0, max: 5, step: 0.1, set: v => fluid.sunIntensity = v, get: () => fluid.sunIntensity },
+
+        { sec: 'Quality 速度↔画質' },
+        { label: 'jacobi iters', min: 8, max: 50, step: 1, set: v => fluid.jacobiIterations = v | 0, get: () => fluid.jacobiIterations },
+        { label: 'march steps', min: 24, max: 128, step: 4, set: v => fluid.renderSteps = v | 0, get: () => fluid.renderSteps },
+        { label: 'light steps', min: 0, max: 12, step: 1, set: v => fluid.lightSteps = v | 0, get: () => fluid.lightSteps },
+        { label: 'resScale ★', min: 0.25, max: 1, step: 0.05, set: v => fluid.resScale = v, get: () => fluid.resScale },
+      ];
+
+      const decimals = s => { const t = String(s); const i = t.indexOf('.'); return i < 0 ? 0 : t.length - i - 1; };
+      const fmt = (v, step) => (+v).toFixed(decimals(step));
+      const host = document.getElementById('cp-sliders');
+      const rows = [];
+
+      for (const c of CP) {
+        if (c.sec) {
+          const h = document.createElement('div');
+          h.className = 'cp-sec';
+          h.textContent = c.sec;
+          host.appendChild(h);
+          continue;
+        }
+        const row = document.createElement('div');
+        row.className = 'cp-row';
+        row.innerHTML = '<label><span>' + c.label + '</span><span class="cp-val"></span></label>'
+          + '<input type="range" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">';
+        const input = row.querySelector('input');
+        const out = row.querySelector('.cp-val');
+        input.value = c.get();
+        out.textContent = fmt(c.get(), c.step);
+        input.addEventListener('input', () => {
+          const v = parseFloat(input.value);
+          out.textContent = fmt(v, c.step);
+          c.set(v);
+          scene.requireUpdateFrame();
+        });
+        host.appendChild(row);
+        rows.push({ c, input, out });
+      }
+
+      function syncAll() {
+        for (const { c, input, out } of rows) {
+          input.value = c.get();
+          out.textContent = fmt(c.get(), c.step);
+        }
+      }
+
+      document.getElementById('cp-toggle').addEventListener('click', () => {
+        document.getElementById('fluid-panel').classList.toggle('collapsed');
+      });
+      const stirBtn = document.getElementById('cp-stir');
+      stirBtn.addEventListener('click', () => {
+        stir = !stir;
+        controller.enabled = !stir;
+        stirBtn.classList.toggle('on', stir);
+        stirBtn.textContent = stir ? '🖐 Stir: ON — drag to inject' : '🖱 Stir: OFF — drag orbits';
+      });
+      document.getElementById('cp-smoke').addEventListener('click', () => applyPreset('smoke'));
+      document.getElementById('cp-fire').addEventListener('click', () => applyPreset('fire'));
+      document.getElementById('cp-reset').addEventListener('click', () => { fluid.reset(); scene.requireUpdateFrame(); });
     });
   </script>
 </head>
@@ -64,9 +203,23 @@
     <div class="menu hover:text-sky-600">
       &lt; <a href="index.html">Back</a>
     </div>
-    <div>GPU Fluid: a real-time 3D smoke simulation (stable-fluids on a 3D-texture grid). Drag to orbit, scroll to zoom.</div>
+    <div>GPU Fluid: a real-time 3D smoke/fire simulation (stable-fluids on a 3D-texture grid). Drag to orbit; turn on Stir and drag to inject.</div>
     <div class="logo"><img src="/img/logo.svg"></div>
   </div>
+
+  <div id="fluid-panel">
+    <div class="cp-title" id="cp-toggle"><span>Fluid parameters</span><span>▾</span></div>
+    <div class="cp-body">
+      <div class="cp-2">
+        <button id="cp-smoke">💨 Smoke</button>
+        <button id="cp-fire">🔥 Fire</button>
+      </div>
+      <button id="cp-stir">🖱 Stir: OFF — drag orbits</button>
+      <div id="cp-sliders"></div>
+      <button id="cp-reset">Reset field</button>
+    </div>
+  </div>
+
   <div id="canvas-container"></div>
 </body>
 </html>

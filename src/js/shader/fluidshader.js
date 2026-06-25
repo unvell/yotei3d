@@ -15,9 +15,11 @@ import { Shader } from '../webgl/shader.js';
 // pressureTex), so a fixed name→unit table would not work.
 const FLUID_UNIFORMS = [
 	"uN", "zLayer", "dt", "dissipation",
-	"buoyancy", "weight", "ambientTemp",
+	"buoyancy", "weight", "ambientTemp", "time", "seedStrength",
 	"emitPos", "emitRadius", "emitDensity", "emitTemp",
-	"velTex", "srcTex", "dcTex", "pressureTex", "divergenceTex",
+	"vorticity",
+	"mouseActive", "mousePos", "mouseRadius", "mouseVel", "mouseDensity", "mouseTemp",
+	"velTex", "srcTex", "dcTex", "pressureTex", "divergenceTex", "curlTex",
 ];
 
 export class FluidShader extends Shader {

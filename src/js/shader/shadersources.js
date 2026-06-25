@@ -94,6 +94,8 @@ import fluidEmitFrag from '../../shader/fluid_emit.frag';
 import fluidDivergenceFrag from '../../shader/fluid_divergence.frag';
 import fluidJacobiFrag from '../../shader/fluid_jacobi.frag';
 import fluidProjectFrag from '../../shader/fluid_project.frag';
+import fluidCurlFrag from '../../shader/fluid_curl.frag';
+import fluidVorticityFrag from '../../shader/fluid_vorticity.frag';
 import fluidRaymarchVert from '../../shader/fluid_raymarch.vert';
 import fluidRaymarchFrag from '../../shader/fluid_raymarch.frag';
 
@@ -140,6 +142,8 @@ export const ShaderSources = {
   fluid_divergence: { vert: fluidVert, frag: fluidDivergenceFrag, class: FluidShader },
   fluid_jacobi: { vert: fluidVert, frag: fluidJacobiFrag, class: FluidShader },
   fluid_project: { vert: fluidVert, frag: fluidProjectFrag, class: FluidShader },
+  fluid_curl: { vert: fluidVert, frag: fluidCurlFrag, class: FluidShader },
+  fluid_vorticity: { vert: fluidVert, frag: fluidVorticityFrag, class: FluidShader },
   fluid_raymarch: { vert: fluidRaymarchVert, frag: fluidRaymarchFrag, class: FluidRaymarchShader },
   fluidcomposite: { vert: volcloudCompositeVert, frag: volcloudCompositeFrag, class: VolumetricCloudCompositeShader },
 

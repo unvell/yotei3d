@@ -2,11 +2,11 @@
 
 // Fluid — EMITTER (inject density + heat).
 //
-// A continuous source: add a soft Gaussian blob of smoke density and
-// temperature around `emitPos` every step. Advection carries it upward and the
-// per-step dissipation fades it, so the two balance into a steady plume. In a
-// later stage the mouse drives a second, movable emitter through these same
-// uniforms.
+// Two sources of fresh smoke/heat, each a soft Gaussian blob:
+//   * the fixed bottom emitter (the continuous plume);
+//   * the MOUSE, while dragging (interactive puffs).
+// Advection carries them upward and the per-step dissipation fades them, so the
+// two balance into a steady, living plume.
 precision highp float;
 precision highp sampler3D;
 
@@ -19,6 +19,12 @@ uniform float emitRadius;        // Gaussian falloff radius, cells
 uniform float emitDensity;       // density added per second at the center
 uniform float emitTemp;          // temperature added per second at the center
 
+uniform float mouseActive;       // 1 while dragging, else 0
+uniform vec3 mousePos;           // grid coords
+uniform float mouseRadius;
+uniform float mouseDensity;
+uniform float mouseTemp;
+
 out vec4 fragColor;
 
 void main(void) {
@@ -28,9 +34,15 @@ void main(void) {
 
 	float d = distance(P, emitPos);
 	float g = exp(-(d * d) / (emitRadius * emitRadius));
-
 	dc.r += dt * emitDensity * g;
 	dc.g += dt * emitTemp * g;
+
+	if (mouseActive > 0.5) {
+		float dm = distance(P, mousePos);
+		float gm = exp(-(dm * dm) / (mouseRadius * mouseRadius));
+		dc.r += dt * mouseDensity * gm;
+		dc.g += dt * mouseTemp * gm;
+	}
 
 	fragColor = dc;
 }
