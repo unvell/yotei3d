@@ -296,12 +296,11 @@ export class StandardShader extends Shader {
 		// the direct sun is on when the scene's sun has non-zero intensity
 		this.useDirectSunUniform.set(sunActive);
 
-		// IBL strength/tint live on the environment (skybox); fall back to the
-		// legacy scene-level values, then to defaults.
+		// IBL strength/tint live on the environment: scene.skybox.intensity /
+		// scene.skybox.tint (scene.skybox aliases scene.environment).
 		const env = scene.environment;
-		const iblIntensity = (env && typeof env.intensity === "number") ? env.intensity
-			: (typeof scene.iblIntensity === "number" ? scene.iblIntensity : 1.0);
-		const iblTint = (env && env.tint) || scene.iblColor || this.defaultIBLColor;
+		const iblIntensity = (env && typeof env.intensity === "number") ? env.intensity : 1.0;
+		const iblTint = (env && env.tint) || this.defaultIBLColor;
 		this.iblIntensityUniform.set(iblIntensity);
 		this.maxEnvLodUniform.set(typeof scene._iblMaxLod === "number" ? scene._iblMaxLod : 6.0);
 		this.iblColorUniform.set(iblTint);

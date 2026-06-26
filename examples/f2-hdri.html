@@ -32,7 +32,8 @@
         faceSize: 1024,
         rotation: 100,
       });
-      scene.iblIntensity = 1.0;
+      scene.skybox.mat = { color: [0.1, 0.1, 0.1] };
+      scene.skybox.intensity = 0.5;
       scene.mainCamera.exposure = 1.0;
 
       // warm daylight key light to complement the sky's blue ambient
