@@ -54,7 +54,6 @@
 
       const renderer = new Renderer({
         enablePostprocess: true,
-        enableEnvmap: true,        // IBL from the HDRI lights the airframe
         enableShadow: false,       // airborne — nothing on the ground to shade
         enableLighting: true,      // the sun + HDRI light the jet
         perspective: { method: "persp", angle: 46, near: 0.5, far: 2500 },

@@ -4,6 +4,7 @@ export * from './scene/scene';
 export * from './scene/viewer.js';
 export * from './scene/material';
 export * from './scene/camera.js';
+export * from './scene/environment';
 export * from './scene/object.js';
 export * from './scene/instancedobject.js';
 export * from './scene/terrain';

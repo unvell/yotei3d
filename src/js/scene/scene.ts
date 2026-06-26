@@ -9,6 +9,7 @@ import { loadObjFormat, loadMtlFormat } from '../utility/objloader';
 import { ResourceManager, ResourceTypes } from '../utility/resourcemanager';
 import { LightLimitation } from "../shader/standard";
 import { Camera } from "./camera";
+import { SimpleSky } from "./environment";
 import { Mesh } from "../webgl/mesh";
 import { Texture } from "../webgl/texture";
 import { CubeMap } from "../webgl/cubemap";
@@ -41,7 +42,11 @@ export class Scene {
 
 	shadowMap: any;
 	shadowMapUpdateRequested: boolean;
-	skybox: any;
+	_environment: any;
+	_iblBakedFor: any;
+	_iblIrradianceMap: any;
+	_iblEnvMap: any;
+	_iblMaxLod?: number;
 
 	mainCamera: Camera;
 	sun: Sun;
@@ -91,7 +96,9 @@ export class Scene {
 
     this.shadowMap = null;
     this.shadowMapUpdateRequested = true;
-    this.skybox = null;
+    // Default environment: a constant-colour sky so scenes have ambient fill
+    // without an explicit skybox (see docs/RENDERING.md §2 + Environment).
+    this._environment = new SimpleSky();
 
 		// main camera
     this.mainCamera = new Camera();
@@ -468,6 +475,27 @@ export class Scene {
 
 		this.selectedObjects.clear();
 		this.requireUpdateFrame();
+	}
+
+	// The scene environment (ambient/IBL source). Defaults to a SimpleSky;
+	// assigning an image-based sky switches the scene to real IBL.
+	get environment(): any { return this._environment; }
+	set environment(env: any) {
+		this._environment = env || new SimpleSky();
+		this._iblBakedFor = null;   // force an IBL re-bake for the new environment
+		this.requireUpdateFrame();
+	}
+
+	// Legacy alias: `scene.skybox` is the image-based environment (the drawn
+	// background + IBL source), or null when the environment is a SimpleSky.
+	// Setting it routes through `environment`.
+	get skybox(): any { return (this._environment instanceof SimpleSky) ? null : this._environment; }
+	set skybox(v: any) { this.environment = v; }
+
+	// Constant indirect-diffuse irradiance for the shader's ambient fallback,
+	// or null when the environment is image-based (real IBL is used instead).
+	get ambientColor(): number[] | null {
+		return (this._environment instanceof SimpleSky) ? this._environment.ambientColor : null;
 	}
 
 	updateLightSources() {

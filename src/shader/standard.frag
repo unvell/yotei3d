@@ -50,6 +50,7 @@ uniform float iblIntensity;
 uniform float maxEnvLod;
 uniform float exposure;
 uniform vec3 iblColor;       // white-balance tint for the diffuse ambient
+uniform vec3 ambientColor;   // constant indirect-diffuse irradiance (SimpleSky)
 uniform samplerCube irradianceMap;
 
 uniform bool receiveLight;
@@ -164,31 +165,6 @@ vec3 correctBoundingBoxIntersect(BoundingBox bbox, vec3 dir) {
 
 float decodeFloatRGBA(vec4 rgba) {
   return dot(rgba, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0));
-}
-
-vec3 traceLight(vec3 vertexNormal, vec3 cameraNormal) {
-
-	vec3 diff = vec3(0.0);
-	vec3 specular = vec3(0.0);
-
-	for (int i = 0; i < MAX_LIGHT_COUNT; i++) {
-		if (i >= lightCount) break;
-
-		vec3 lightRay = lights[i].pos - vertex;
-		vec3 lightNormal = normalize(lightRay);
-
-		float ln = dot(lightNormal, vertexNormal);
-		float ld = length(lightRay);
-		float lda = pow(2.718282, -ld);
-		diff += lights[i].color * max(ln * lda, 0.0);
-
-		vec3 lightReflection = reflect(lightNormal, vertexNormal);
-		float refd = max(dot(lightReflection, cameraNormal), 0.0);
-		float sf = pow(refd, pow(glossy, -2.0)) * (1.0 / ld);
-		specular += lights[i].color * sf * glossy;
-	}
-
-	return diff + specular;
 }
 
 vec3 refract2(vec3 d, vec3 normal, float r) {
@@ -318,124 +294,77 @@ void main(void) {
 		ao = texture2D(aoMap, uv1).r;
 	}
 
-	if (hasIBL) {
+	//////////////// Lighting (unified PBR: direct + indirect) ////////////////
+	// One physically-based path for every object (see docs/RENDERING.md §2).
+	// Direct = sun + analytic point lights (Cook-Torrance). Indirect = a single
+	// environment model: diffuse from light probes (GI) where present, else the
+	// baked IBL irradiance; specular always from the prefiltered environment
+	// cubemap. There is no separate non-IBL fallback path.
 
-		//////////////// IBL (split-sum approximation) ////////////////
+	vec3 N = vertexNormal;
+	vec3 viewDir = -cameraNormal;                  // fragment -> eye
+	float NdotV = max(dot(N, viewDir), 1.0e-4);
+	vec3 F0 = mix(vec3(0.04), albedo, matMetallic);
+	float cloudT = cloudSunTransmittance();
 
-		vec3 N = vertexNormal;
-		vec3 viewDir = -cameraNormal;                  // fragment -> eye
-		float NdotV = max(dot(N, viewDir), 1.0e-4);
-
-		vec3 F0 = mix(vec3(0.04), albedo, matMetallic);
-
-		// direct lighting (additive), evaluated with a full Cook-Torrance BRDF.
-		// The analytic sun is only added when scene lighting is enabled; for
-		// IBL-only scenes the environment map already carries the key light, so
-		// adding it again would double-count.
-		float cloudT = cloudSunTransmittance();
-
-		vec3 direct = vec3(0.0);
-		if (receiveLight) {
-			if (useDirectSun) {
-				// the sun is what the clouds occlude; scale its contribution by the
-				// projected cloud transmittance so the gaps cast bright dappled light
-				direct += cookTorrance(N, viewDir, sundir, sunlight, albedo, matRoughness, matMetallic, F0) * cloudT;
-			}
-
-			for (int i = 0; i < MAX_LIGHT_COUNT; i++) {
-				if (i >= lightCount) break;
-				vec3 lightRay = lights[i].pos - vertex;
-				float ld = length(lightRay);
-				vec3 L = lightRay / max(ld, 1.0e-4);
-				vec3 radiance = lights[i].color / (1.0 + ld * ld);  // inverse-square falloff
-				direct += cookTorrance(N, viewDir, L, radiance, albedo, matRoughness, matMetallic, F0);
-			}
+	// --- direct lights (sun + analytic point lights) ---
+	vec3 direct = vec3(0.0);
+	if (receiveLight) {
+		if (useDirectSun) {
+			// the sun is what the clouds occlude; scale its contribution by the
+			// projected cloud transmittance so the gaps cast bright dappled light
+			direct += cookTorrance(N, viewDir, sundir, sunlight, albedo, matRoughness, matMetallic, F0) * cloudT;
 		}
 
-		// diffuse ambient from the baked irradiance map
-		vec3 F = fresnelSchlickRoughness(NdotV, F0, matRoughness);
-		vec3 kD = (1.0 - F) * (1.0 - matMetallic);
-		vec3 irradiance = textureCube(irradianceMap, N).rgb * iblColor;
-		vec3 diffuseIBL = irradiance * albedo;
+		for (int i = 0; i < MAX_LIGHT_COUNT; i++) {
+			if (i >= lightCount) break;
+			vec3 lightRay = lights[i].pos - vertex;
+			float ld = length(lightRay);
+			vec3 L = lightRay / max(ld, 1.0e-4);
+			vec3 radiance = lights[i].color / (1.0 + ld * ld);  // inverse-square falloff
+			direct += cookTorrance(N, viewDir, L, radiance, albedo, matRoughness, matMetallic, F0);
+		}
+	}
 
-		// specular ambient: environment cubemap sampled at a roughness-driven
-		// mip, weighted by the analytic environment BRDF
+	// --- indirect: one Fresnel splits diffuse/specular for the environment too ---
+	vec3 F = fresnelSchlickRoughness(NdotV, F0, matRoughness);
+	vec3 kD = (1.0 - F) * (1.0 - matMetallic);
+
+	// indirect diffuse — a SINGLE term: light-probe GI where probes exist,
+	// otherwise the baked IBL irradiance. Probes are baked including the
+	// environment, so adding both would double-count.
+	vec3 indirectDiffuse = vec3(0.0);
+	if (hasProbes) {
+		indirectDiffuse = kD * albedo * evalProbeIrradiance(N, vertex) * probeIntensity;
+	} else if (hasIBL) {
+		indirectDiffuse = kD * albedo * textureCube(irradianceMap, N).rgb * iblColor * iblIntensity;
+	} else {
+		// no probes, no baked IBL: constant-colour environment (SimpleSky) — a
+		// uniform-radiance environment, so every scene has ambient fill.
+		indirectDiffuse = kD * albedo * ambientColor;
+	}
+
+	// indirect specular — prefiltered environment cubemap (per-object refMap or
+	// the scene environment) weighted by the analytic environment BRDF.
+	vec3 indirectSpecular = vec3(0.0);
+	if (refMapType > 0) {
 		vec3 R = reflect(cameraNormal, N);
 		if (refMapType == 2) {
 			R = normalize(correctBoundingBoxIntersect(refMapBox, R));
 		}
 		// Flip X to match the skybox sampling convention (panorama.vert negates
-		// texcoord.x; the refraction lookup below negates cameraNormal.x), so
-		// reflections line up left-right with the visible sky.
+		// texcoord.x) so reflections line up left-right with the visible sky.
 		R.x = -R.x;
 		vec3 prefiltered = textureCube(refMap, R, matRoughness * maxEnvLod).rgb;
 		vec2 ab = envBRDFApprox(NdotV, matRoughness);
-		vec3 specularIBL = prefiltered * (F0 * ab.x + ab.y);
-
-		// ambient (indirect) light is what AO occludes; direct light is not.
-		// Shadowed ground also loses some skylight, so fade the ambient partially
-		// under cloud cover too (weaker than the full sun attenuation).
-		vec3 ambient = (kD * diffuseIBL + specularIBL) * iblIntensity * ao * mix(1.0, cloudT, 0.4);
-
-		finalColor = direct + ambient;
-
-	} else {
-
-		//////////////// Lights (legacy non-IBL path) ////////////////
-
-		if (receiveLight) {
-			// sun + ambient base: albedo modulated by the directional sun term and
-			// globally tinted by the sun/ambient colour. For sun-only scenes (no
-			// point lights) this is identical to the previous behaviour.
-			float vtos = clamp(dot(vertexNormal, sundir), 0.0, 1.0);
-			float cloudT = cloudSunTransmittance();
-			finalColor = finalColor * (0.75 + vtos * 0.25 * cloudT) * sunlight;
-
-			// analytic point lights add their illumination ON TOP of that base,
-			// modulated by the surface albedo — so a warm, bright light (a campfire,
-			// a torch) actually lights nearby surfaces instead of being crushed by a
-			// dim, cold ambient (the old code added the light first and then
-			// multiplied everything by the sun colour, cancelling it out). With the
-			// floating-point scene target this energy can push lit surfaces past 1.0
-			// and spill into the bloom.
-			if (lightCount > 0 || glossy > 0.0) {
-				finalColor += albedo * traceLight(vertexNormal, cameraNormal);
-			}
-		}
-
-		//////////////// RefMap ////////////////
-		float roughdelta = pow(roughness, 10.0);
-
-		vec3 refmapLookup = reflect(cameraNormal, vertexNormal);
-
-		if (refMapType == 2) {
-			refmapLookup = normalize(correctBoundingBoxIntersect(refMapBox, refmapLookup));
-		}
-
-		// Flip X to match the skybox sampling convention (panorama.vert), matching
-		// the refraction lookup below which negates cameraNormal.x.
-		refmapLookup.x = -refmapLookup.x;
-
-		if (glossy > 0.0) {
-			vec3 refColor = textureCube(refMap, refmapLookup, roughdelta).rgb;
-			finalColor = finalColor * (1.0 - glossy) + finalColor * refColor * glossy;
-		}
-
-		//////////////// RefraMap ////////////////
-
-		if (refraction > 0.0) {
-			vec3 refraLookup = refract2(vec3(-cameraNormal.x, cameraNormal.y, cameraNormal.z), vertexNormal, 1.05);
-			vec3 refraColor = textureCube(refMap, refraLookup, roughdelta).rgb;
-			finalColor = finalColor * (1.0 - refraction) + finalColor * refraColor * refraction;
-		}
+		indirectSpecular = prefiltered * (F0 * ab.x + ab.y) * iblIntensity;
 	}
 
-	// //////////////// Light-probe indirect diffuse ////////////////
+	// indirect light is what AO occludes; direct light is not. Ambient also
+	// fades partially under cloud cover (weaker than the full sun attenuation).
+	vec3 ambient = (indirectDiffuse + indirectSpecular) * ao * mix(1.0, cloudT, 0.4);
 
-	if (hasProbes) {
-		vec3 probeIrradiance = evalProbeIrradiance(vertexNormal, vertex);
-		finalColor += albedo * probeIrradiance * probeIntensity * ao;
-	}
+	finalColor = direct + ambient;
 
 	// //////////////// ShadowMap ////////////////
 

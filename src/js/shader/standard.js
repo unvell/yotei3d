@@ -73,6 +73,7 @@ export class StandardShader extends Shader {
 		this.maxEnvLodUniform = this.bindUniform("maxEnvLod", "float");
 		this.exposureUniform = this.bindUniform("exposure", "float");
 		this.iblColorUniform = this.bindUniform("iblColor", "color3");
+		this.ambientColorUniform = this.bindUniform("ambientColor", "color3");
 
 		// light-probe irradiance volume (SH L1)
 		this.hasProbesUniform = this.bindUniform("hasProbes", "bool");
@@ -280,22 +281,30 @@ export class StandardShader extends Shader {
 			this.cloudShadowMapUniform.set(Shader.emptyTexture);
 		}
 
-		// IBL: runtime-baked irradiance (diffuse) + environment cubemap (specular)
-		const iblActive = this.renderer.options.enableEnvmap
-			&& scene._iblIrradianceMap instanceof CubeMap && scene._iblIrradianceMap.loaded
+		// IBL is automatic: active whenever the scene's image-based environment
+		// has been baked into irradiance + specular cubemaps (no enableEnvmap gate).
+		const iblActive = scene._iblIrradianceMap instanceof CubeMap && scene._iblIrradianceMap.loaded
 			&& scene._iblEnvMap instanceof CubeMap && scene._iblEnvMap.loaded;
 
 		this._iblActive = iblActive;
 		this._sceneEnvMap = iblActive ? scene._iblEnvMap : null;
 
+		// These drive the unified ambient path and must be valid every frame —
+		// even for scenes that have only a per-object specular refMap (no baked
+		// irradiance) or only light probes. `hasIBL` gates the *diffuse
+		// irradiance* term specifically; specular keys off refMapType in-shader.
+		this.useDirectSunUniform.set(this.renderer.options.enableLighting !== false);
+		this.iblIntensityUniform.set(typeof scene.iblIntensity === "number" ? scene.iblIntensity : 1.0);
+		this.maxEnvLodUniform.set(typeof scene._iblMaxLod === "number" ? scene._iblMaxLod : 6.0);
+		this.iblColorUniform.set(scene.iblColor || this.defaultIBLColor);
+
+		// constant-colour environment fallback (SimpleSky). [0,0,0] when the
+		// environment is image-based, since IBL irradiance is used instead.
+		this.ambientColorUniform.set(scene.ambientColor || [0, 0, 0]);
+
 		if (iblActive) {
 			this.hasIBLUniform.set(true);
-			this.useDirectSunUniform.set(this.renderer.options.enableLighting !== false);
 			this.irradianceMapUniform.set(scene._iblIrradianceMap);
-			this.iblIntensityUniform.set(typeof scene.iblIntensity === "number" ? scene.iblIntensity : 1.0);
-			this.maxEnvLodUniform.set(typeof scene._iblMaxLod === "number" ? scene._iblMaxLod : 6.0);
-			this.exposureUniform.set(typeof scene.exposure === "number" ? scene.exposure : 1.0);
-			this.iblColorUniform.set(scene.iblColor || this.defaultIBLColor);
 		} else {
 			this.hasIBLUniform.set(false);
 			this.irradianceMapUniform.set(this.emptyCubemap);
@@ -500,8 +509,7 @@ export class StandardShader extends Shader {
 		}
 
 		// refmap
-		if (this.renderer.options.enableEnvmap
-			&& typeof obj.refmap && (obj.refmap instanceof CubeMap) && obj.refmap.loaded) {
+		if (typeof obj.refmap && (obj.refmap instanceof CubeMap) && obj.refmap.loaded) {
 			this.refMapUniform.set(obj.refmap);
 			this.refMapTypeUniform.set(1);
 
@@ -598,8 +606,7 @@ export class StandardShader extends Shader {
 		}
 
 		// refmap
-		if (this.renderer.options.enableEnvmap
-			&& typeof mesh._refmap === "object" && mesh._refmap instanceof CubeMap && mesh._refmap.loaded) {
+		if (typeof mesh._refmap === "object" && mesh._refmap instanceof CubeMap && mesh._refmap.loaded) {
 			this.refMapUniform.set(mesh._refmap);
 			this.refMapTypeUniform.set(1);
 

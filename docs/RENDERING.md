@@ -140,9 +140,19 @@ would make two cameras disagree on scene brightness (Invariant 1).
   Internally stores a normalised direction; no positional `location`.
 - **Probes:** L2 SH (9 coeff) as today, baked from the scene incl. skybox; supply
   indirect diffuse where present (see §2).
-- **Environment (IBL):** diffuse irradiance map + prefiltered specular env + analytic
-  env-BRDF LUT (`envBRDFApprox`) — the existing split-sum implementation is the
-  canonical and only path.
+- **Environment (`scene.environment`):** the single ambient/IBL source.
+  - An **image-based** environment (SkyBox / HDRISkyBox / DynamicSky) is drawn as
+    the background and baked into IBL automatically (diffuse irradiance map +
+    prefiltered specular env + analytic env-BRDF LUT `envBRDFApprox`). There is
+    no `enableEnvmap` flag — IBL is on whenever an image environment exists.
+  - A **`SimpleSky(color)`** is the constant-colour environment (a
+    uniform-radiance / degenerate IBL): it supplies a constant indirect-diffuse
+    irradiance so a scene without a skybox still has ambient fill instead of
+    rendering black. `scene.environment` defaults to a `SimpleSky`.
+  - `scene.skybox` is a legacy alias: it is the image-based environment, or null
+    when the environment is a `SimpleSky`. Assigning it routes through `environment`.
+  - Indirect diffuse resolves to exactly one source: probes → IBL irradiance →
+    SimpleSky ambient (first available wins; never summed).
 
 ---
 
@@ -174,13 +184,19 @@ These are real and agreed, but separate from the lighting axis:
 
 ## 8. Implementation phases (lighting axis)
 
-1. **Camera-owned output.** Add `camera.exposure` / `toneMapping` / `bloom` /
-   `renderScale`; route Stage C from the camera; delete `scene.exposure` &
-   `renderingImage.exposure`; remove `panorama.frag` private exposure.
-2. **Single lighting path.** Make IBL unconditional in `standard.frag`; delete the
-   legacy branch; unify probe + IBL into one indirect-diffuse term; inverse-square
-   point falloff.
-3. **Colour space.** Linearise sRGB albedo/emissive on read; document linear authoring.
-4. **Environment & sun.** Move IBL intensity/tint onto the skybox/environment;
-   `sun.direction`-only; delete `sun.location`.
-5. **Migrate scenes** (floor-walkthrough, pbr, model, …) to the new axis and verify.
+1. ✅ **Camera-owned output.** `camera.exposure` / `gamma` / `toneMapping` /
+   `bloom` / `resolutionRatio`; Stage C routed from the active camera; deleted
+   `scene.exposure` & dead `renderingImage.exposure`. (panorama.frag private
+   exposure removal still pending in a later colour-space pass.)
+2. ✅ **Single lighting path.** IBL unconditional in `standard.frag`; legacy
+   non-IBL branch + `traceLight` deleted; probe/IBL unified into one
+   indirect-diffuse term; inverse-square point falloff. Added `scene.environment`
+   + `SimpleSky` constant-ambient fallback (no scene renders black); `scene.skybox`
+   is now an alias. Removed the `enableEnvmap` flag — IBL is automatic when an
+   image environment exists.
+3. TODO **Colour space.** Linearise sRGB albedo/emissive on read; document linear
+   authoring; remove `panorama.frag` private exposure (skybox through Stage C).
+4. TODO **Environment & sun.** Move IBL intensity/tint onto the environment
+   (`skybox.intensity`); add `sun.direction` / `sun.intensity`; delete
+   `sun.location`; then remove the now-redundant `enableLighting` flag.
+5. TODO **Migrate remaining scenes** to the new axis and verify.

@@ -36,7 +36,6 @@ export class Renderer {
 			enableLighting: true,
 			enableLightmap: true,
 			enableNormalMap: true,
-			enableEnvmap: true,
 			enableHighlightSelectedChildren: true,
 			enableLightProbes: false,
 			enablePostprocess: true,
@@ -747,8 +746,11 @@ export class Renderer {
 	// from the scene's skybox. Re-bakes only when the source environment
 	// cubemap changes, so this is effectively a one-time cost per skybox.
 	updateIBL(scene) {
-		if (!scene || !this.options.enableEnvmap) return;
+		if (!scene) return;
 
+		// IBL bakes automatically from the scene's image-based environment
+		// (scene.skybox aliases it); a SimpleSky environment has no cubemap and
+		// falls through to the constant ambient instead.
 		const sky = scene.skybox;
 		const src = (sky && sky.loaded && sky.cubemap && sky.cubemap.loaded) ? sky.cubemap : null;
 
