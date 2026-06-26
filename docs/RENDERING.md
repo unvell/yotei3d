@@ -158,8 +158,9 @@ would make two cameras disagree on scene brightness (Invariant 1).
     internal `options.backColor` mirror feeds the clear + fog-fallback paths.)
   - Indirect diffuse resolves to exactly one source: probes → IBL irradiance →
     SimpleSky ambient (first available wins; never summed).
-  - Sky brightness knobs: `camera.exposure` (whole image), `skybox.mat.color`
-    (drawn cubemap only), `skybox.intensity` / `.tint` (IBL on objects only).
+  - Sky brightness knobs: `camera.exposure` (whole image),
+    `scene.environment.mat.color` (drawn cubemap only),
+    `scene.environment.intensity` / `.tint` (IBL on objects only).
 
 ---
 
