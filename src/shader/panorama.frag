@@ -4,11 +4,8 @@ precision highp float;
 uniform samplerCube texture;
 uniform vec3 color;
 
-// > 0 enables exposure tone mapping, so an HDR sky's highlights roll off to
-// 1.0 instead of hard-clipping to white. Matches standard.frag's tonemap() so
-// the background stays consistent with lit/reflective objects. Left at 0 for
-// ordinary LDR cubemap skyboxes (unchanged passthrough).
-uniform float hdrExposure;
+// true: linear HDR panorama (already linear); false: sRGB LDR cubemap (decode).
+uniform bool hdrSource;
 
 // Horizon haze: melt the lower band of the sky into the scene's fog colour so a
 // fogged ground/ocean plane and the sky meet at the same colour instead of a
@@ -26,7 +23,12 @@ varying vec3 texcoord;
 
 void main(void) {
 
-	vec3 fcolor = textureCube(texture, texcoord).rgb * color;
+	// Bring the sky into linear-HDR space so it shares the scene's single
+	// tone-map/encode in the final screen pass (docs/RENDERING.md §2 Stage B/C).
+	// HDR panoramas are already linear; sRGB LDR cube faces are decoded.
+	vec3 sky = textureCube(texture, texcoord).rgb;
+	if (!hdrSource) sky = pow(sky, vec3(2.2));
+	vec3 fcolor = sky * color;
 
 	// Blend toward the haze colour in linear space, before tone mapping, so the
 	// lower sky goes through the same exposure roll-off as the ocean's linear
@@ -35,10 +37,6 @@ void main(void) {
 		vec3 dir = normalize(texcoord);
 		float h = 1.0 - smoothstep(skyFogLower, skyFogUpper, dir.y);
 		fcolor = mix(fcolor, skyFogColor, clamp(h, 0.0, 1.0) * skyFogDensity);
-	}
-
-	if (hdrExposure > 0.0) {
-		fcolor = vec3(1.0) - exp(-fcolor * hdrExposure);
 	}
 
 	gl_FragColor = vec4(fcolor, 1.0);

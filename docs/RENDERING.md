@@ -194,11 +194,12 @@ These are real and agreed, but separate from the lighting axis:
    + `SimpleSky` constant-ambient fallback (no scene renders black); `scene.skybox`
    is now an alias. Removed the `enableEnvmap` flag — IBL is automatic when an
    image environment exists.
-3. ⚠️ DEFERRED **Colour space.** Linearising sRGB albedo/emissive + a proper
-   linear→sRGB output encode + filmic ACES tonemap is correct, but it re-tunes
-   every scene's exposure (the right values shift ~6× and in opposite directions
-   per scene's HDR range) and flips the meaning of the gamma knob. It needs a
-   per-scene art-review pass, so it is NOT landed blind. (Attempted and reverted.)
+3. ✅ **Colour space.** sRGB albedo/material-colour/emissive decoded to linear on
+   read; sky decoded LDR-only (HDR panoramas already linear); single linear→sRGB
+   display encode (`camera.gamma` = display gamma, default 2.2); filmic ACES
+   tonemap replaces the exponential curve; `panorama.frag` private exposure
+   removed (skybox through Stage C). The pipeline re-tunes scene brightness, so
+   exposures were re-tuned per scene (ongoing art pass with Jingwood).
 4. ✅ **Environment & sun.** IBL intensity/tint read from the environment
    (`scene.environment.intensity` / `.tint`, falling back to legacy scene values);
    `sun.direction` is canonical and `sun.intensity` added (0 = no direct sun).

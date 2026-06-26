@@ -138,6 +138,14 @@ vec3 gamma(vec3 c, float factor) {
 	return pow(c, vec3(factor));
 }
 
+// Filmic ACES tonemap (Narkowicz 2015 approximation). Maps linear HDR to a
+// displayable range while holding highlights far better than a plain
+// exponential, so bright skies/IBL roll off instead of washing to white.
+vec3 acesToneMap(vec3 x) {
+	const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+	return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 vec3 lighter(vec3 a, vec3 b, float factor) {
 	vec3 d = clamp(b - a, 0.0, 1.0);
 	return a + d * factor;
@@ -172,11 +180,14 @@ void main(void) {
 	}
 
 	if (toneMap) {
-		// exposure-based exponential tonemap (matches the standard shader's curve)
-		fc.rgb = vec3(1.0) - exp(-fc.rgb * exposure);
+		// apply camera exposure, then the filmic ACES curve (linear HDR -> [0,1])
+		fc.rgb = acesToneMap(fc.rgb * exposure);
 	}
 
-	fc.rgb = gamma(fc.rgb, gammaFactor);
+	// Display encode: linear -> sRGB(ish). gammaFactor is the display gamma
+	// (camera.gamma, default 2.2), so the encode is pow(c, 1/gamma). Intermediate
+	// pipeline nodes pass gammaFactor = 1.0 to stay linear.
+	fc.rgb = gamma(fc.rgb, 1.0 / gammaFactor);
   fc.a = alpha;
  
 	gl_FragColor = fc;

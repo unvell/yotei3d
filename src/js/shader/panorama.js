@@ -21,7 +21,7 @@ export class PanoramaShader extends Shader {
 
 		this.textureUniform = this.bindUniform("texture", "tex", 0);
 		this.colorUniform = this.bindUniform("color", "color3");
-		this.hdrExposureUniform = this.bindUniform("hdrExposure", "float");
+		this.hdrSourceUniform = this.bindUniform("hdrSource", "bool");
 
 		// horizon haze (scene.skyFog) — fades the lower sky into the fog colour
 		this.hasSkyFogUniform = this.bindUniform("hasSkyFog", "bool");
@@ -100,14 +100,11 @@ export class PanoramaShader extends Shader {
       this.textureUniform.set(this.emptyCubemap);
 		}
 
-		// HDR skies carry values > 1, so tone-map them with the scene exposure to
-		// stay consistent with lit objects. LDR cubemaps pass through unchanged.
+		// Colour-space of the sky source: HDR panoramas are already linear float;
+		// LDR cubemap faces are sRGB and get decoded to linear in the shader. Both
+		// are then tone-mapped + encoded once in the final screen pass.
 		const scene = this.renderer.currentScene;
-		let hdrExposure = 0.0;
-		if (texture && texture.hdr) {
-			hdrExposure = (scene && typeof scene.exposure === "number") ? scene.exposure : 1.0;
-		}
-		this.hdrExposureUniform.set(hdrExposure);
+		this.hdrSourceUniform.set(!!(texture && texture.hdr));
 
 		// Horizon haze: opt-in via scene.skyFog. Defaults its colour to the
 		// scene fog colour (or the renderer back colour) so it matches a fogged

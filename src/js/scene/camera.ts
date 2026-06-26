@@ -89,7 +89,7 @@ export class Camera extends SceneObject {
 
     // output / post defaults (see docs/RENDERING.md §4)
     this.exposure = 1.0;
-    this.gamma = 1.0;
+    this.gamma = 2.2;   // display gamma; final encode is pow(c, 1/gamma) ~ sRGB
     this.toneMapping = 'auto';
     this.bloom = {
       enabled: true,

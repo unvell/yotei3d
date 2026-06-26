@@ -1034,7 +1034,9 @@ export class Renderer {
 		const be = this.options.bloomEffect || {};
 
 		if (typeof ri.exposure === "number") camera.exposure = ri.exposure;
-		if (typeof ri.gamma === "number") camera.gamma = ri.gamma;
+		// NOTE: renderingImage.gamma is intentionally NOT seeded — it used to be an
+		// artistic post-darkening; the camera now does a proper linear->sRGB encode
+		// (camera.gamma is the display gamma, default 2.2).
 		if (typeof ri.resolutionRatio === "number") camera._resolutionRatio = ri.resolutionRatio;
 
 		if (typeof be.enabled === "boolean") camera.bloom.enabled = be.enabled;

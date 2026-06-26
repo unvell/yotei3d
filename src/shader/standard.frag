@@ -253,6 +253,9 @@ void main(void) {
 
 	vec2 uv1 = texcoord1 * texTiling;
 	vec4 textureColor = texture2D(texture, uv1);
+	// Albedo textures are authored sRGB; decode to linear before lighting math
+	// (docs/RENDERING.md §3). Alpha is not a colour and stays linear.
+	textureColor.rgb = pow(textureColor.rgb, vec3(2.2));
 
 	float alpha = opacity * textureColor.a;
 	if (alpha < 0.01){
@@ -269,7 +272,9 @@ void main(void) {
 
 	vec3 cameraRay = vertex - cameraLoc;
 	vec3 cameraNormal = normalize(cameraRay);
-	vec3 finalColor = color * textureColor.rgb;
+	// Material base `color` is authored sRGB (colour-picker space), same as the
+	// albedo texture; decode to linear so the final sRGB encode round-trips it.
+	vec3 finalColor = pow(color, vec3(2.2)) * textureColor.rgb;
 
 	//////////////// LightMap ////////////////
 
@@ -422,9 +427,9 @@ void main(void) {
 	// glTF emissive channel and is always added.
 	finalColor += albedo * emission;
 
-	vec3 emissive = emissiveColor;
+	vec3 emissive = pow(emissiveColor, vec3(2.2));   // sRGB emissive factor -> linear
 	if (hasEmissiveMap) {
-		emissive *= texture2D(emissiveMap, uv1).rgb;
+		emissive *= pow(texture2D(emissiveMap, uv1).rgb, vec3(2.2));   // sRGB -> linear
 	}
 	finalColor += emissive;
 

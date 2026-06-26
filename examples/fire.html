@@ -28,6 +28,7 @@
 
       const scene = renderer.createScene();
       window._scene = scene;
+      scene.mainCamera.exposure = 0.5;   // keep the HDR flame from blowing to white
 
       // ---- dark earth ----
       const ground = new Shapes.Plane();
