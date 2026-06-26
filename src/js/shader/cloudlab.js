@@ -1,4 +1,5 @@
 
+import { Matrix4 } from "@/math";
 import { Shader } from '../webgl/shader.js';
 
 // CloudLab — learning-oriented volumetric cloud sandbox shaders (see CloudLab in
@@ -53,6 +54,7 @@ export class CloudViewShader extends Shader {
 		this.vertexPositionAttribute = this.findAttribute("vertexPosition");
 
 		this.invViewProjUniform = this.bindUniform("uInvViewProj", "mat4");
+		this.invModelUniform = this.bindUniform("uInvModel", "mat4");
 		this.cameraPosUniform = this.bindUniform("uCameraPos", "vec3");
 		this.boxMinUniform = this.bindUniform("uBoxMin", "vec3");
 		this.boxMaxUniform = this.bindUniform("uBoxMax", "vec3");
@@ -80,6 +82,12 @@ export class CloudViewShader extends Shader {
 		this.invViewProjUniform.set(r.projectionViewMatrix.inverse());
 		const cam = driver.scene.mainCamera;
 		this.cameraPosUniform.set(cam ? cam.worldLocation : [0, 0, 0]);
+
+		// world -> volume-local: the inverse of the transform object's rotation,
+		// so dragging (which spins that object) rotates the cloud. Rotation-only
+		// keeps the matrix orthonormal, so ray distances / dt stay correct.
+		const tob = driver.transformObject;
+		this.invModelUniform.set(tob ? tob.getRotationMatrix(true).inverse() : Matrix4.Identity);
 
 		this.boxMinUniform.set(driver.boxMin);
 		this.boxMaxUniform.set(driver.boxMax);

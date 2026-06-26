@@ -18,8 +18,9 @@ in vec2 vNdc;
 out vec4 fragColor;
 
 uniform mat4  uInvViewProj;   // clip -> world
+uniform mat4  uInvModel;      // world -> volume-local（pivot 回転の逆）。雲を回す
 uniform vec3  uCameraPos;
-uniform vec3  uBoxMin;        // 雲ボックスのワールド AABB（cell[0,1]^3 の対応箱）
+uniform vec3  uBoxMin;        // 雲ボックスのローカル AABB（cell[0,1]^3 の対応箱）
 uniform vec3  uBoxMax;
 uniform sampler3D uVolume;    // ベイクした密度（.r）
 uniform float uSigma;         // 消散係数スケール（雲の濃さ）
@@ -51,11 +52,18 @@ void main(void) {
 	vec3 ro = uCameraPos;
 	vec3 rd = normalize(farW.xyz - nearW.xyz);
 
-	// 背景の空（視線の仰角で上下グラデ）
+	// 背景の空（視線の仰角で上下グラデ）。空はワールド固定なので回さない。
 	vec3 sky = mix(uSkyBottom, uSkyTop, clamp(rd.y * 0.5 + 0.5, 0.0, 1.0));
 
-	// --- レイ vs 雲ボックス ---
-	vec2 tHit = intersectBox(ro, rd, uBoxMin, uBoxMax);
+	// --- レイをボリュームのローカル空間へ変換（pivot の回転を雲に適用）---
+	// uInvModel は world->local（pivot 回転の逆）。ボックス中心まわりで回したい
+	// ので、中心を引いてから回転し、戻す。回転のみなので距離・dt は保たれる。
+	vec3 boxC = (uBoxMin + uBoxMax) * 0.5;
+	vec3 roL = (uInvModel * vec4(ro - boxC, 1.0)).xyz + boxC;
+	vec3 rdL = (uInvModel * vec4(rd, 0.0)).xyz;
+
+	// --- レイ vs 雲ボックス（以降はすべてローカル空間で進める）---
+	vec2 tHit = intersectBox(roL, rdL, uBoxMin, uBoxMax);
 	float tEnter = max(tHit.x, 0.0);
 	float tExit  = tHit.y;
 	if (tExit <= tEnter) { fragColor = vec4(sky, 1.0); return; }   // 箱に当たらない
@@ -73,8 +81,8 @@ void main(void) {
 	for (int i = 0; i < 256; i++) {
 		if (i >= uSteps || transmittance < 0.01) break;   // 不透明になったら打ち切り
 
-		vec3 p = ro + rd * t;
-		vec3 cell = (p - uBoxMin) / boxSize;     // world -> [0,1]^3
+		vec3 p = roL + rdL * t;                   // local-space march position
+		vec3 cell = (p - uBoxMin) / boxSize;     // local -> [0,1]^3
 		float d = texture(uVolume, cell).r;      // 補間付きの密度フェッチ
 
 		if (d > 0.0) {

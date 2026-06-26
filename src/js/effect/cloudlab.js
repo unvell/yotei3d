@@ -43,6 +43,11 @@ export class CloudLab {
 		});
 		this._target = new Volume3DTarget(r);
 
+		// Optional SceneObject whose rotation is applied to the cloud (so you can
+		// spin the volume and inspect how it's filled in 3D). The viewer marches
+		// in this object's local frame via the inverse of its rotation matrix.
+		this.transformObject = options.transformObject || null;
+
 		// --- world-space box the volume maps onto (cell [0,1]^3 -> this AABB) ---
 		const s = numberOr(options.size, 2.0);
 		const c = options.center || [0, 0, 0];
