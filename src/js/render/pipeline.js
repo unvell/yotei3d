@@ -194,6 +194,17 @@ export class ImageToScreenRenderer extends PipelineNode {
 
       const imageShader = this.shader;
 
+      // Camera-owned 2D post stage: the active camera drives exposure / gamma /
+      // bloom intensity / tone-map per-frame (see docs/RENDERING.md §4). Falls
+      // back to the node's own fields when no camera is active.
+      const cam = this.cameraControlled ? this.renderer.activeCamera : null;
+      if (cam) {
+        this.gammaFactor = (typeof cam.gamma === "number") ? cam.gamma : 1.0;
+        if (cam.bloom && typeof cam.bloom.intensity === "number") {
+          this.tex2Intensity = cam.bloom.intensity;
+        }
+      }
+
       if (this.tex2Input) {
         this.tex2Input.process();
         imageShader.tex2 = this.tex2Input.output;
@@ -214,11 +225,17 @@ export class ImageToScreenRenderer extends PipelineNode {
         imageShader.gammaFactor = this.gammaFactor;
       }
 
-      // HDR final resolve: tonemap (with the scene's exposure) when the scene
-      // was rendered into a floating-point target.
-      imageShader.toneMap = !!this.toneMap;
-      const scene = this.renderer.currentScene;
-      imageShader.exposure = (scene && typeof scene.exposure === "number") ? scene.exposure : 1.0;
+      // HDR final resolve: tone-map (with the camera's exposure) when the scene
+      // was rendered into a floating-point target. Exposure & tone-map enable
+      // come from the active camera; 'none' disables tone-mapping.
+      if (cam) {
+        imageShader.exposure = (typeof cam.exposure === "number") ? cam.exposure : 1.0;
+        imageShader.toneMap = !!this.toneMap && cam.toneMapping !== "none";
+      } else {
+        imageShader.toneMap = !!this.toneMap;
+        const scene = this.renderer.currentScene;
+        imageShader.exposure = (scene && typeof scene.exposure === "number") ? scene.exposure : 1.0;
+      }
 
       this.renderer.setGLViewportSize(this.width, this.height);
       // this.renderer.setGLViewportSize(this.renderer.renderLogicalSize.width,

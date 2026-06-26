@@ -12,7 +12,7 @@
 
       const renderer = new Renderer({
         enableLighting: false,
-        backColor: [0.96, .98, 1],
+        backColor: [0.96, 0.95, 0.92],
         
         enablePostprocess: true,
         enableAntialias: true,
@@ -29,10 +29,11 @@
         },
         bloomEffect: {
           threshold: 0.3,
-          gamma: 1.4,
+          gamma: 1.2,
         },
         renderingImage: {
-          gamma: 1.0,
+          gamma: 1.2,
+          exposure: 1.5,
           resolutionRatio: 1,
         },
       });
@@ -43,7 +44,7 @@
 
       // light-probe indirect-diffuse strength (kept modest; the office is
       // already brightly lit by the glossy reflection cubemap + window sky)
-      scene.probeIntensity = 0.5;
+      scene.probeIntensity = 1.0;
 
       // Place a probe volume over the loaded floor's world bounds and bake.
       // Probes sit in two height layers covering the walk-through / furniture
@@ -60,7 +61,7 @@
 
       // used when enableEnvmap is true
       // scene.iblIntensity = 2.5;
-      // scene.exposure = 1.5;
+      // scene.mainCamera.exposure = 1.5;
       // scene.iblColor = [1.15, 1.0, 0.9];
 
       let rootObj, refCubebox;

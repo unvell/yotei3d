@@ -95,6 +95,8 @@ export class Matrix4 {
   invertInPlace(): Matrix4;
   transpose(): Matrix4;
   transposeInPlace(): Matrix4;
+  equals(m: Matrix4): boolean;
+  approxiEquals(m: Matrix4, epsilon?: number): boolean;
   translate(x: number, y: number, z: number): Matrix4;
   rotate(x: number | Vec3, y?: number, z?: number, order?: string): Matrix4;
   rotateX(angle: number): Matrix4;

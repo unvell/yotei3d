@@ -42,6 +42,20 @@ export class Camera extends SceneObject {
   renderTexture: any;
   filters: any[];
 
+  // --- Output / post-processing (camera owns the "how the scene is viewed"
+  // half of the pipeline; see docs/RENDERING.md). Scene radiance is rendered
+  // linear-HDR; these control the single 2D post chain that resolves it. ---
+  exposure: number;             // linear-HDR multiplier before tone-map
+  gamma: number;                // display-encode factor (pow(c, gamma))
+  toneMapping: string;          // 'auto' (tone-map when HDR target) | 'none'
+  bloom: {
+    enabled: boolean;
+    intensity: number;          // composite weight of the blurred bright-pass
+    threshold: number;          // bloom buffer resolution scale (build-time)
+    luminanceThreshold: number; // HDR bright-pass cutoff
+  };
+  _resolutionRatio: number;     // 3D HDR render scale (0.5 = half-res, cheap)
+
   static meshInstance: CameraMesh | null = null;
 
   constructor() {
@@ -72,6 +86,32 @@ export class Camera extends SceneObject {
 
     // post process filters
     this.filters = [];
+
+    // output / post defaults (see docs/RENDERING.md §4)
+    this.exposure = 1.0;
+    this.gamma = 1.0;
+    this.toneMapping = 'auto';
+    this.bloom = {
+      enabled: true,
+      intensity: 0.35,
+      threshold: 0.1,
+      luminanceThreshold: 1.0,
+    };
+    this._resolutionRatio = 1.0;
+  }
+
+  // 3D render scale. Changing it resizes the HDR pipeline targets, so the
+  // pipeline must be rebuilt — done here when the camera is attached to a scene.
+  get resolutionRatio(): number { return this._resolutionRatio; }
+  set resolutionRatio(v: number) {
+    if (this._resolutionRatio !== v) {
+      this._resolutionRatio = v;
+      const renderer = this.scene && this.scene.renderer;
+      if (renderer && typeof renderer.createPipeline === 'function') {
+        renderer.createPipeline();
+        this.scene.requireUpdateFrame();
+      }
+    }
   }
 
   calcVisibleDistanceToObject(obj: any, out?: any): number {

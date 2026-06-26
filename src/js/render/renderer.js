@@ -522,8 +522,17 @@ export class Renderer {
 	createPipeline() {
 		this.pipelineNodes = [];
 
-		const renderImageWidth = this.renderPhysicalSize.width * (this.options.renderingImage.resolutionRatio || 1.0),
-			renderImageHeight = this.renderPhysicalSize.height * (this.options.renderingImage.resolutionRatio || 1.0);
+		// Build-time params come from the active camera (runtime owner); at init
+		// no scene/camera exists yet, so fall back to the constructor options.
+		// Changing camera.resolutionRatio rebuilds the pipeline (see Camera).
+		const cam = this.activeCamera;
+		const resolutionRatio = (cam && typeof cam.resolutionRatio === "number")
+			? cam.resolutionRatio
+			: (this.options.renderingImage.resolutionRatio || 1.0);
+		const bloomCfg = (cam && cam.bloom) ? cam.bloom : (this.options.bloomEffect || {});
+
+		const renderImageWidth = this.renderPhysicalSize.width * resolutionRatio,
+			renderImageHeight = this.renderPhysicalSize.height * resolutionRatio;
 
 		if (this.options.backgroundImage) {
 			this.createTextureFromURL(this.options.backgroundImage, tex => {
@@ -579,19 +588,19 @@ export class Renderer {
 			let bloomBlurNode;
 
 			if (this.options.enablePostprocess !== false
-				&& (!this.options.bloomEffect || this.options.bloomEffect.enabled !== false)
+				&& (bloomCfg.enabled !== false)
 			) {
 				const bloomSmallImageNode = new ImageFilterRenderer(this, {
-					width: width * (this.options.bloomEffect.threshold || 0.1),
-					height: height * (this.options.bloomEffect.threshold || 0.1),
+					width: width * (bloomCfg.threshold || 0.1),
+					height: height * (bloomCfg.threshold || 0.1),
 					flipTexcoordY: true,
 					filter: "light-pass",
 					float: this.extHDR,
 				});
 				bloomSmallImageNode.gammaFactor = 1.0;   // bloom is gathered in linear space
 				bloomSmallImageNode.bloomThreshold = this.extHDR
-					? ((typeof this.options.bloomEffect.luminanceThreshold === "number")
-						? this.options.bloomEffect.luminanceThreshold : 1.0)
+					? ((typeof bloomCfg.luminanceThreshold === "number")
+						? bloomCfg.luminanceThreshold : 1.0)
 					: 0.7;   // LDR fallback: threshold near-white pixels like before
 				bloomSmallImageNode.input = sceneImageRenderer;
 
@@ -654,8 +663,10 @@ export class Renderer {
 			}
 
 
-			const bloomIntensity = (this.options.bloomEffect && typeof this.options.bloomEffect.intensity === "number")
-				? this.options.bloomEffect.intensity : 0.35;
+			// Initial bloom weight; when the final node is camera-controlled this is
+			// refreshed per-frame from camera.bloom.intensity (see pipeline.js).
+			const bloomIntensity = (typeof bloomCfg.intensity === "number")
+				? bloomCfg.intensity : 0.35;
 
 			// final render
 			if (this.options.pipelinePreview) {
@@ -670,6 +681,7 @@ export class Renderer {
 				finalImagePreviewRenderer.input = ssaoEffectRenderer;
 				finalImagePreviewRenderer.tex2Input = bloomBlurNode;
 				finalImagePreviewRenderer.gammaFactor = this.options.renderingImage.gamma;
+				finalImagePreviewRenderer.cameraControlled = true;
 				finalImagePreviewRenderer.enableAntialias = this.options.enableAntialias;
 
 				// previewRenderer.addPreview(finalImagePreviewRenderer);
@@ -688,10 +700,12 @@ export class Renderer {
 				finalScreenRenderer.tex2Input = bloomBlurNode;
 				finalScreenRenderer.tex2Intensity = bloomIntensity;
 				finalScreenRenderer.gammaFactor = this.options.renderingImage.gamma;
+				// The final resolve is the camera-owned 2D post stage: exposure,
+				// gamma, bloom intensity and tone-map are pulled per-frame from the
+				// active camera (see pipeline.js). HDR tone-map still requires a
+				// floating-point scene target, else the colour is already LDR.
+				finalScreenRenderer.cameraControlled = true;
 				finalScreenRenderer.enableAntialias = this.options.enableAntialias;
-				// HDR scene → tonemap on the way to the 8-bit screen. Only when the
-				// scene target is actually floating-point; otherwise the colour is
-				// already LDR and tonemapping would just darken it.
 				finalScreenRenderer.toneMap = !!this.extHDR;
 				this.pipelineNodes.push(finalScreenRenderer);
 			}
@@ -997,8 +1011,35 @@ export class Renderer {
 		}
 	}
 
+	// The camera driving the main pass — owner of exposure/tone-map/bloom/
+	// resolution (see docs/RENDERING.md §4). Null before a scene is shown.
+	get activeCamera() {
+		return this.currentScene ? this.currentScene.mainCamera : null;
+	}
+
 	createScene() {
-		return new Scene(this)
+		const scene = new Scene(this);
+		this.seedCameraOutput(scene.mainCamera);
+		return scene;
+	}
+
+	// Seed a camera's output/post params from the legacy Renderer constructor
+	// options. The options are now just construction-time defaults; the camera
+	// is the runtime source of truth. This is also what revives the previously
+	// dead `renderingImage.exposure` (it now lands on camera.exposure).
+	seedCameraOutput(camera) {
+		if (!camera) return;
+		const ri = this.options.renderingImage || {};
+		const be = this.options.bloomEffect || {};
+
+		if (typeof ri.exposure === "number") camera.exposure = ri.exposure;
+		if (typeof ri.gamma === "number") camera.gamma = ri.gamma;
+		if (typeof ri.resolutionRatio === "number") camera._resolutionRatio = ri.resolutionRatio;
+
+		if (typeof be.enabled === "boolean") camera.bloom.enabled = be.enabled;
+		if (typeof be.intensity === "number") camera.bloom.intensity = be.intensity;
+		if (typeof be.threshold === "number") camera.bloom.threshold = be.threshold;
+		if (typeof be.luminanceThreshold === "number") camera.bloom.luminanceThreshold = be.luminanceThreshold;
 	}
 
 	createScene2D() {
