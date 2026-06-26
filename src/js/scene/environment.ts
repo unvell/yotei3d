@@ -1,33 +1,46 @@
 import { Color3 } from "@/math";
 
+function toColor3(c: any): Color3 {
+  if (c instanceof Color3) return c;
+  if (Array.isArray(c)) return new Color3(c[0], c[1], c[2]);
+  return new Color3(c.r, c.g, c.b);
+}
+
 /**
- * The scene environment — the single source of ambient/indirect light
- * (see docs/RENDERING.md §2). A scene's `environment` is either:
+ * The scene environment — the single source of ambient/indirect light AND the
+ * background you see when looking past the geometry (see docs/RENDERING.md §2).
+ * A scene's `environment` is either:
  *
- *   - an image-based sky (SkyBox / HDRISkyBox / DynamicSky …): drawn as the
+ *   - an image-based sky (SkyBox / HDRSkyBox / DynamicSky): drawn as the cubemap
  *     background and baked into IBL (diffuse irradiance + prefiltered specular);
- *   - a `SimpleSky`: a constant-colour environment — the uniform-radiance
- *     (degenerate) IBL used when there is no image sky, so a scene is never
- *     pitch black just because it has no skybox.
+ *   - a `SimpleSky`: a constant-colour environment — a uniform-radiance
+ *     (degenerate) IBL that lights the scene AND fills the background, optionally
+ *     with a background image. Used when there is no image sky, so a scene is
+ *     never pitch black / undefined just because it has no skybox.
  *
- * `scene.environment` defaults to a `SimpleSky`. Assigning an image sky (or the
- * legacy `scene.skybox = …`) switches the scene to real IBL.
+ * `scene.environment` defaults to a `SimpleSky`. It is the single property —
+ * there is no separate `scene.skybox` / `renderer.backColor` / `backgroundImage`.
  */
 export class SimpleSky {
-  // Marks this as the constant-colour environment (not image-based). The scene
-  // uses this to decide between the ambient-colour fallback and baked IBL.
+  // Not an image sky — the scene uses this to choose between the ambient-colour
+  // fallback + flat background and a baked cubemap.
   readonly isImageBased = false;
 
+  // ambient (indirect-diffuse) irradiance + its scalar strength
   color: Color3;
   intensity: number;
 
-  constructor(color: any = [0.5, 0.52, 0.58], intensity = 1.0) {
-    this.color = (color instanceof Color3) ? color
-      : new Color3(
-        Array.isArray(color) ? color[0] : color.r,
-        Array.isArray(color) ? color[1] : color.g,
-        Array.isArray(color) ? color[2] : color.b);
-    this.intensity = intensity;
+  // background: a flat fill colour drawn behind the scene, and/or an image.
+  // Separate from `color` so a scene can have e.g. a light backdrop with modest
+  // ambient. Both are rendered through the scene's single tone-map/encode.
+  background: Color3;
+  backgroundImage: string | null;
+
+  constructor(color: any = [0.5, 0.52, 0.58], options: any = {}) {
+    this.color = toColor3(color);
+    this.intensity = (typeof options.intensity === "number") ? options.intensity : 1.0;
+    this.background = options.background ? toColor3(options.background) : new Color3(0.93, 0.93, 0.93);
+    this.backgroundImage = options.backgroundImage || null;
   }
 
   // The constant indirect-diffuse irradiance the standard shader applies when

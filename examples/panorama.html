@@ -39,7 +39,7 @@
     const skybox = new SkyBox(renderer, skyImageUrls);
 
     // scene can has only one sky box
-    scene.skybox = skybox;
+    scene.environment = skybox;
 
     new TouchController(scene);
 

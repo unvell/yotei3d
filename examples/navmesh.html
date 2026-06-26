@@ -7,12 +7,10 @@
 	<script type="module">
       
     import { MathFunctions } from "@/math";
-    import { Renderer, ModelViewer, Keys, SceneObject, Shapes, CollisionModes } from "@";
+    import { Renderer, ModelViewer, Keys, SceneObject, Shapes, CollisionModes, SimpleSky } from "@";
 
     window.addEventListener('load', function() {
       const renderer = new Renderer({
-        backColor: [.05, .05, .2, 1],
-        backgroundImage: "/textures/bg-gray-gradient.jpg",
         enableShadow: true,
         enableSSAO: true,
         shadowQuality: {
@@ -25,6 +23,12 @@
       });
 
       const scene = renderer.createScene();
+
+      // The environment owns the ambient light AND the background (colour + image).
+      scene.environment = new SimpleSky([0.5, 0.52, 0.58], {
+        background: [.05, .05, .2],
+        backgroundImage: "/textures/bg-gray-gradient.jpg",
+      });
 
       let navmesh = scene.createObjectFromManifest({
         mesh: "/models/navmesh.mesh",
@@ -79,42 +83,44 @@
 
       scene.add(sphere);
       
-      scene.sun.direction = [0, 5, 0];
       
       let dirx = 0, diry = 0;
       scene.onmousemove = function(e) {
         dirx += e.movement.x * 0.001;
         diry += e.movement.y * 0.001;
-
+        
         dirx = MathFunctions.clamp(dirx, -0.1, 0.1);
         diry = MathFunctions.clamp(diry, -0.1, 0.1);
-
+        
         modelViewer.viewer.angle.x = -(renderer.renderSize.height * 0.5 - e.position.y) * 0.02;
         modelViewer.viewer.angle.z = (renderer.renderSize.width * 0.5 - e.position.x) * 0.01;
       };
-
+      
       setInterval(function() {
         if (!sphere.move(dirx, 0, diry)) {
           dirx = 0; diry = 0;
         }
-
+        
         if (renderer.viewer.pressedKeys.has(Keys.Up)) {
           diry = -0.05;
         } else if (renderer.viewer.pressedKeys.has(Keys.Down)) {
           diry = 0.05;
         }
-
+        
         if (renderer.viewer.pressedKeys.has(Keys.Left)) {
           dirx = -0.05;
         } else if (renderer.viewer.pressedKeys.has(Keys.Right)) {
           dirx = 0.05;
         }
       }, 10);
+      
+      scene.sun.direction = [0, 5, 0];
 
       scene.mainCamera.fieldOfView = 50;
       scene.mainCamera.location.set(0, 10, 10);
       scene.mainCamera.angle.set(-50, 0, 0);
-
+      scene.mainCamera.exposure = 1;
+      
       const modelViewer = new ModelViewer(scene);
       modelViewer.viewer.angle.x = 10;
       modelViewer.minRotateX = -40;

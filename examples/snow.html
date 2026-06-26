@@ -6,7 +6,7 @@
 	<link href="css/examples.css" rel="stylesheet" type="text/css" />
 	<script type="module">
 
-    import { Renderer, Shapes, SceneObject, Snow, TouchController } from "@";
+    import { Renderer, Shapes, SceneObject, Snow, TouchController, SimpleSky } from "@";
 
     window.addEventListener("load", function() {
 
@@ -39,9 +39,9 @@
         const r = 0.8 + Math.random() * 2.2;
         s.scale.set(r, r * 0.7, r);
         s.location.set(
-          (Math.random() - 0.5) * 30,
+          (Math.random() - 0.5) * 20,
           -r * 0.35,
-          (Math.random() - 0.5) * 30
+          (Math.random() - 0.5) * 20
         );
         const w = 0.82 + Math.random() * 0.12;
         s.mat.color = [w, w * 1.0, w * 1.02];
@@ -78,9 +78,11 @@
       scene.sun.mat.color = [1.0, 1.0, 1.05];
       scene.sun.intensity = 0;   // ambient-only scene; direction kept for effects
 
+      scene.mainCamera.exposure = 0.5;
+
       scene.mainCamera.fieldOfView = 50;
       scene.mainCamera.location.set(0, 1, 0);
-      scene.mainCamera.angle.set(-6, 0, 0);
+      scene.mainCamera.angle.set(10, 0, 0);
 
       const controller = new TouchController(scene);
 

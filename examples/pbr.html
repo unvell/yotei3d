@@ -27,12 +27,12 @@
       // image-based lighting source: a cubemap skybox. With enableEnvmap on,
       // the renderer bakes a diffuse irradiance map + uses this for specular IBL.
       const baseurl = "/textures/cubemap/office-256/";
-      scene.skybox = new SkyBox(renderer, [
+      scene.environment = new SkyBox(renderer, [
         baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
         baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
       ]);
-      scene.skybox.intensity = 1.0;
-      scene.mainCamera.exposure = 1.0;
+      scene.environment.intensity = 0.7;
+      scene.mainCamera.exposure = 0.7;
 
       // ---- PBR test grid: metallic (rows) x roughness (columns) ----
       // The canonical way to eyeball a PBR pipeline: dielectric->metal top to

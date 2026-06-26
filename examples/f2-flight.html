@@ -49,11 +49,12 @@
       window._scene = scene;
 
       // clear-blue-sky HDRI: lights the jet + serves as the sky background
-      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+      scene.environment = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
         rotation: 115,
       });
-      scene.skybox.intensity = 1.0;
+      scene.environment.mat = { color: [0.1, 0.1, 0.1] };
+      scene.environment.intensity = 0.5;
       scene.mainCamera.exposure = 1.0;
 
       // far clouds and the horizon fade into a pale haze so the sky reads deep
@@ -324,8 +325,8 @@
           follow: scene.sun,
           occluders: [obj],
           color: [0.5, 0.47, 0.47],
-          intensity: 2,         // strength of the ghost chain (reflection discs)
-          coreIntensity: 0.1,   // sun point + starburst + streak — tune separately
+          intensity: 50,         // strength of the ghost chain (reflection discs)
+          coreIntensity: 0.3,   // sun point + starburst + streak — tune separately
           scale: 2.0,
         });
 

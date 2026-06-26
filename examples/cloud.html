@@ -86,13 +86,13 @@
 
       // distance fog: far mounds and the horizon fade into the winter haze.
       // Colour defaults to the background sky if omitted.
-      scene.fog = { near: 24, far: 500 };
+      scene.fog = { near: 100, far: 500 };
 
       // ---- the clouds ----
       const clouds = new Clouds({
         clusters: 100,
         width: 480, depth: 480,
-        height: 54,
+        height: 84,
         heightVariance: 22,
         clusterRadius: 20,
         clusterThickness: 1,
@@ -106,8 +106,8 @@
         groundShadow: true,                 // soft shadows drifting on the grass
         groundTarget: terrain,              // follow the terrain surface (not a fixed height)
         shadowY: 0.6,                       // float just above the ground
-        shadowStrength: 0.34,
-        shadowScale: 1.7,
+        shadowStrength: 0.14,
+        shadowScale: 2.7,
       });
       scene.add(clouds);
 
@@ -120,6 +120,7 @@
       scene.mainCamera.fieldOfView = 70;
       scene.mainCamera.location.set(0, 24, 92);
       scene.mainCamera.angle.set(9, 0, 0);   // a touch of ground so cloud shadows show
+      scene.mainCamera.exposure = 0.3;
 
       const controller = new TouchController(scene);
 

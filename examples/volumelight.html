@@ -19,7 +19,7 @@
         perspective: { method: "persp", angle: 55, near: 0.5, far: 4000 },
         shadowQuality: { scale: 12, viewDepth: 2, resolution: 2048, intensity: 0.5 },
         bloomEffect: { enabled: true, threshold: 0.8, gamma: 1.2, intensity: 0.5 },
-        renderingImage: { gamma: 1.22, resolutionRatio: 1 },
+        renderingImage: { gamma: 2.22, resolutionRatio: 1 },
       });
 
       const scene = renderer.createScene();
@@ -30,12 +30,13 @@
       // reflections. We spin it so its bright quarter sits ahead of the camera,
       // then bleed a warm haze into the lower sky (skyFog) so the horizon the
       // shafts emerge from reads as a sunset rather than flat blue.
-      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+      scene.environment = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
         rotation: 132,
       });
-      scene.skybox.intensity = 1.6;
-      scene.mainCamera.exposure = 1.05;
+      scene.environment.mat = { color: [0.5, 0.5, 0.5] };
+      scene.environment.intensity = 1;
+      scene.mainCamera.exposure = 0.2;
 
       // distance haze so the far towers melt into the glow instead of ending hard
       scene.fog = { near: 10, far: 200, color: [0.62, 0.52, 0.42] };
@@ -121,9 +122,9 @@
         follow: scene.sun,
         occluders: buildings,
         color: [1.0, 0.86, 0.62],
-        intensity: 0.22,       // ghost chain — kept subtle so the shafts lead
-        coreIntensity: 0.7,    // sun point + starburst + streak (a tasteful accent)
-        scale: 1,
+        intensity: 1,       // ghost chain — kept subtle so the shafts lead
+        coreIntensity: 0.5,    // sun point + starburst + streak (a tasteful accent)
+        scale: 2,
       });
       window._lensFlare = lensFlare;
 
@@ -139,7 +140,7 @@
         intensity: 0.1,
         density: 1,   // ray reach (k up to ~2× → long shafts)
         decay: 0.965,    // tail falloff
-        weight: 0.1,
+        weight: 0.3,
         samples: 64,
         sunSize: 1,
       });
@@ -147,8 +148,8 @@
 
       // --- camera: a hero shot looking down the avenue into the sun -----------
       scene.mainCamera.fieldOfView = 55;
-      scene.mainCamera.location.set(0, 15, 120);
-      scene.mainCamera.angle.set(-2.5, 0, 0);
+      scene.mainCamera.location.set(-30, 15, 120);
+      scene.mainCamera.angle.set(2, -10, 0);
 
       // Orbit the city (the controller spins the holder, the sun stays put), so
       // dragging sweeps the skyline across the sun and the shafts re-carve live.

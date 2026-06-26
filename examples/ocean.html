@@ -30,15 +30,16 @@
 
       // --- sky: a cubemap skybox. The renderer bakes IBL from it, and the
       //     ocean reflects this same cubemap (no extra reflection pass). -------
-      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+      scene.environment = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
         rotation: 130,
       });
-      scene.skybox.intensity = 2.5;
-      scene.mainCamera.exposure = 0.7;
+      scene.environment.mat = { color: [0.4, 0.4, 0.4] };
+      scene.environment.intensity = 0.2;
+      scene.mainCamera.exposure = 0.3;
 
       // haze the sea into the horizon so the water plane's far edge is hidden
-      scene.fog = { near: 100, far: 2000, color: [0.34, 0.43, 0.50] };
+      scene.fog = { near: 100, far: 2000, color: [0.24, 0.33, 0.40] };
 
       // ...and bleed the same haze into the bottom of the skybox so the sky and
       // the fogged sea meet at one colour instead of a hard horizon line. The
@@ -115,7 +116,7 @@
       // --- camera + orbit ----------------------------------------------------
       scene.mainCamera.fieldOfView = 60;
       scene.mainCamera.location.set(-100, 10, 60);
-      scene.mainCamera.angle.set(0, -20, 0);
+      scene.mainCamera.angle.set(3, -20, 0);
 
       const controller = new TouchController(scene);
 
@@ -163,9 +164,9 @@
         d.onSplash = (pos, kind, dolphin) => {
           const s = dolphin.options.length / 4;   // scale the burst with the dolphin
           if (kind === "enter") {
-            splash.burst(pos, { count: 130, speed: 13 * s, spread: 0.7, size: [5, 7], life: [0.7, 1.5] });
+            splash.burst(pos, { count: 100, speed: 7 * s, spread: 0.5, size: [3, 5], life: [0.7, 1.5] });
           } else {
-            splash.burst(pos, { count: 110, speed: 10 * s, spread: 0.55, size: [5, 7], life: [0.5, 1.1] });
+            splash.burst(pos, { count: 80, speed: 5 * s, spread: 0.3, size: [3, 5], life: [0.5, 1.1] });
           }
         };
       });

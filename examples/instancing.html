@@ -17,6 +17,8 @@
 
       const scene = renderer.createScene();
 
+      scene.mainCamera.exposure = 0.3;
+
       // sun + distance fog so the far columns fade into the background
       scene.sun.direction = [0.5, 1.0, 0.4];
       scene.sun.mat.color = [1.0, 0.98, 0.92];

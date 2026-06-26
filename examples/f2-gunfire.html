@@ -70,11 +70,12 @@
       window._scene = scene;
 
       // clear-blue-sky HDRI: lights the jet + serves as the sky background
-      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+      scene.environment = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
         faceSize: 1024,
         rotation: 115,
       });
-      scene.skybox.intensity = 1.0;
+      scene.environment.mat = { color: [0.1, 0.1, 0.1] };
+      scene.environment.intensity = 0.5;
       scene.mainCamera.exposure = 1.0;
       scene.fog = { near: 120, far: 1600, color: [0.74, 0.82, 0.92] };
 
@@ -142,7 +143,7 @@
         // sphere radius is 1, so world half-extent = scale. thin across X/Y,
         // stretched along Z into a streak.
         b.scale.set(BULLET_DIAMETER / 2, BULLET_DIAMETER / 2, BULLET_LENGTH / 2);
-        b.mat.color = [1.0, 0.1, 0.1];
+        b.mat.color = [1.0, 0.3, 0.3];
         b.mat.emission = 20.0;            // HDR over-bright → strong bloom streak
         b.mat.additive = true;           // glowing, non-occluding
         b.mat.castLight = false;

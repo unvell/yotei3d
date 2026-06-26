@@ -145,14 +145,21 @@ would make two cameras disagree on scene brightness (Invariant 1).
     the background and baked into IBL automatically (diffuse irradiance map +
     prefiltered specular env + analytic env-BRDF LUT `envBRDFApprox`). There is
     no `enableEnvmap` flag — IBL is on whenever an image environment exists.
-  - A **`SimpleSky(color)`** is the constant-colour environment (a
-    uniform-radiance / degenerate IBL): it supplies a constant indirect-diffuse
-    irradiance so a scene without a skybox still has ambient fill instead of
-    rendering black. `scene.environment` defaults to a `SimpleSky`.
-  - `scene.skybox` is a legacy alias: it is the image-based environment, or null
-    when the environment is a `SimpleSky`. Assigning it routes through `environment`.
+  - A **`SimpleSky(ambientColor, { background, backgroundImage, intensity })`** is
+    the constant-colour environment (a uniform-radiance / degenerate IBL): it
+    supplies a constant indirect-diffuse irradiance so a scene without a skybox
+    still has ambient fill instead of rendering black, AND it owns the background
+    — a flat `background` colour and/or a `backgroundImage`. `scene.environment`
+    defaults to a `SimpleSky`.
+  - **`scene.environment` is the single entry point.** There is no `scene.skybox`,
+    `renderer.backColor`, or `renderer.backgroundImage` in the public API — the
+    environment owns ambient/IBL + background. (`backColor`/`backgroundImage`
+    constructor options still seed the default SimpleSky for convenience, and an
+    internal `options.backColor` mirror feeds the clear + fog-fallback paths.)
   - Indirect diffuse resolves to exactly one source: probes → IBL irradiance →
     SimpleSky ambient (first available wins; never summed).
+  - Sky brightness knobs: `camera.exposure` (whole image), `skybox.mat.color`
+    (drawn cubemap only), `skybox.intensity` / `.tint` (IBL on objects only).
 
 ---
 

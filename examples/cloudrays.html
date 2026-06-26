@@ -27,12 +27,13 @@
       // --- sky -----------------------------------------------------------------
       // A clear-sky HDRI for believable cloud lighting + reflections, with a warm
       // haze bled into the lower sky so the horizon behind the rays reads warm.
-      scene.skybox = new HDRSkyBox(renderer, "/textures/hdr/kloofendal_48d_partly_cloudy_puresky_4k.hdr", {
+      scene.environment = new HDRSkyBox(renderer, "/textures/hdr/kloofendal_48d_partly_cloudy_puresky_4k.hdr", {
         faceSize: 1024,
         rotation: 130,
       });
-      scene.skybox.intensity = 1.5;
-      scene.mainCamera.exposure = 1.05;
+      scene.environment.mat = { color: [0.5, 0.5, 0.5] };
+      scene.environment.intensity = 1;
+      scene.mainCamera.exposure = 0.2;
 
       scene.fog = { near: 10, far: 1200, color: [0.38, 0.34, 0.20] };
       scene.skyFog = {
@@ -89,7 +90,7 @@
         ghosts: true,         // no chromatic discs — keep the sky clean
         intensity: 1,
         coreIntensity: 0.2,    // sun point + starburst + streak only
-        scale: 2.5,
+        scale: 1.5,
       });
       window._lensFlare = lensFlare;
 
@@ -105,12 +106,12 @@
         // additive 8-bit channels clip at different radii (red→yellow→white
         // rings); keeping it near-white avoids that banding.
         color: [1.0, 0.92, 0.80],
-        intensity: 1.0,   // overall brightness of the shafts
+        intensity: 0.2,   // overall brightness of the shafts
         density: 0.5,   // ray reach
         decay: 0.972,    // tail falloff
-        weight: 0.01,
+        weight: 0.2,
         samples: 32,
-        sunSize: 1.5,    // a defined sun disc the clouds break into shafts
+        sunSize: 1.0,    // a defined sun disc the clouds break into shafts
       });
       window._godRays = godRays;
 

@@ -30,10 +30,11 @@
         faceSize: 1024,
         rotation: 100,
       });
-      scene.skybox = sky;
+      scene.environment = sky;
 
-      scene.skybox.intensity = 1.0;
-      scene.mainCamera.exposure = 0.45;
+      scene.environment.mat = { color: [0.2, 0.2, 0.2] };
+      scene.environment.intensity = 0.5;
+      scene.mainCamera.exposure = 0.5;
 
       // ---- PBR test grid: metallic (rows) x roughness (columns) ----
       const grid = new SceneObject();

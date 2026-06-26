@@ -20,7 +20,7 @@
         enableAntialias: true,
         enableShadow: false,
         bloomEffect: {
-          threshold: 0.05,
+          threshold: 0.5,
           gamma: 2.2,
         },
       });
@@ -59,12 +59,13 @@
           baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
         ];
 
-        scene.skybox = new SkyBox(renderer, skyImageUrls);
+        scene.environment = new SkyBox(renderer, skyImageUrls);
       }
 
       scene.sun.direction = [0, 1, 0];
       scene.sun.mat.color = [1, 1, 1];
 
+      scene.mainCamera.exposure = 0.5;
       scene.mainCamera.fieldOfView = 75;
       scene.mainCamera.location.set(-2.55, 1.5, 2.12);
       scene.mainCamera.angle.set(-3, 310, 0);

@@ -40,9 +40,13 @@
       window._scene = scene;
       window._renderer = renderer;
 
+      // scene.environment.mat = { color: [0.5, 0.5, 0.5] };
+      // scene.environment.intensity = 1;
+      scene.mainCamera.exposure = 1.0;
+
       // light-probe indirect-diffuse strength (kept modest; the office is
       // already brightly lit by the glossy reflection cubemap + window sky)
-      scene.probeIntensity = 1.0;
+      // scene.probeIntensity = 1.0;
 
       // Place a probe volume over the loaded floor's world bounds and bake.
       // Probes sit in two height layers covering the walk-through / furniture
@@ -58,9 +62,9 @@
       }
 
       // used when enableEnvmap is true
-      // scene.skybox.intensity = 2.5;
+      // scene.environment.intensity = 2.5;
       // scene.mainCamera.exposure = 1.5;
-      // scene.skybox.tint = [1.15, 1.0, 0.9];
+      // scene.environment.tint = [1.15, 1.0, 0.9];
 
       let rootObj, refCubebox;
 
@@ -113,13 +117,13 @@
 
       let baseurl = "/textures/cubemap/city/"
 
-      scene.skybox = new SkyBox(renderer, [
+      scene.environment = new SkyBox(renderer, [
         baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
         baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
       ]);
 
-      scene.skybox.mat = { color: [1.7, 1.6, 1.5] };
-      scene.skybox.visible = false;
+      scene.environment.mat = { color: [1.7, 1.6, 1.5] };
+      scene.environment.visible = false;
 
       baseurl = "/textures/cubemap/office-256-blur/"
 
@@ -138,16 +142,16 @@
       
       floorViewController.on("beginChangeMode", _ => {
         if (floorViewController.topViewStatus.topViewMode) {
-          if (scene.skybox) {
-            scene.skybox.visible = false;
+          if (scene.environment) {
+            scene.environment.visible = false;
           }
         }
       });
       
       floorViewController.on("modeChanged", _ => {
         if (!floorViewController.topViewStatus.topViewMode) {
-          if (scene.skybox) {
-            scene.skybox.visible = true;
+          if (scene.environment) {
+            scene.environment.visible = true;
           }
         }
 
@@ -157,7 +161,7 @@
 
       scene.sun.direction = [0, 10, 0];
       scene.sun.mat.color = [1.0, 1.0, 1.0];
-      scene.sun.intensity = 0;   // ambient/IBL-only scene (no direct sun)
+      scene.sun.intensity = 1;   // ambient/IBL-only scene (no direct sun)
 
       scene.show();
 

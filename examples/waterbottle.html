@@ -26,12 +26,12 @@
 
       // image-based lighting source
       const baseurl = "/textures/cubemap/office-256/";
-      scene.skybox = new SkyBox(renderer, [
+      scene.environment = new SkyBox(renderer, [
         baseurl + "px.jpg", baseurl + "nx.jpg", baseurl + "py.jpg",
         baseurl + "ny.jpg", baseurl + "pz.jpg", baseurl + "nz.jpg",
       ]);
-      scene.skybox.intensity = 1.0;
-      scene.mainCamera.exposure = 1.2;
+      scene.environment.intensity = 0.8;
+      scene.mainCamera.exposure = 0.8;
 
       // holder lets the controller orbit a stable pivot while the model keeps
       // its own authored offset/scale

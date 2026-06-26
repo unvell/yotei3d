@@ -86,8 +86,8 @@ export class WaterShader extends Shader {
 		let env = null;
 		if (scene._iblEnvMap instanceof CubeMap && scene._iblEnvMap.loaded) {
 			env = scene._iblEnvMap;
-		} else if (scene.skybox && scene.skybox.cubemap instanceof CubeMap && scene.skybox.cubemap.loaded) {
-			env = scene.skybox.cubemap;
+		} else if (scene.imageSky && scene.imageSky.cubemap instanceof CubeMap && scene.imageSky.cubemap.loaded) {
+			env = scene.imageSky.cubemap;
 		}
 
 		if (env) {

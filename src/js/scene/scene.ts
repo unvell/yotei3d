@@ -477,25 +477,47 @@ export class Scene {
 		this.requireUpdateFrame();
 	}
 
-	// The scene environment (ambient/IBL source). Defaults to a SimpleSky;
-	// assigning an image-based sky switches the scene to real IBL.
+	// The scene environment — the single ambient/IBL + background source
+	// (docs/RENDERING.md §2). Defaults to a SimpleSky; assigning an image-based
+	// sky (SkyBox/HDRSkyBox/DynamicSky) switches the scene to real IBL + a drawn
+	// cubemap background.
 	get environment(): any { return this._environment; }
 	set environment(env: any) {
 		this._environment = env || new SimpleSky();
 		this._iblBakedFor = null;   // force an IBL re-bake for the new environment
+		this._syncBackground();
 		this.requireUpdateFrame();
 	}
 
-	// Legacy alias: `scene.skybox` is the image-based environment (the drawn
-	// background + IBL source), or null when the environment is a SimpleSky.
-	// Setting it routes through `environment`.
-	get skybox(): any { return (this._environment instanceof SimpleSky) ? null : this._environment; }
-	set skybox(v: any) { this.environment = v; }
+	// Internal: the image-based environment (cubemap sky drawn as background +
+	// IBL source), or null when the environment is a SimpleSky.
+	get imageSky(): any { return (this._environment && this._environment.isImageBased) ? this._environment : null; }
 
 	// Constant indirect-diffuse irradiance for the shader's ambient fallback,
 	// or null when the environment is image-based (real IBL is used instead).
 	get ambientColor(): number[] | null {
 		return (this._environment instanceof SimpleSky) ? this._environment.ambientColor : null;
+	}
+
+	// Mirror the environment's background colour / image into the renderer fields
+	// that the clear + fog-fallback paths still read (so those internals don't
+	// each need to know about environments). A SimpleSky owns a flat background
+	// colour + optional image; an image sky draws its cubemap, so it leaves the
+	// fallback colour untouched. Changing the background image rebuilds the
+	// pipeline (it owns a pipeline node).
+	_syncBackground(): void {
+		const r: any = this.renderer;
+		if (!r || !r.options) return;
+		const env = this._environment;
+		if (env && env.background) {
+			const b = env.background;
+			r.options.backColor = new Color4(b.r, b.g, b.b, 1.0);
+		}
+		const img = (env && env.backgroundImage) || null;
+		if (img !== (r.options.backgroundImage || null)) {
+			r.options.backgroundImage = img;
+			if (r.initialized && typeof r.createPipeline === "function") r.createPipeline();
+		}
 	}
 
 	updateLightSources() {

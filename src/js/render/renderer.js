@@ -1,5 +1,5 @@
 
-import { Vec3, Vec4, Color4, Matrix4, Ray } from "@/math";
+import { Vec3, Vec4, Color3, Color4, Matrix4, Ray } from "@/math";
 import { MathFunctions as _mf, MathFunctions3 as _mf3 } from "@/math";
 import { initDOM } from "./dom";
 import { EventDispatcher } from '../utility/event';
@@ -483,8 +483,9 @@ export class Renderer {
 
 				// procedural skyboxes (e.g. DynamicSky) re-bake here when their sun
 				// or parameters changed, before IBL is (re)baked from the result.
-				if (scene.skybox && scene.skybox.update) {
-					scene.skybox.update();
+				const proceduralSky = scene.imageSky;
+				if (proceduralSky && proceduralSky.update) {
+					proceduralSky.update();
 				}
 
 				this.updateIBL(scene);
@@ -747,10 +748,10 @@ export class Renderer {
 	updateIBL(scene) {
 		if (!scene) return;
 
-		// IBL bakes automatically from the scene's image-based environment
-		// (scene.skybox aliases it); a SimpleSky environment has no cubemap and
-		// falls through to the constant ambient instead.
-		const sky = scene.skybox;
+		// IBL bakes automatically from the scene's image-based environment; a
+		// SimpleSky environment has no cubemap and falls through to the constant
+		// ambient instead.
+		const sky = scene.imageSky;
 		const src = (sky && sky.loaded && sky.cubemap && sky.cubemap.loaded) ? sky.cubemap : null;
 
 		if (!src) return;
@@ -847,8 +848,8 @@ export class Renderer {
 
 		scene.beforeDrawFrame(this);
 
-		if (scene.skybox && scene.skybox.loaded) {
-			const sky = scene.skybox;
+		const sky = scene.imageSky;
+		if (sky && sky.loaded) {
 
 			// Keep the skybox centred on the eye so its finite cube always surrounds
 			// the camera. A cube fixed in world space shows parallax — its faces,
@@ -1021,7 +1022,20 @@ export class Renderer {
 	createScene() {
 		const scene = new Scene(this);
 		this.seedCameraOutput(scene.mainCamera);
+		this.seedEnvironment(scene);
 		return scene;
+	}
+
+	// Seed the default SimpleSky environment's background from the legacy
+	// constructor options (backColor / backgroundImage). The environment is the
+	// runtime source of truth; these options are just construction-time defaults.
+	seedEnvironment(scene) {
+		const env = scene.environment;
+		if (!env || env.isImageBased) return;
+
+		const bc = this.options.backColor;
+		if (bc) env.background = new Color3(bc.r, bc.g, bc.b);
+		if (this.options.backgroundImage) env.backgroundImage = this.options.backgroundImage;
 	}
 
 	// Seed a camera's output/post params from the legacy Renderer constructor

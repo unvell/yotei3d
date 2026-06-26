@@ -31,9 +31,9 @@
         faceSize: 256,
         light: scene.sun,
       });
-      scene.skybox = sky;
+      scene.environment = sky;
 
-      scene.skybox.intensity = 1.0;
+      scene.environment.intensity = 1.0;
       scene.mainCamera.exposure = 1.1;
 
       // ---- ground ----

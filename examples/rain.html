@@ -25,7 +25,7 @@
 
       // ---- a small wet "city block" to catch the rain ----
       const ground = new Shapes.Plane();
-      ground.scale.set(60, 1, 60);
+      ground.scale.set(200, 1, 200);
       ground.mat.color = [0.12, 0.13, 0.16];
       ground.mat.roughness = 0.4;          // damp asphalt: a little reflective
       scene.add(ground);
@@ -52,13 +52,13 @@
       // ---- drifting ground fog ----
       // Stacked noise planes hugging the ground; slowly flows with the wind.
       const fog = new GroundFog({
-        size: 70,
-        layers: 4,
-        baseHeight: 0.3,
+        size: 100,
+        layers: 2,
+        baseHeight: 0.5,
         layerGap: 0.8,
         color: [0.58, 0.62, 0.70],
-        opacity: 0.55,
-        density: 0.6,
+        opacity: 0.25,
+        density: 0.5,
         noiseScale: 0.05,
         drift: [1.2, 0.4],   // matches the wind direction of the rain
       });
@@ -69,11 +69,11 @@
       // Added after the geometry so the depth buffer already holds the scene;
       // the rain shader tests (but doesn't write) depth, so buildings occlude drops.
       const rain = new Rain({
-        count: 3000,
+        count: 2000,
         width: 60, depth: 60, height: 34,
-        speed: 30,
-        wind: [5, 1.5],
-        slant: 0.22,
+        speed: 40,
+        wind: [2, 0.1],
+        slant: 0.02,
         opacity: 0.35,
         color: [0.66, 0.76, 0.96],
         thickness: 0.01,
@@ -85,11 +85,7 @@
 
       // drive the simulation every frame
       scene.on("frame", () => rain.update());
-
-      // gloomy key light
-      scene.sun.direction = [0.6, 1, 0.4];
-      scene.sun.mat.color = [0.55, 0.6, 0.72];
-
+      
       // ---- lightning ----
       // Random flashes that briefly light up the sky and the whole scene.
       // Created after the sun colour is set so it captures the correct base.
@@ -99,7 +95,7 @@
       });
       window._lightning = lightning;
       scene.on("frame", () => lightning.update());
-
+      
       // ---- sound ----
       // Looping rain + a one-shot thunder clap per lightning strike, mixed
       // through one AudioMixer (a single Web Audio context — seamless loops and
@@ -110,7 +106,7 @@
       mix.loop("/audio/calming-rain.mp3", { volume: 0.55 });
       const thunder = mix.sound("/audio/thunderstorm.mp3", { volume: 0.8 });
       mix.unlockOnGesture();
-
+      
       const soundBtn = document.getElementById("sound-toggle");
       function setSound(on) {
         mix.enabled = on;
@@ -119,16 +115,22 @@
       }
       soundBtn.addEventListener("click", () => setSound(!mix.enabled));
       setSound(true);   // default On (unlocked on the first gesture)
-
+      
       // play thunder just after the flash (sound lags light)
       lightning.options.onStrike = () => {
         const delay = 250 + Math.random() * 450;
         setTimeout(() => thunder.play(), delay);   // play() is a no-op when muted
       };
+        
+      // gloomy key light
+      scene.sun.direction = [0.6, 1, 0.4];
+      scene.sun.mat.color = [0.55, 0.6, 0.72];
+      scene.fog = { near: 30, far: 250, color: [0.12, 0.14, 0.18] };
 
       scene.mainCamera.fieldOfView = 50;
       scene.mainCamera.location.set(0, 6, 28);
-      scene.mainCamera.angle.set(-8, 0, 0);
+      scene.mainCamera.angle.set(2, 0, 0);
+      scene.mainCamera.exposure = 0.3;
 
       const controller = new TouchController(scene);
 

@@ -322,6 +322,10 @@ export class SkyBox extends ImageCubeBox {
   constructor(renderer, imageUrls, size = 500) {
     super(renderer, imageUrls);
 
+    // Marks this as an image-based environment (draws a cubemap background +
+    // bakes IBL), as opposed to the constant-colour SimpleSky. See Scene.environment.
+    this.isImageBased = true;
+
     this.cube = new Shapes.Cube();
     this.cube.location.set(0, 2, 0);
     this.cube.scale.set(size, size, size);

@@ -54,10 +54,10 @@
         faceSize: 256,
         light: scene.sun,
       });
-      scene.skybox = sky;
+      scene.environment = sky;
       sky.setSunElevationAzimuth(24, 135);
 
-      scene.skybox.intensity = 1.0;
+      scene.environment.intensity = 1.0;
       scene.mainCamera.exposure = 0.9;
 
       // ---- ground + a few objects ----
