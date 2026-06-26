@@ -30,7 +30,6 @@
       const renderer = new Renderer({
         backColor: [0.42, 0.62, 0.86, 1.0],   // clear blue sky
         enablePostprocess: true,
-        enableLighting: true,
         enableShadow: true,
         // The default far plane is only 50, but the cloud layer spreads out to
         // ~400 units. Without pushing it out, only the nearest clusters survive
@@ -115,7 +114,7 @@
       scene.on("frame", () => clouds.update());
 
       // warm midday sun
-      scene.sun.location.set(0.5, 1, 0.4);
+      scene.sun.direction = [0.5, 1, 0.4];
       scene.sun.mat.color = [1.05, 1.02, 0.95];
 
       scene.mainCamera.fieldOfView = 70;

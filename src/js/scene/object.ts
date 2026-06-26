@@ -969,17 +969,22 @@ export const ObjectTypes = {
 ////////////////////////// Sun //////////////////////////
 
 export class Sun extends SceneObject {
+  // Scalar radiance multiplier on the sun's colour. 0 disables the direct sun
+  // entirely (ambient/IBL-only scenes), replacing the old `enableLighting:false`.
+  intensity: number;
+
   constructor() {
     super();
 
     this.visible = false;
+    this.intensity = 1.0;
   }
 
   // The Sun is a directional light at infinity, so only its *direction* carries
-  // meaning — the underlying `location` is just storage and its magnitude is
-  // irrelevant. `direction` is the natural way to aim it: a (normalized) vector
+  // meaning. `direction` is the canonical way to aim it: a (normalized) vector
   // pointing toward the sun, the same convention the water shader and LensFlare
-  // read as "sundir".
+  // read as "sundir". (Internally it is stored in `location`, which callers
+  // should not use directly — set `direction` instead.)
   //
   //   scene.sun.direction = [0, 0.1, -1];   // low sun, straight ahead
   get direction(): Vec3 {
@@ -991,6 +996,10 @@ export class Sun extends SceneObject {
     const z = v.z !== undefined ? v.z : v[2];
     this._location.set(x, y, z);
   }
+
+  // Sun colour, backed by `mat.color` (the convention effects already read).
+  get color(): any { return this.mat && this.mat.color; }
+  set color(c: any) { if (!this.mat) this.mat = {}; this.mat.color = c; }
 }
 
 //////////////////// ParticleObject ////////////////////

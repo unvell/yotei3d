@@ -11,7 +11,6 @@
     window.addEventListener("load", function() {
 
       const renderer = new Renderer({
-        enableLighting: false,
         backColor: [0.96, 0.95, 0.92],
         
         enablePostprocess: true,
@@ -156,8 +155,9 @@
         renderer.options.shadowQuality.enableCache = true;
       });
 
-      scene.sun.location.set(0, 10, 0);
+      scene.sun.direction = [0, 10, 0];
       scene.sun.mat.color = [1.0, 1.0, 1.0];
+      scene.sun.intensity = 0;   // ambient/IBL-only scene (no direct sun)
 
       scene.show();
 

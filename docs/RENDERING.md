@@ -194,9 +194,15 @@ These are real and agreed, but separate from the lighting axis:
    + `SimpleSky` constant-ambient fallback (no scene renders black); `scene.skybox`
    is now an alias. Removed the `enableEnvmap` flag — IBL is automatic when an
    image environment exists.
-3. TODO **Colour space.** Linearise sRGB albedo/emissive on read; document linear
-   authoring; remove `panorama.frag` private exposure (skybox through Stage C).
-4. TODO **Environment & sun.** Move IBL intensity/tint onto the environment
-   (`skybox.intensity`); add `sun.direction` / `sun.intensity`; delete
-   `sun.location`; then remove the now-redundant `enableLighting` flag.
-5. TODO **Migrate remaining scenes** to the new axis and verify.
+3. ⚠️ DEFERRED **Colour space.** Linearising sRGB albedo/emissive + a proper
+   linear→sRGB output encode + filmic ACES tonemap is correct, but it re-tunes
+   every scene's exposure (the right values shift ~6× and in opposite directions
+   per scene's HDR range) and flips the meaning of the gamma knob. It needs a
+   per-scene art-review pass, so it is NOT landed blind. (Attempted and reverted.)
+4. ✅ **Environment & sun.** IBL intensity/tint read from the environment
+   (`scene.environment.intensity` / `.tint`, falling back to legacy scene values);
+   `sun.direction` is canonical and `sun.intensity` added (0 = no direct sun).
+   Removed the `enableLighting` flag — scenes that used `enableLighting:false`
+   now set `sun.intensity = 0`. Examples migrated `sun.location.set(...)` →
+   `sun.direction = [...]`.
+5. TODO **Colour-space pass (Phase 3)** with art review, then migrate/verify all scenes.

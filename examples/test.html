@@ -15,7 +15,6 @@
       const renderer = new Renderer({
         backColor: [0.93, 0.93, 0.93],
         enablePostprocess: false,
-        enableLighting: true,
         enableShadow: true,
         shadowQuality: {
           scale: 5,
@@ -39,7 +38,7 @@
       // shadow map, so 8-bit-depth self-shadow acne is most visible. Without a
       // depth bias this single panel shadows itself (banding / a diagonal half
       // in shadow); with the bias it stays evenly lit.
-      scene.sun.location.set(6, 1.2, 0);
+      scene.sun.direction = [6, 1.2, 0];
       scene.sun.mat.color = [1.0, 1.0, 1.0];
 
       // look down at the panel

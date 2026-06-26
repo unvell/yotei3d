@@ -79,7 +79,7 @@
 
       scene.add(sphere);
       
-      scene.sun.location.set(0, 5, 0);
+      scene.sun.direction = [0, 5, 0];
       
       let dirx = 0, diry = 0;
       scene.onmousemove = function(e) {

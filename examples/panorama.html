@@ -11,11 +11,11 @@
   window.addEventListener('load', function() {
 
     const renderer = new Renderer({
-      enableLighting: false,
       enablePostprocess: false,
     });
 
     const scene = renderer.createScene();
+    scene.sun.intensity = 0;   // panorama viewer; no direct sun (was enableLighting:false)
     window._scene = scene;
     
     // Download outlook images from Google Street View API

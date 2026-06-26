@@ -14,7 +14,6 @@
         renderPixelRatio: 1,
         backColor: [0.1],
         enablePostprocess: true,
-        enableLighting: false,
         bloomEffect: {
           threshold: 0.5,
           gamma: 1.0,
@@ -25,6 +24,7 @@
       });
 
       const scene = renderer.createScene();
+      scene.sun.intensity = 0;   // ambient-only scene (was enableLighting:false)
       window._scene = scene;
     
       const count = 20000;

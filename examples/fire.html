@@ -13,7 +13,6 @@
       const renderer = new Renderer({
         backColor: [0.04, 0.05, 0.08, 1.0],   // night
         enablePostprocess: true,
-        enableLighting: true,
         enableShadow: true,
         bloomEffect: {
           enabled: true,
@@ -139,7 +138,7 @@
       });
 
       // dim, cool moonlight so the logs and stones stay just visible
-      scene.sun.location.set(-0.4, 1, 0.6);
+      scene.sun.direction = [-0.4, 1, 0.6];
       scene.sun.mat.color = [0.22, 0.26, 0.36];
 
       scene.mainCamera.fieldOfView = 50;

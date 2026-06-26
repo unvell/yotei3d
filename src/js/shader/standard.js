@@ -187,8 +187,7 @@ export class StandardShader extends Shader {
 		// lights
 		let lightCount = 0;
 
-		if (scene.renderer.options.enableLighting) {
-
+		{
 			lightCount = scene._activedLightSources.length;
 			// never index past the shader's light uniform array (lights[MAX_LIGHT_COUNT])
 			if (lightCount > this.lightUniforms.length) lightCount = this.lightUniforms.length;
@@ -225,20 +224,21 @@ export class StandardShader extends Shader {
 	
 		this.lightCountUniform.set(lightCount);
 
-		// sun
+		// sun (directional light). Aimed by sun.direction; sun.intensity scales
+		// its colour and 0 disables it (replaces the old enableLighting flag).
+		let sunActive = false;
 		if (scene.sun !== undefined) {
 			const sun = scene.sun;
+			const intensity = (typeof sun.intensity === "number") ? sun.intensity : 1.0;
+			sunActive = intensity > 0;
 
-			const sundir = Vec3.normalize(sun.worldLocation);
-			this.sundirUniform.set(sundir);
-		
-			let sunlight = Shader.defaultSunColor;
+			this.sundirUniform.set(sun.direction);
 
-			if (sun.mat && sun.mat.color) {
-				sunlight = sun.mat.color;
-			}
-
-			this.sunlightUniform.set(sunlight);
+			let c = (sun.mat && sun.mat.color) || Shader.defaultSunColor;
+			const cr = (c.r !== undefined ? c.r : c[0]) * intensity;
+			const cg = (c.g !== undefined ? c.g : c[1]) * intensity;
+			const cb = (c.b !== undefined ? c.b : c[2]) * intensity;
+			this.sunlightUniform.set([cr, cg, cb]);
 		}
 	
 		// shadow
@@ -293,10 +293,18 @@ export class StandardShader extends Shader {
 		// even for scenes that have only a per-object specular refMap (no baked
 		// irradiance) or only light probes. `hasIBL` gates the *diffuse
 		// irradiance* term specifically; specular keys off refMapType in-shader.
-		this.useDirectSunUniform.set(this.renderer.options.enableLighting !== false);
-		this.iblIntensityUniform.set(typeof scene.iblIntensity === "number" ? scene.iblIntensity : 1.0);
+		// the direct sun is on when the scene's sun has non-zero intensity
+		this.useDirectSunUniform.set(sunActive);
+
+		// IBL strength/tint live on the environment (skybox); fall back to the
+		// legacy scene-level values, then to defaults.
+		const env = scene.environment;
+		const iblIntensity = (env && typeof env.intensity === "number") ? env.intensity
+			: (typeof scene.iblIntensity === "number" ? scene.iblIntensity : 1.0);
+		const iblTint = (env && env.tint) || scene.iblColor || this.defaultIBLColor;
+		this.iblIntensityUniform.set(iblIntensity);
 		this.maxEnvLodUniform.set(typeof scene._iblMaxLod === "number" ? scene._iblMaxLod : 6.0);
-		this.iblColorUniform.set(scene.iblColor || this.defaultIBLColor);
+		this.iblColorUniform.set(iblTint);
 
 		// constant-colour environment fallback (SimpleSky). [0,0,0] when the
 		// environment is image-based, since IBL irradiance is used instead.

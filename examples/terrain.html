@@ -13,7 +13,6 @@
 
       const renderer = new Renderer({
         backColor: [0.62, 0.78, 0.92, 1],
-        enableLighting: true,
         enablePostprocess: true,
         enableAntialias: true,
         enableShadow: true,
@@ -81,7 +80,7 @@
 
       // --- lighting ---------------------------------------------------------
       // warm, fairly high sun for long soft shadows across the landscape
-      scene.sun.location.set(8, 14, 6);
+      scene.sun.direction = [8, 14, 6];
       scene.sun.mat.color = [1.25, 1.18, 1.0];
 
       const fill = new PointLight();

@@ -33,7 +33,6 @@ export class Renderer {
 			backgroundImage: null,
 			enableDrawMesh: true,
 			enableCustomDraw: true,
-			enableLighting: true,
 			enableLightmap: true,
 			enableNormalMap: true,
 			enableHighlightSelectedChildren: true,

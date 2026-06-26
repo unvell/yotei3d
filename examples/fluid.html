@@ -42,7 +42,7 @@
       const scene = renderer.createScene();
       window._scene = scene;
 
-      scene.sun.location.set(20, 40, 30);
+      scene.sun.direction = [20, 40, 30];
       scene.sun.mat.color = [1.0, 0.98, 0.95];
       scene.iblIntensity = 0.6;
       scene.mainCamera.exposure = 1.6;

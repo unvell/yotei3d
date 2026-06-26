@@ -501,10 +501,6 @@ export class Scene {
 	updateLightSources() {
 		this._activedLightSources = [];
 
-		if (!this.renderer.options.enableLighting) {
-			return;
-		}
-
 		if (this.renderer.debugger) {
 			this.renderer.debugger.beforeSelectLightSource();
 		}
