@@ -23,6 +23,8 @@ export class SceneObject {
   _transform: Matrix4;
   _normalTransform: Matrix4;
   _suspendTransformUpdate: boolean;
+  _transformDirty: boolean;
+  _conformal: boolean;
   _location: ObjectVectorProperty;
   _angle: ObjectVectorProperty;
   _scale: ObjectVectorProperty;
@@ -73,6 +75,8 @@ export class SceneObject {
     this._scene = undefined;
     this._transform = new Matrix4().loadIdentity();
     this._normalTransform = new Matrix4().loadIdentity();
+    this._transformDirty = true;
+    this._conformal = true;
 
     this._suspendTransformUpdate = true;
     this._location = new ObjectVectorProperty(this, "onmove");
@@ -174,13 +178,69 @@ export class SceneObject {
   }
 
   get transform(): Matrix4 {
+    this._ensureTransform();
     return this._transform;
   }
 
+  /*
+   * Mark this object's world transform — and its whole subtree — as needing
+   * recomputation. This is the cheap, eager half of the dirty-flag scheme: it
+   * only flips flags and requests a redraw. The actual (costly) matrix
+   * composition is deferred until the transform is next *read* (via the
+   * `transform` / `worldLocation` getters or the per-frame resolve pass), so
+   * editing several TRS components in one frame recomputes at most once instead
+   * of once per setter.
+   *
+   * The early-out relies on the invariant that whenever a node is dirty its
+   * descendants were already marked dirty in the same call, so re-walking the
+   * subtree on an already-dirty node would be redundant.
+   */
+  invalidateTransform(): void {
+    if (this._transformDirty) return;
+    this._transformDirty = true;
+
+    for (const child of this.objects) child.invalidateTransform();
+
+    if (this._scene) this._scene.requireUpdateFrame();
+  }
+
+  /*
+   * Lazily bring this node up to date, resolving the ancestor chain first so
+   * the parent's world matrix is fresh before we compose against it. Walks
+   * *up* only — children resolve themselves when they are read/drawn — so a
+   * single read costs O(depth), not O(subtree).
+   */
+  _ensureTransform(): void {
+    if (!this._transformDirty || this._suspendTransformUpdate) return;
+    if (this._parent) this._parent._ensureTransform();
+    this._composeTransform();
+    this._transformDirty = false;
+  }
+
+  /*
+   * Eagerly recompute this node and its entire subtree right now. Retained for
+   * callers that need a whole branch fresh immediately (scene.add, model
+   * loaders) rather than on next read.
+   */
   updateTransform(): void {
     if (this._suspendTransformUpdate) return;
 
-    let t = this._transform;
+    if (this._parent) this._parent._ensureTransform();
+    this._composeTransform();
+    this._transformDirty = false;
+
+    for (const child of this.objects) {
+      child.updateTransform();
+    }
+  }
+
+  /*
+   * Compose this node's local→world matrix (and normal matrix + world
+   * location) from its TRS and the parent's already-resolved world matrix.
+   * Does NOT touch children — callers handle traversal.
+   */
+  _composeTransform(): void {
+    const t = this._transform;
 
     if (this._parent) {
       t.copyFrom(this._parent._transform);
@@ -210,11 +270,22 @@ export class SceneObject {
       t.scale(this._scale._x, this._scale._y, this._scale._z);
     }
 
-    this._normalTransform.copyFrom(t);
-    this._normalTransform.inverse().transpose();
+    // Normal matrix. The inverse-transpose only differs in *direction* from the
+    // world matrix when the linear part is non-conformal — i.e. some
+    // non-uniform scale exists on this node or an ancestor. The shader
+    // re-normalizes, so for a conformal (translation + rotation + uniform
+    // scale) chain the world matrix itself is a valid normal matrix and we can
+    // skip the expensive inverse-transpose. Conformality propagates down the
+    // hierarchy, so we AND with the parent's flag. Unit/uniform scale — the
+    // overwhelmingly common case — takes the fast path.
+    const sx = this._scale._x, sy = this._scale._y, sz = this._scale._z;
+    this._conformal = (sx === sy && sy === sz)
+      && (this._parent ? this._parent._conformal !== false : true);
 
-    for (const child of this.objects) {
-      child.updateTransform();
+    if (this._conformal) {
+      this._normalTransform.copyFrom(t);
+    } else {
+      this._normalTransform.copyFrom(t).invertInPlace().transposeInPlace();
     }
   }
 
@@ -500,10 +571,16 @@ export class SceneObject {
   getTransformMatrix(selfTransform?: boolean): Matrix4 {
 
     if (selfTransform) {
+      this._ensureTransform();
       return this._transform;
     }
 
-    return this._parent ? this._parent._transform : Matrix4.Identity;
+    if (this._parent) {
+      this._parent._ensureTransform();
+      return this._parent._transform;
+    }
+
+    return Matrix4.Identity;
   }
 
   getRotationMatrix(selfRotate?: boolean): Matrix4 {
@@ -531,6 +608,7 @@ export class SceneObject {
   }
 
   get worldLocation(): Vec3 {
+    this._ensureTransform();
     return this._worldLocation;
   }
 
@@ -556,6 +634,7 @@ export class SceneObject {
    * Perform hit test from specified ray.
    */
   hitTestByRay(ray: any, out: any): boolean | undefined {
+    this._ensureTransform();
     if (typeof this.radiyBody === "object" && this.radiyBody !== null) {
       let type = "cube";
 
@@ -627,6 +706,8 @@ export class SceneObject {
   getBounds(options?: any): any {
 
     if (this._cachedBbox) return this._cachedBbox;
+
+    this._ensureTransform();
 
     let bbox;
 
@@ -858,7 +939,7 @@ export class ObjectVectorProperty extends Vec3 {
 
   notifyObj(): void {
     if (this.obj) {
-      this.obj.updateTransform();
+      this.obj.invalidateTransform();
       if (this.changeEvent) this.changeEvent.call(this.obj);
     }
   }

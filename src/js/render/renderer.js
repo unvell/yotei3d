@@ -817,6 +817,12 @@ export class Renderer {
 
 		if (!scene) return;
 
+		// Resolve all deferred object transforms once, up front, so every
+		// direct `_transform` read this frame (light/shadow collection, mesh
+		// draw) sees fresh matrices. Objects invalidated later in the frame
+		// (e.g. the recentred skybox) are re-resolved at draw time in drawObject.
+		scene._resolveTransforms();
+
 		if (this.debugger) {
 			this.debugger.numberOfSceneRendered++;
 			if (this.debugger.numberOfSceneRendered > 1) {
@@ -1026,6 +1032,12 @@ export class Renderer {
 		if (!obj || obj.visible === false) {
 			return;
 		}
+
+		// Resolve any deferred transform before reading obj._transform. Cheap (a
+		// flag check) when clean; recomposes only dirty nodes. This also covers
+		// objects invalidated mid-frame, e.g. the skybox cube which is recentred
+		// on the eye just before it is drawn.
+		obj._ensureTransform();
 
 		if (!transparencyRendering) {
 			obj.__opacity = (!isNaN(obj._opacity) ? obj._opacity : 1)

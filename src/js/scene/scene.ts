@@ -999,6 +999,17 @@ export class Scene {
 		}
 	}
 
+	/*
+	 * Bring every object's deferred world transform up to date for this frame.
+	 * Objects mark themselves dirty on TRS changes (SceneObject.invalidateTransform)
+	 * and recompose lazily; this single top-down pass resolves the whole graph
+	 * before the renderer reads `_transform` directly (light/shadow collection,
+	 * mesh draw, etc.). Clean nodes cost only a flag check.
+	 */
+	_resolveTransforms() {
+		this.eachObject((obj: any) => obj._ensureTransform());
+	}
+
 	findObjectsByCurrentMousePosition(options?: any) {
 		return this.findObjectsByViewPosition(this.renderer.viewer.mouse.position, options);
 	}
