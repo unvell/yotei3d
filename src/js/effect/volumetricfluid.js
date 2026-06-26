@@ -295,7 +295,7 @@ export class VolumetricFluid {
 	pointerDrag(nx, ny, nxPrev, nyPrev) {
 		const pvm = this.renderer.projectionViewMatrix;
 		if (!pvm) return;
-		const inv = pvm.clone().inverse().toArray();
+		const inv = pvm.inverse().toArray();
 		const pick = this._pickBox(inv, nx, ny);
 		if (!pick) { this._mouse.active = 0; return; }
 
@@ -363,7 +363,7 @@ export class VolumetricFluid {
 		const r = this.renderer, gl = r.gl;
 
 		this._ensureFBO();
-		this.invViewProj = r.projectionViewMatrix.clone().inverse();
+		this.invViewProj = r.projectionViewMatrix.inverse();
 		const cam = this.scene.mainCamera;
 		this.cameraPos = cam ? cam.worldLocation : new Vec3(0, 0, 0);
 

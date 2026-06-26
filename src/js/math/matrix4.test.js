@@ -62,8 +62,22 @@ describe('Matrix4 multiplication', () => {
 describe('Matrix4 inverse', () => {
   it('M * inverse(M) = identity', () => {
     const m = new Matrix4().loadIdentity().translate(4, -2, 7).rotateY(30).rotateX(15).scale(2, 3, 0.5);
-    const inv = m.clone().inverse();
-    expectIdentity(m.mul(inv));
+    expectIdentity(m.mul(m.inverse()));
+  });
+
+  it('inverse() does not mutate the source', () => {
+    const m = new Matrix4().loadIdentity().translate(4, -2, 7).rotateY(30).scale(2, 3, 0.5);
+    const original = m.clone();
+    m.inverse();
+    expect(m.approxiEquals(original)).toBe(true);
+  });
+
+  it('invertInPlace() mutates and returns this', () => {
+    const m = new Matrix4().loadIdentity().translate(4, -2, 7).rotateX(15).scale(2, 3, 0.5);
+    const expected = m.inverse();
+    const ret = m.invertInPlace();
+    expect(ret).toBe(m);
+    expect(m.approxiEquals(expected)).toBe(true);
   });
 
   it('canInverse reflects invertibility', () => {
@@ -75,9 +89,22 @@ describe('Matrix4 inverse', () => {
 describe('Matrix4 transpose', () => {
   it('transpose twice is the original (round-trip)', () => {
     const m = new Matrix4().loadIdentity().translate(1, 2, 3).rotateZ(22);
+    expect(m.transpose().transpose().approxiEquals(m)).toBe(true);
+  });
+
+  it('transpose() does not mutate the source', () => {
+    const m = new Matrix4().loadIdentity().translate(1, 2, 3).rotateZ(22);
     const original = m.clone();
-    m.transpose().transpose();
+    m.transpose();
     expect(m.approxiEquals(original)).toBe(true);
+  });
+
+  it('transposeInPlace() mutates and returns this', () => {
+    const m = new Matrix4().loadIdentity().translate(1, 2, 3).rotateZ(22);
+    const expected = m.transpose();
+    const ret = m.transposeInPlace();
+    expect(ret).toBe(m);
+    expect(m.approxiEquals(expected)).toBe(true);
   });
 });
 

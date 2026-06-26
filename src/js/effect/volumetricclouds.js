@@ -211,10 +211,9 @@ export class VolumetricClouds {
 		// gather per-frame inputs
 		const now = (typeof performance !== "undefined" && performance.now) ? performance.now() : 0;
 		this.time = (now - this._t0) * 0.001 * this.windSpeed;
-		// clone before inverting — Matrix4.inverse() mutates in place, and this
-		// runs in a pre-pass *before* the scene draw, so inverting the renderer's
-		// matrix directly would corrupt every subsequent draw this frame.
-		this.invViewProj = r.projectionViewMatrix.clone().inverse();
+		// inverse() returns a new matrix and leaves the renderer's matrix intact,
+		// which matters here: this runs in a pre-pass *before* the scene draw.
+		this.invViewProj = r.projectionViewMatrix.inverse();
 		const cam = this.scene.mainCamera;
 		this.cameraPos = cam ? cam.worldLocation : new Vec3(0, 0, 0);
 		this.sunDir = this._sunDir();

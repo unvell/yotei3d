@@ -582,7 +582,7 @@ export class Viewer {
   moveOffset(offsetX: number, offsetY: number, offsetZ: number): void {
     if (Viewer._moveOffsetMatrix === undefined) Viewer._moveOffsetMatrix = new Matrix4();
     const m = Viewer._moveOffsetMatrix;
-    m.loadIdentity().rotate(this.angle).inverse();
+    m.loadIdentity().rotate(this.angle).invertInPlace();
 
     const v = new Vec4(offsetX, offsetY, offsetZ, 1).mulMat(m);
     this.location.offset(v);

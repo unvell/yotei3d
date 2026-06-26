@@ -56,8 +56,7 @@ Shaders.SimpleShader = class extends Shader {
 		gl.uniformMatrix4fv(this.modelMatrixUniform, false, modelMatrix.toArray());
 
 		var normalMatrix = new Matrix4(modelMatrix);
-		normalMatrix.inverse();
-		normalMatrix.transpose();
+		normalMatrix.invertInPlace().transposeInPlace();
 
 		gl.uniformMatrix4fv(this.normalMatrixUniform, false, normalMatrix.toArray());
 

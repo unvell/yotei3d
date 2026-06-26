@@ -306,7 +306,20 @@ export class Matrix4 {
 		return (delta !== 0);
 	}
 
+	/*
+	 * Returns the inverse of this matrix as a NEW matrix; `this` is left
+	 * unchanged. For the in-place (allocation-free) variant used on hot paths
+	 * and scratch matrices, see invertInPlace().
+	 */
 	inverse() {
+		return this.clone().invertInPlace();
+	}
+
+	/*
+	 * In-place inverse: overwrites this matrix with its inverse and returns
+	 * `this` (fluent). If the matrix is singular it is left unchanged.
+	 */
+	invertInPlace() {
 		const
 			a = this.a1, b = this.b1, c = this.c1, d = this.d1,
 			e = this.a2, f = this.b2, g = this.c2, h = this.d2,
@@ -358,7 +371,19 @@ export class Matrix4 {
 		return this;
 	}
 
+	/*
+	 * Returns the transpose of this matrix as a NEW matrix; `this` is left
+	 * unchanged. For the in-place variant see transposeInPlace().
+	 */
 	transpose() {
+		return this.clone().transposeInPlace();
+	}
+
+	/*
+	 * In-place transpose: overwrites this matrix with its transpose and
+	 * returns `this` (fluent).
+	 */
+	transposeInPlace() {
 		const a2 = this.b1, a3 = this.c1, a4 = this.d1;
 		const b1 = this.a2, b3 = this.c2, b4 = this.d2;
 		const c1 = this.a3, c2 = this.b3, c4 = this.d3;

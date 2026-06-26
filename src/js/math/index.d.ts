@@ -92,7 +92,9 @@ export class Matrix4 {
   clone(): Matrix4;
   mul(m: Matrix4): Matrix4;
   inverse(): Matrix4;
+  invertInPlace(): Matrix4;
   transpose(): Matrix4;
+  transposeInPlace(): Matrix4;
   translate(x: number, y: number, z: number): Matrix4;
   rotate(x: number | Vec3, y?: number, z?: number, order?: string): Matrix4;
   rotateX(angle: number): Matrix4;
