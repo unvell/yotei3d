@@ -25,6 +25,7 @@ export * from './effect/volumetriclight.js';
 export * from './effect/cloudvolume.js';
 export * from './effect/volumetricclouds.js';
 export * from './effect/volumetricfluid.js';
+export * from './effect/cloudlab.js';
 export * from './view/modelviewer.js';
 export * from './view/objectcontroller.js';
 export * from './view/touchcontroller.js';

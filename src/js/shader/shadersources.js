@@ -25,6 +25,7 @@ import { EquirectShader } from './equirect';
 import { AtmosphereSkyShader } from './atmosky';
 import { VolumetricCloudShader } from './volcloud';
 import { VolumetricCloudCompositeShader } from './volcloudcomposite';
+import { CloudGenShader, CloudViewShader } from './cloudlab';
 import { FluidShader, FluidRaymarchShader } from './fluidshader';
 
 // import viewerVert from '../../shader/viewer.vert';
@@ -87,6 +88,10 @@ import volcloudVert from '../../shader/volcloud.vert';
 import volcloudFrag from '../../shader/volcloud.frag';
 import volcloudCompositeVert from '../../shader/volcloudcomposite.vert';
 import volcloudCompositeFrag from '../../shader/volcloudcomposite.frag';
+import cloudlabGenVert from '../../shader/cloudlab_gen.vert';
+import cloudlabGenFrag from '../../shader/cloudlab_gen.frag';
+import cloudlabViewVert from '../../shader/cloudlab_view.vert';
+import cloudlabViewFrag from '../../shader/cloudlab_view.frag';
 import fluidVert from '../../shader/fluid.vert';
 import fluidAdvectFrag from '../../shader/fluid_advect.frag';
 import fluidForceFrag from '../../shader/fluid_force.frag';
@@ -132,6 +137,11 @@ export const ShaderSources = {
   atmosky: { vert: iblVert, frag: atmoskyFrag, class: AtmosphereSkyShader },
   volcloud: { vert: volcloudVert, frag: volcloudFrag, class: VolumetricCloudShader },
   volcloudcomposite: { vert: volcloudCompositeVert, frag: volcloudCompositeFrag, class: VolumetricCloudCompositeShader },
+
+  // CloudLab — learning sandbox. cloudlab_gen bakes density() into a 3D texture;
+  // cloudlab_view ray-marches it (Beer's law) as a full-screen background.
+  cloudlab_gen: { vert: cloudlabGenVert, frag: cloudlabGenFrag, class: CloudGenShader },
+  cloudlab_view: { vert: cloudlabViewVert, frag: cloudlabViewFrag, class: CloudViewShader },
 
   // GPU fluid (smoke/fire) simulation passes. The six sim kernels share one
   // wrapper class and vertex stage; the raymarch renders the density volume,

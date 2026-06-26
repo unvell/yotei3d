@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>CloudLab (P1: density field) - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<style>
+		#lab-panel{position:fixed;top:48px;right:12px;z-index:20;width:240px;
+			background:rgba(18,26,38,.72);color:#eaf2ff;
+			font:12px/1.35 system-ui,-apple-system,sans-serif;
+			border-radius:8px;padding:10px 12px;backdrop-filter:blur(4px);
+			max-height:calc(100vh - 64px);overflow:auto;user-select:none}
+		#lab-panel .lp-title{font-weight:600;margin-bottom:6px;font-size:13px}
+		#lab-panel .lp-sec{margin:10px 0 2px;font-size:11px;font-weight:600;
+			letter-spacing:.04em;text-transform:uppercase;opacity:.55}
+		#lab-panel .lp-row{margin:6px 0}
+		#lab-panel .lp-row label{display:flex;justify-content:space-between;margin-bottom:2px}
+		#lab-panel .lp-row .lp-val{opacity:.75;font-variant-numeric:tabular-nums}
+		#lab-panel input[type=range]{width:100%;accent-color:#7fb3ff;margin:0}
+		#lab-panel .lp-note{margin-top:10px;opacity:.6;font-size:11px;line-height:1.4}
+		#lab-panel code{background:rgba(255,255,255,.08);padding:1px 4px;border-radius:3px}
+	</style>
+	<script type="module">
+
+		import { Renderer, SceneObject, CloudLab, TouchController } from "@";
+
+		window.addEventListener("load", function () {
+
+			const renderer = new Renderer({
+				enablePostprocess: false,
+				backColor: [0.80, 0.86, 0.92, 1.0],
+				perspective: { method: "persp", angle: 50, near: 0.05, far: 100 },
+			});
+
+			const scene = renderer.createScene();
+			window._scene = scene;
+
+			// invisible object at the origin for the orbit controller to target
+			const pivot = new SceneObject();
+			pivot.visible = false;
+			scene.add(pivot);
+
+			// P1 sandbox: bakes your cloudlab_gen.frag density() into a 3D texture
+			// and ray-marches it (Beer's law, density only). Edit density() in
+			// src/shader/cloudlab_gen.frag and the dev server hot-reloads.
+			const lab = new CloudLab(scene, {
+				resolution: 96,
+				size: 2.0,
+				coverage: 0.5,
+				scale: 1.0,
+				sigma: 40,
+				steps: 96,
+			});
+			window._lab = lab;
+
+			scene.mainCamera.fieldOfView = 50;
+			scene.mainCamera.location.set(0, 1.1, 4.2);
+			scene.mainCamera.angle.set(-12, 0, 0);
+
+			const controller = new TouchController(scene, { enableVerticalRotation: true });
+			controller.targetObject = pivot;
+
+			scene.show();
+
+			// ---- parameter panel --------------------------------------------------
+			// `bake:true` rows feed density() → changing them re-runs the GPU bake.
+			// `bake:false` rows only affect the viewer → just redraw, no rebake.
+			const ROWS = [
+				{ sec: 'Density bake（density() に渡る）' },
+				{ label: 'coverage 量',  min: 0,   max: 1,   step: 0.01, bake: true,  set: v => lab.coverage = v, get: () => lab.coverage },
+				{ label: 'scale 細かさ',  min: 0.2, max: 4,   step: 0.05, bake: true,  set: v => lab.scale = v,    get: () => lab.scale },
+				{ label: 'time 実験用',   min: 0,   max: 10,  step: 0.05, bake: true,  set: v => lab.time = v,     get: () => lab.time },
+
+				{ sec: 'View（レイマーチ表示）' },
+				{ label: 'σ 濃さ',        min: 1,   max: 160, step: 1,    bake: false, set: v => lab.sigma = v,    get: () => lab.sigma },
+				{ label: 'march steps',  min: 16,  max: 200, step: 4,    bake: false, set: v => lab.steps = v,    get: () => lab.steps },
+			];
+
+			const decimals = s => { const t = String(s); const i = t.indexOf('.'); return i < 0 ? 0 : t.length - i - 1; };
+			const fmt = (v, step) => (+v).toFixed(decimals(step));
+			const host = document.getElementById('lp-sliders');
+
+			for (const c of ROWS) {
+				if (c.sec) {
+					const h = document.createElement('div');
+					h.className = 'lp-sec';
+					h.textContent = c.sec;
+					host.appendChild(h);
+					continue;
+				}
+				const row = document.createElement('div');
+				row.className = 'lp-row';
+				row.innerHTML = '<label><span>' + c.label + '</span><span class="lp-val"></span></label>'
+					+ '<input type="range" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">';
+				const input = row.querySelector('input');
+				const out = row.querySelector('.lp-val');
+				input.value = c.get();
+				out.textContent = fmt(c.get(), c.step);
+				input.addEventListener('input', () => {
+					const v = parseFloat(input.value);
+					out.textContent = fmt(v, c.step);
+					c.set(v);
+					if (c.bake) lab.rebake();          // density changed → re-bake the volume
+					else scene.requireUpdateFrame();    // view-only → just redraw
+				});
+				host.appendChild(row);
+			}
+		});
+	</script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+		<div>CloudLab P1 — write your density() in <b>src/shader/cloudlab_gen.frag</b>; it bakes into a 3D texture and is ray-marched (Beer's law, density only). Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+			<img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="lab-panel">
+		<div class="lp-title">CloudLab — P1 density field</div>
+		<div id="lp-sliders"></div>
+		<div class="lp-note">数学は <code>cloudlab_gen.frag</code> の <code>density()</code> に書きます。保存するとホットリロードで焼き直されます。</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+</body>
+</html>
