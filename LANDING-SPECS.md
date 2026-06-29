@@ -168,6 +168,21 @@ can move/turn the whole ship (carrier underway) via the holder.
     `maxPoints ≤ 48` (= `WaterShader.WAKE_MAX`, must match `#define WAKE_MAX` in
     `water.frag`). The foam is computed in **world space**, so it stays crisp
     regardless of the (coarse) ocean mesh resolution.
+    - `wake.sparkle` (HDR; 0 = off) scatters sharp, fast-twinkling sun glints over
+      the foam/spray, biased toward the sun and added HDR-bright so bloom catches
+      them. The sparkle field covers **all** foam (wake + contact, below).
+  - **Depth-based contact foam (new):** `ocean.options.contactFoam = { enabled,
+    distance, color, intensity }` — white water wherever **solid geometry breaks
+    the surface** (hull waterline, shoreline, rocks). A *different system* from the
+    path-trail wake. The `WaterShader` runs its own scene **depth pre-pass** (the
+    `attributemap` linear-depth shader, registered via `renderer.prePasses`) into a
+    target sized **1:1 to the main framebuffer** so the water pass can sample it by
+    `gl_FragCoord` and hit exact texel centres. The ocean **excludes itself**
+    (`castShadow=false`, like the shadow/SSAO passes), so the depth holds only
+    solids; the target is cleared to **far/white** so empty sky never foams. The
+    fragment unpacks the nearest opaque depth, compares it to its own linearised
+    `gl_FragCoord.z` depth, and foams where the gap < `distance` world units. No
+    per-object setup — anything that casts (hull, future terrain) gets a waterline.
 - **Static dir:** examples are served from `examples/` with `examples/public/` as
   the web root (so `/models/...`, `/textures/...`, `/img/...`).
 
@@ -181,10 +196,14 @@ can move/turn the whole ship (carrier underway) via the holder.
   needs a check against the engine's `angle.y` rotation convention. P2/P3 should
   define the approach axis off the **angled** deck (not the centerline) — measure
   the angled-deck bearing from the model.
-- **Wake fidelity:** current wake is **foam only** (no geometric bow/stern waves)
-  and a **straight/curving polyline trail** with no Kelvin V arms. Geometric wake
-  displacement would need a finer mesh near the ship (mesh is ~100 u/cell) or a
-  displacement decal — future work. Tunables live in `ocean.options.wake`.
+- **Wake / foam fidelity:** there are now two foam systems — the path-trail
+  **wake** (`options.wake`) and **depth-based contact foam** (`options.contactFoam`,
+  hull waterline / shoreline), with shared sun **sparkle**. Both are **foam only**:
+  no geometric bow/stern waves and no Kelvin V arms, and the wake trail has no V.
+  Geometric wake displacement would need a finer mesh near the ship (mesh is
+  ~100 u/cell) or a displacement decal — future work. The contact-foam depth
+  pre-pass is full-res every frame; if cost matters, drop it to half-res (sampling
+  is normalized so only sharpness changes) — but then force NEAREST or keep 1:1.
 - **Wire zone & touchdown:** need deck-surface height (top of deck ≈ keel + ~deck
   height; compute precisely from bounds/sampling) and a 2D landing box for the 3–4
   arresting wires.
@@ -216,3 +235,11 @@ can move/turn the whole ship (carrier underway) via the holder.
   local −Z), follows it with the ocean (not the eye) and the camera (pivot shifted
   by the ship's travel, preserving user orbit/zoom/pan), and configures the wake.
   Verified in-browser. Updated §3/§6/§7.
+- **2026-06-29 — wake sparkle + contact foam:** Added `wake.sparkle` (HDR sun
+  glints twinkling on the spray) and **depth-based contact foam**
+  (`options.contactFoam`) — white water at the hull waterline (and any future
+  shoreline) via a scene depth pre-pass the `WaterShader` runs itself (ocean
+  excluded; target 1:1 with the main FB; cleared to far so empty sky never foams).
+  Wake + contact foam unified so the sparkle covers both. Verified in-browser
+  (waterline band wraps the hull bow→stern; wake trails behind; open water clean).
+  Updated §6/§7.
