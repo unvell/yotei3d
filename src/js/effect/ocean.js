@@ -76,7 +76,10 @@ export class Ocean extends SceneObject {
 			// water shader runs a scene depth pre-pass (the ocean excludes itself,
 			// since castShadow is false) and foams where that geometry sits just
 			// under the surface. Pass { enabled, distance, color, intensity };
-			// null/omitted = off. `distance` is the foam band width in world units.
+			// null/omitted = off. `distance` is how far *below* the waterline (world
+			// Y units) the foam fades out — a vertical band, so it stays a thin
+			// waterline at any view angle and converges at the bow instead of
+			// smearing forward.
 			contactFoam: null,
 		}, options);
 

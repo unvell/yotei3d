@@ -58,7 +58,7 @@ uniform sampler2D uContactDepth;
 uniform vec2      uContactRes;       // main framebuffer size, to map gl_FragCoord
 uniform float     uContactNear;
 uniform float     uContactFar;
-uniform float     uContactDist;      // foam band width away from the contact (world units)
+uniform float     uContactDist;      // foam fades out this far *below* the surface (world Y units)
 uniform vec3      uContactColor;
 uniform float     uContactIntensity;
 
@@ -239,14 +239,21 @@ void main(void) {
 	float contactF = 0.0;
 	if (uHasContact) {
 		vec2 uv = gl_FragCoord.xy / uContactRes;
-		float sceneD = unpackDepth(texture2D(uContactDepth, uv));
-		float zc = gl_FragCoord.z * 2.0 - 1.0;                       // NDC depth
-		float viewDist = (2.0 * uContactNear * uContactFar)
-		               / (uContactFar + uContactNear - zc * (uContactFar - uContactNear));
-		float waterD = clamp((viewDist - uContactNear) / (uContactFar - uContactNear), 0.0, 1.0);
-		float gap = (sceneD - waterD) * (uContactFar - uContactNear);   // world units
-		float band = (1.0 - smoothstep(0.0, uContactDist, gap))
-		           * smoothstep(0.0, uContactDist * 0.2, gap);
+		float sceneD = unpackDepth(texture2D(uContactDepth, uv));         // 0..1 linear
+		float zc = gl_FragCoord.z * 2.0 - 1.0;                            // NDC depth
+		float waterDist = (2.0 * uContactNear * uContactFar)
+		                / (uContactFar + uContactNear - zc * (uContactFar - uContactNear));
+		float sceneDist = sceneD * (uContactFar - uContactNear) + uContactNear;
+		// The solid behind this pixel lies on the SAME camera ray as the water
+		// fragment, so its world position scales with view distance. Reconstruct
+		// it and foam by how far it sits *below the water surface vertically* —
+		// NOT by the camera-space depth gap, which at grazing angles smears into a
+		// long tongue ahead of the bow (the ray skims the deep submerged forefoot).
+		// A vertical band instead stays a thin waterline and converges at the stem.
+		vec3 geoPos = cameraLoc + (vWorldPos - cameraLoc) * (sceneDist / waterDist);
+		float vgap = vWorldPos.y - geoPos.y;                             // >0 = solid below surface
+		float band = (1.0 - smoothstep(0.0, uContactDist, vgap))
+		           * smoothstep(0.0, uContactDist * 0.2, vgap);
 		float cn = valueNoise(vWorldXZ * 0.6 + vec2(time * 0.4, -time * 0.5));
 		contactF = clamp(band * mix(0.6, 1.25, cn) * uContactIntensity, 0.0, 1.0);
 		if (contactF > 0.0) color = mix(color, uContactColor, contactF);

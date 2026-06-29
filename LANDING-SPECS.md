@@ -180,8 +180,11 @@ can move/turn the whole ship (carrier underway) via the holder.
     `gl_FragCoord` and hit exact texel centres. The ocean **excludes itself**
     (`castShadow=false`, like the shadow/SSAO passes), so the depth holds only
     solids; the target is cleared to **far/white** so empty sky never foams. The
-    fragment unpacks the nearest opaque depth, compares it to its own linearised
-    `gl_FragCoord.z` depth, and foams where the gap < `distance` world units. No
+    fragment unpacks the nearest opaque depth, **reconstructs that solid's world
+    position along the view ray**, and foams where it sits less than `distance`
+    world-units *below* the water surface (a **vertical** band — so it stays a thin
+    waterline at any view angle and **converges at the bow** instead of the
+    camera-depth gap smearing forward into the water at grazing angles). No
     per-object setup — anything that casts (hull, future terrain) gets a waterline.
 - **Static dir:** examples are served from `examples/` with `examples/public/` as
   the web root (so `/models/...`, `/textures/...`, `/img/...`).

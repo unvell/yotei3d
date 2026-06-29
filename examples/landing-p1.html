@@ -153,7 +153,7 @@
       // sitting just under the water; this needs no per-object setup.
       ocean.options.contactFoam = {
         enabled: true,
-        distance: 14,        // foam band width around the waterline (world units)
+        distance: 6,         // foam fades out this far *below* the waterline (world Y)
         color: [1.0, 1.05, 1.12],
         intensity: 1.0,
       };
