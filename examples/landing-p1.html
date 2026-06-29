@@ -72,34 +72,59 @@
 
       // --- the ocean ---------------------------------------------------------
       const ocean = new Ocean({
-        size: 12000,
-        segments: 120,
-        level: 0,
-        wind: [1.0, 0.5],
-        waveAmp: 0.35,
-        waveLen: 120,
-        waveSpeed: 0.12,
-        steepness: 0.6,
-        sunGlitter: 0.25,
-        specStrength: 0.18,
-        fresnelPower: 5.0,
-        fresnelBias: 0.2,
-        reflectivity: 0.32,
-        reflectionBlur: 1.0,
-        rippleScale: 1.0,
-        rippleStrength: 0.5, // 0..1, higher = more ripple
-        rippleDetail: 10.0, // 1..5, higher = more detail
-        deepColor: [0.015, 0.08, 0.12],
-        shallowColor: [0.10, 0.34, 0.40],
-        // P1 keeps the ocean world-fixed (no followTarget). The waves/ripples are
-        // evaluated in world space, so recentring the grid on the *orbiting* eye
-        // would sweep the surface through the world-locked wave field — making the
-        // ripples churn and the swell "fast-forward" every time the camera turns.
-        // size 12000 (half-extent 6000) already reaches the horizon well past the
-        // 1400u max orbit distance, so no follow is needed. Later phases, once the
-        // carrier/aircraft actually travels, should follow that moving focus (the
-        // orbit target / holder) — never the camera eye.
-      });
+        "size": 10000,
+        "segments": 10,
+        "level": 0,
+        "wind": [ 1, 0.4 ],
+        "waveAmp": 0.01,
+        "waveLen": 100,
+        "waveSpeed": 0.1,
+        "steepness": 0.01,
+        "timeScale": 1,
+        
+        "sunGlitter": 0.2,
+        "specStrength": 0.15,
+
+        "fresnelPower": 5,
+        "fresnelBias": 0.01,
+        "reflectivity": 0.5,
+        "reflectionBlur": 0.5,
+        "rippleScale": 0.5,
+        "rippleStrength": 0.5,
+        "rippleDetail": 3,
+        "deepColor": [ 0.016, 0.067, 0.125 ],
+        "shallowColor": [ 0.078, 0.157, 0.243 ],
+      })
+
+      // const ocean = new Ocean({
+      //   size: 12000,
+      //   segments: 20,
+      //   level: 0,
+      //   wind: [1.0, 0.5],
+      //   waveAmp: 0.1,
+      //   waveLen: 120,
+      //   waveSpeed: 0.12,
+      //   steepness: 0.6,
+      //   sunGlitter: 0.25,
+      //   specStrength: 0.18,
+      //   fresnelPower: 3.0,
+      //   fresnelBias: 0.01,
+      //   reflectivity: 0.4,
+      //   reflectionBlur: 1.0,
+      //   rippleScale: 1.0,
+      //   rippleStrength: 1.0, // 0..1, higher = more ripple
+      //   rippleDetail: 0.1, // 1..5, higher = more detail
+      //   deepColor: [0.015, 0.08, 0.12],
+      //   shallowColor: [0.10, 0.34, 0.40],
+      //   // P1 keeps the ocean world-fixed (no followTarget). The waves/ripples are
+      //   // evaluated in world space, so recentring the grid on the *orbiting* eye
+      //   // would sweep the surface through the world-locked wave field — making the
+      //   // ripples churn and the swell "fast-forward" every time the camera turns.
+      //   // size 12000 (half-extent 6000) already reaches the horizon well past the
+      //   // 1400u max orbit distance, so no follow is needed. Later phases, once the
+      //   // carrier/aircraft actually travels, should follow that moving focus (the
+      //   // orbit target / holder) — never the camera eye.
+      // });
       ocean.location.set(0, 0, 0);
       scene.add(ocean);
       window._ocean = ocean;
@@ -139,23 +164,23 @@
       ocean.options.followTarget = holder;
       ocean.options.wake = {
         source: holder,
-        dropDistance: 5,     // sample the path every 5u (smooth trail)
-        life: 16,            // foam lingers 16s ≈ a long trail at this speed
+        dropDistance: 10,     // sample the path every 5u (smooth trail)
+        life: 50,            // foam lingers 16s ≈ a long trail at this speed
         maxPoints: 48,       // == shader WAKE_MAX
         width: 22,           // half-width at the stern (ship beam ≈ 64u)
-        widthGrowth: 4,      // tail fans out to ~5× that
+        widthGrowth: 2,      // tail fans out to ~5× that
         foamColor: [1.0, 1.05, 1.12],
-        foamIntensity: 1.0,
-        sparkle: 7,          // sun glints twinkling on the flying spray (HDR)
+        foamIntensity: 0.5,
+        sparkle: 12,          // sun glints twinkling on the flying spray (HDR)
       };
       // Depth-based contact foam: white water where the hull breaks the surface
       // (and any future shoreline/rocks). A scene depth pre-pass detects solids
       // sitting just under the water; this needs no per-object setup.
       ocean.options.contactFoam = {
         enabled: true,
-        distance: 6,         // foam fades out this far *below* the waterline (world Y)
+        distance: 2,         // foam fades out this far *below* the waterline (world Y)
         color: [1.0, 1.05, 1.12],
-        intensity: 1.0,
+        intensity: 0.3,
       };
 
       const dimEl = () => document.getElementById("lh-dim");
