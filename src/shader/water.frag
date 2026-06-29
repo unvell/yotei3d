@@ -49,6 +49,19 @@ uniform vec3  uWakeFoamColor;      // foam tint (slightly >1 to bloom)
 uniform float uWakeFoamIntensity;  // overall foam opacity
 uniform float uWakeSparkle;        // sun sparkle on the spray (HDR; 0 = off)
 
+// depth-based contact foam — white water wherever solid geometry breaks the
+// surface (hull waterline, shoreline, rocks). A depth pre-pass packs the
+// nearest opaque linear depth (the ocean excludes itself) into RGBA; we unpack
+// it per pixel and foam where that geometry sits just under the water surface.
+uniform bool      uHasContact;
+uniform sampler2D uContactDepth;
+uniform vec2      uContactRes;       // main framebuffer size, to map gl_FragCoord
+uniform float     uContactNear;
+uniform float     uContactFar;
+uniform float     uContactDist;      // foam band width away from the contact (world units)
+uniform vec3      uContactColor;
+uniform float     uContactIntensity;
+
 varying vec3 vWorldPos;
 varying vec3 vNormal;
 varying vec2 vWorldXZ;
@@ -87,6 +100,11 @@ vec3 proceduralSky(vec3 dir) {
 	// a soft glow around the sun reflected off the water
 	float sun = pow(max(dot(dir, sundir), 0.0), 80.0);
 	return sky + sunlight * sun * 0.5;
+}
+
+// unpack the RGBA-packed linear depth written by attribmap.frag (packDepth).
+float unpackDepth(vec4 enc) {
+	return dot(enc, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0));
 }
 
 // distance from point p to segment ab, with t = the closest-point parameter
@@ -199,33 +217,56 @@ void main(void) {
 	// octaves break it into froth and boiling streaks so it reads as churn
 	// rather than a painted stripe. Laid over the water before fog so the far
 	// trail melts into the haze with the rest of the sea.
+	float wakeF = 0.0;
 	if (uWakeCount >= 2) {
-		float foam = wakeFoam(vWorldXZ);
-		if (foam > 0.0) {
+		wakeF = wakeFoam(vWorldXZ);
+		if (wakeF > 0.0) {
 			vec2 fp = vWorldXZ * 0.18;
 			float n1 = valueNoise(fp + vec2(time * 0.6, -time * 0.4));
 			float n2 = valueNoise(fp * 2.7 - vec2(time * 0.9, time * 0.7));
 			float churn = mix(0.55, 1.15, n1) * mix(0.7, 1.1, n2);
-			foam = clamp(foam * churn * uWakeFoamIntensity, 0.0, 1.0);
-			color = mix(color, uWakeFoamColor, foam);
-
-			// Sun sparkle on the churned spray: thousands of tiny droplets each
-			// flash as they catch the sun, so we scatter sharp, fast-twinkling
-			// HDR glints across the foam. Two high-frequency noise fields scroll
-			// against each other and are raised to a high power to leave only
-			// sparse pinpoints; density follows the foam and they only fire when
-			// the sun is up. Added HDR-bright so the bloom pass makes them glitter.
-			if (uWakeSparkle > 0.0 && sunUp > 0.0) {
-				vec2 sp = vWorldXZ * 1.7;
-				float tw = valueNoise(sp + vec2(time * 2.3, -time * 1.7))
-				         * valueNoise(sp * 1.9 - vec2(time * 3.1, time * 2.2));
-				tw = pow(tw, 6.0);
-				// bias the glints toward the sun's specular direction so they
-				// read as sun reflections rather than uniform white noise.
-				float toSun = 0.5 + 0.5 * pow(NoH, 8.0);
-				color += sunlight * (tw * foam * uWakeSparkle * sunUp * toSun);
-			}
+			wakeF = clamp(wakeF * churn * uWakeFoamIntensity, 0.0, 1.0);
+			color = mix(color, uWakeFoamColor, wakeF);
 		}
+	}
+
+	// --- contact foam: white water where solid geometry breaks the surface.
+	// Compare this water pixel's linear depth to the nearest opaque depth in the
+	// pre-pass: a small positive gap means geometry sits just below the surface
+	// here (the hull's waterline, a beach, a rock), so we lay a foam band that
+	// rises off the exact contact line and fades out by uContactDist. The band
+	// is broken up by a slow noise so it churns instead of reading as a decal.
+	float contactF = 0.0;
+	if (uHasContact) {
+		vec2 uv = gl_FragCoord.xy / uContactRes;
+		float sceneD = unpackDepth(texture2D(uContactDepth, uv));
+		float zc = gl_FragCoord.z * 2.0 - 1.0;                       // NDC depth
+		float viewDist = (2.0 * uContactNear * uContactFar)
+		               / (uContactFar + uContactNear - zc * (uContactFar - uContactNear));
+		float waterD = clamp((viewDist - uContactNear) / (uContactFar - uContactNear), 0.0, 1.0);
+		float gap = (sceneD - waterD) * (uContactFar - uContactNear);   // world units
+		float band = (1.0 - smoothstep(0.0, uContactDist, gap))
+		           * smoothstep(0.0, uContactDist * 0.2, gap);
+		float cn = valueNoise(vWorldXZ * 0.6 + vec2(time * 0.4, -time * 0.5));
+		contactF = clamp(band * mix(0.6, 1.25, cn) * uContactIntensity, 0.0, 1.0);
+		if (contactF > 0.0) color = mix(color, uContactColor, contactF);
+	}
+
+	// Sun sparkle across all the churned-up foam/spray: thousands of tiny
+	// droplets each flash as they catch the sun, so we scatter sharp,
+	// fast-twinkling HDR glints over the foam. Two high-frequency noise fields
+	// scroll against each other and are raised to a high power to leave only
+	// sparse pinpoints; density follows the foam and they only fire when the sun
+	// is up, biased toward its specular direction. HDR-bright so the bloom pass
+	// makes them glitter.
+	float foamAll = max(wakeF, contactF);
+	if (uWakeSparkle > 0.0 && sunUp > 0.0 && foamAll > 0.0) {
+		vec2 sp = vWorldXZ * 1.7;
+		float tw = valueNoise(sp + vec2(time * 2.3, -time * 1.7))
+		         * valueNoise(sp * 1.9 - vec2(time * 3.1, time * 2.2));
+		tw = pow(tw, 6.0);
+		float toSun = 0.5 + 0.5 * pow(NoH, 8.0);
+		color += sunlight * (tw * foamAll * uWakeSparkle * sunUp * toSun);
 	}
 
 	// distance fog toward the horizon

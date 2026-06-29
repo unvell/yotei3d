@@ -148,6 +148,15 @@
         foamIntensity: 1.0,
         sparkle: 7,          // sun glints twinkling on the flying spray (HDR)
       };
+      // Depth-based contact foam: white water where the hull breaks the surface
+      // (and any future shoreline/rocks). A scene depth pre-pass detects solids
+      // sitting just under the water; this needs no per-object setup.
+      ocean.options.contactFoam = {
+        enabled: true,
+        distance: 14,        // foam band width around the waterline (world units)
+        color: [1.0, 1.05, 1.12],
+        intensity: 1.0,
+      };
 
       const dimEl = () => document.getElementById("lh-dim");
 
@@ -196,9 +205,9 @@
         follow: scene.sun,
         occluders: [holder],
         color: [1, 1, 0.95],
-        intensity: 2,
+        intensity: 1,
         coreIntensity: 0.5,
-        scale: 2.0,
+        scale: 1.0,
       });
       window._lensFlare = lensFlare;
 

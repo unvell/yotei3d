@@ -70,6 +70,14 @@ export class Ocean extends SceneObject {
 			//   foamIntensity overall foam opacity
 			//   sparkle       sun glints twinkling on the spray (HDR; 0 = off)
 			wake: null,
+
+			// Depth-based contact foam — white water wherever solid geometry
+			// breaks the surface (the hull's waterline, a shoreline, rocks). The
+			// water shader runs a scene depth pre-pass (the ocean excludes itself,
+			// since castShadow is false) and foams where that geometry sits just
+			// under the surface. Pass { enabled, distance, color, intensity };
+			// null/omitted = off. `distance` is the foam band width in world units.
+			contactFoam: null,
 		}, options);
 
 		// expose the live-readable shading/wave params on the object so the
