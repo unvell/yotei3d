@@ -1,80 +1,68 @@
+////////////////////////////////////////////////////////////////////////////////
+// Yotei3D - Web3D Engine
+// Copyright(c) 2024-2025 Jingwood, All Rights Reserved.
+////////////////////////////////////////////////////////////////////////////////
+
 import { Vec3, Matrix4 } from "@/math";
-import { Keys, MouseButtons } from "../scene/viewer";
+import { Keys, MouseButtons } from "../scene/input";
 import { invokeIfExist } from "../utility/utility";
+import { CameraController } from "./cameracontroller";
 
-export class FPSController {
-  scene: any;
-  renderer: any;
-  options: any;
+interface FPSControllerOptions {
+  moveSpeed?: number;
+}
 
-  /** optional callback, invoked after a first-person move (if assigned) */
+// FPSController — first-person camera: WASD / arrows to walk, drag to look,
+// Shift+W/S to rise/fall, Shift+drag (or right drag) to slide. Acts on the
+// attached Camera; held-key movement runs each frame in update().
+export class FPSController extends CameraController {
+  options: Required<FPSControllerOptions>;
+
+  /** optional callback fired after a movement step (assign if needed) */
   oncameramove?: (...args: any[]) => any;
 
-  static defaultOptions() {
-    return {
-      moveSpeed: 0.2,
-    };
+  private _m = new Matrix4();
+  private _dir = new Vec3();
+
+  static defaultOptions(): Required<FPSControllerOptions> {
+    return { moveSpeed: 0.2 };
   }
 
-  constructor(scene: any, options?: any) {
-    this.scene = scene;
-    this.renderer = scene.renderer;
-    this.options = { ...FPSController.defaultOptions(), ...options };
+  constructor(arg?: any, options?: FPSControllerOptions) {
+    super();
+    const parsed = CameraController.parseArgs(arg, options);
+    this.options = { ...FPSController.defaultOptions(), ...(parsed.options || {}) };
 
-    const viewer = this.renderer.viewer;
-    let movementDetectingTimer: any = null;
-
-    scene.on("keydown", () => {
-      if (!movementDetectingTimer) {
-        movementDetectingTimer = setInterval(() => {
-          this.detectFirstPersonMove();
-        }, 10);
-      }
-    });
-
-    scene.on("keyup", () => {
-      if (viewer.pressedKeys.size === 0) {
-        clearInterval(movementDetectingTimer);
-        movementDetectingTimer = null;
-      }
-    });
-
-    scene.on("begindrag", () => {
-      this.renderer.viewer.setCursor("none");
-    });
-
-    scene.on("enddrag", () => {
-      this.renderer.viewer.setCursor("auto");
-    });
-
-    scene.on("drag", () => {
-      const camera = scene.mainCamera;
-
-      if (viewer && camera) {
-        if (viewer.mouse.pressedButtons.has(MouseButtons.Left)
-          || viewer.touch.fingers == 1) {
-
-          if (viewer.pressedKeys.has(Keys.Shift)) {
-            this.dragToMoveCamera();
-          } else {
-            this.dragToRotateCamera();
-          }
-        }
-
-        if (viewer.mouse.pressedButtons.has(MouseButtons.Right)
-          || viewer.touch.fingers == 2) {
-          this.dragToMoveCamera();
-        }
-      }
-    });
+    if (parsed.camera) parsed.camera.controller = this;
   }
 
-  dragToRotateCamera() {
-    var viewer = this.renderer.viewer;
-    var camera = this.scene.mainCamera;
+  protected override onAttach(): void {
+    this.bind("begindrag", () => this.renderer.input.setCursor("none"));
+    this.bind("enddrag", () => this.renderer.input.setCursor("auto"));
+    this.bind("drag", () => this._onDrag());
+  }
 
-    camera.angle.x -= viewer.mouse.movement.y * 200 / viewer.renderer.renderSize.height;
-    camera.angle.y -= viewer.mouse.movement.x * 200 / viewer.renderer.renderSize.width;
+  private _onDrag(): void {
+    if (!this.isActive()) return;
+    const input = this.input;
+
+    if (input.mouse.pressedButtons.has(MouseButtons.Left) || input.touch.fingers === 1) {
+      if (input.pressedKeys.has(Keys.Shift)) this._dragToMoveCamera();
+      else this._dragToRotateCamera();
+    }
+
+    if (input.mouse.pressedButtons.has(MouseButtons.Right) || input.touch.fingers === 2) {
+      this._dragToMoveCamera();
+    }
+  }
+
+  private _dragToRotateCamera(): void {
+    const input = this.input;
+    const camera = this.camera;
+    const renderSize = this.renderer.renderSize;
+
+    camera.angle.x -= input.mouse.movement.y * 200 / renderSize.height;
+    camera.angle.y -= input.mouse.movement.x * 200 / renderSize.width;
 
     if (camera.angle.x < -80) camera.angle.x = -80;
     else if (camera.angle.x > 80) camera.angle.x = 80;
@@ -84,84 +72,60 @@ export class FPSController {
     this.scene.requireUpdateFrame();
   }
 
-  dragToMoveCamera() {
-    var viewer = this.renderer.viewer;
-    var camera = this.scene.mainCamera;
+  private _dragToMoveCamera(): void {
+    const input = this.input;
+    const camera = this.camera;
+    const renderSize = this.renderer.renderSize;
 
-    const m = new Matrix4();
-    m.loadIdentity().rotate(camera.angle);
+    this._m.loadIdentity().rotate(camera.angle);
+    const td = new Vec3(
+      input.mouse.movement.x * 50 / renderSize.width, 0,
+      input.mouse.movement.y * 50 / renderSize.height).mulMat(this._m);
 
-    var transformedDir = new Vec3(
-      viewer.mouse.movement.x * 50 / viewer.renderer.renderSize.width, 0,
-      viewer.mouse.movement.y * 50 / viewer.renderer.renderSize.height).mulMat(m);
-
-    camera.location.x += transformedDir.x;
-    camera.location.z += transformedDir.z;
+    camera.location.x += td.x;
+    camera.location.z += td.z;
 
     camera.onmove();
-
     this.scene.requireUpdateFrame();
   }
 
-  detectFirstPersonMove() {
-    const m = new Matrix4(), dir = new Vec3();
+  override update(dt: number): void {
+    const camera = this.camera;
+    const input = this.input;
+    if (!camera || !input || input.pressedKeys.size === 0) return;
 
-    var scene = this.scene;
-    var viewer = this.renderer.viewer;
+    const k = dt * 60;
+    const speed = this.options.moveSpeed;
+    const dir = this._dir;
+    dir.set(0, 0, 0);
+    let moved = false;
 
-    if (scene && scene.mainCamera) {
-      var camera = scene.mainCamera;
+    if (input.pressedKeys.has(Keys.A)) dir.x = -1;
+    else if (input.pressedKeys.has(Keys.D)) dir.x = 1;
 
-      dir.set(0, 0, 0);
-
-      if (viewer.pressedKeys.has(Keys.A)) {
-        dir.x = -1;
-      } else if (viewer.pressedKeys.has(Keys.D)) {
-        dir.x = 1;
-      }
-
-      if (viewer.pressedKeys.has(Keys.W)
-        || viewer.pressedKeys.has(Keys.Up)) {
-        if (viewer.pressedKeys.has(Keys.Shift)) {
-          camera.location.y += this.options.moveSpeed;
-          scene.requireUpdateFrame();
-        } else {
-          dir.z = -1;
-        }
-      } else if (viewer.pressedKeys.has(Keys.S)
-        || viewer.pressedKeys.has(Keys.Down)) {
-        if (viewer.pressedKeys.has(Keys.Shift)) {
-          camera.location.y -= this.options.moveSpeed;
-          scene.requireUpdateFrame();
-        } else {
-          dir.z = 1;
-        }
-      }
-
-      if (viewer.pressedKeys.has(Keys.Left)) {
-        camera.angle.y += this.options.moveSpeed * 10;
-        scene.requireUpdateFrame();
-      } else if (viewer.pressedKeys.has(Keys.Right)) {
-        camera.angle.y -= this.options.moveSpeed * 10;
-        scene.requireUpdateFrame();
-      }
-
-      camera.angle.y = (camera.angle.y + 360) % 360;
-
-      if (dir.x !== 0 || dir.y !== 0 || dir.z !== 0) {
-
-        m.loadIdentity().rotate(camera.angle);
-
-        var transformedDir = dir.mulMat(m);
-
-        transformedDir.y = 0;
-        transformedDir = transformedDir.normalize();
-
-        // don't allow to change y if you don't want fly :)
-        camera.move(transformedDir.x * this.options.moveSpeed, 0, transformedDir.z * this.options.moveSpeed);
-
-        invokeIfExist(this, "oncameramove");
-      }
+    if (input.pressedKeys.has(Keys.W) || input.pressedKeys.has(Keys.Up)) {
+      if (input.pressedKeys.has(Keys.Shift)) { camera.location.y += speed * k; moved = true; }
+      else dir.z = -1;
+    } else if (input.pressedKeys.has(Keys.S) || input.pressedKeys.has(Keys.Down)) {
+      if (input.pressedKeys.has(Keys.Shift)) { camera.location.y -= speed * k; moved = true; }
+      else dir.z = 1;
     }
+
+    if (input.pressedKeys.has(Keys.Left)) { camera.angle.y += speed * 10 * k; moved = true; }
+    else if (input.pressedKeys.has(Keys.Right)) { camera.angle.y -= speed * 10 * k; moved = true; }
+
+    camera.angle.y = (camera.angle.y + 360) % 360;
+
+    if (dir.x !== 0 || dir.y !== 0 || dir.z !== 0) {
+      this._m.loadIdentity().rotate(camera.angle);
+      let td = dir.mulMat(this._m);
+      td.y = 0;
+      td = td.normalize();
+      camera.move(td.x * speed * k, 0, td.z * speed * k);
+      invokeIfExist(this, "oncameramove");
+      moved = true;
+    }
+
+    if (moved) this.scene.requireUpdateFrame();
   }
 }

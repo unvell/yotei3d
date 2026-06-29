@@ -17,7 +17,7 @@ import { Archive } from "../utility/archive";
 import { Animation } from "./animation";
 import { arrayRemove, byteArrayToBase64 } from "../utility/utility";
 import { GLTFLoader } from "../utility/gltfloader";
-import { Keys } from "./viewer";
+import { Keys } from "./input";
 
 export class Scene {
 	renderer: any;
@@ -1057,7 +1057,7 @@ export class Scene {
 	}
 
 	findObjectsByCurrentMousePosition(options?: any) {
-		return this.findObjectsByViewPosition(this.renderer.viewer.mouse.position, options);
+		return this.findObjectsByViewPosition(this.renderer.input.mouse.position, options);
 	}
 
 	findObjectsByViewPosition(p: any, options?: any): any {
@@ -1219,8 +1219,8 @@ export class Scene {
 			var renderer = this.renderer;
 
 			if (renderer.debugger
-				&& renderer.viewer.pressedKeys.has(Keys.Shift)
-				&& renderer.viewer.pressedKeys.has(Keys.Control)) {
+				&& renderer.input.pressedKeys.has(Keys.Shift)
+				&& renderer.input.pressedKeys.has(Keys.Control)) {
 				renderer.debugger.showObjectInfoPanel(obj);
 			}
 
@@ -1286,7 +1286,7 @@ export class Scene {
 	mousemove(pos: any): any {
 		if (this.renderer.options.enableObjectHover) {
 
-			var out = this.findObjectsByViewPosition(this.renderer.viewer.mouse.position);
+			var out = this.findObjectsByViewPosition(this.renderer.input.mouse.position);
 
 			var obj = out.object;
 

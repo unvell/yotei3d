@@ -128,12 +128,12 @@ export function performMovementAccelerationAnimation(
   const renderer = scene.renderer;
   if (!renderer) return;
 
-  const viewer = renderer.viewer;
-  if (!viewer) return;
+  const input = renderer.input;
+  if (!input) return;
 
   const movement = {
-    x: viewer.mouse.movement.x * intensity,
-    y: viewer.mouse.movement.y * intensity,
+    x: input.mouse.movement.x * intensity,
+    y: input.mouse.movement.y * intensity,
   };
 
   function updateFrame() {

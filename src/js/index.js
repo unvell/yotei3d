@@ -1,7 +1,7 @@
 export * from './render/renderer.js';
 export * from './render/pipeline.js';
 export * from './scene/scene';
-export * from './scene/viewer.js';
+export * from './scene/input.js';
 export * from './scene/material';
 export * from './scene/camera.js';
 export * from './scene/environment';
@@ -25,11 +25,16 @@ export * from './effect/volumetriclight.js';
 export * from './effect/cloudvolume.js';
 export * from './effect/volumetricclouds.js';
 export * from './effect/volumetricfluid.js';
-export * from './view/modelviewer.js';
-export * from './view/objectcontroller.js';
-export * from './view/touchcontroller.js';
-export * from './view/floorviewcontroller.js'
-export * from './view/fpscontroller'
+export * from './view/cameracontroller.js';
+export * from './view/orbitcontroller.js';
+export * from './view/turntablecontroller.js';
+export * from './view/flywalkcontroller.js';
+export * from './view/floorviewcontroller.js';
+export * from './view/fpscontroller';
+// deprecated aliases for the legacy controller class names
+export * from './view/modelviewer.js';      // ModelViewer -> OrbitController
+export * from './view/objectcontroller.js'; // ObjectViewController -> TurntableController
+export * from './view/touchcontroller.js';  // TouchController -> FlyWalkController
 export * from './webgl/cubemap.js';
 export * from './webgl/hdrskybox.js';
 export * from './webgl/dynamicsky.js';

@@ -12,7 +12,7 @@ import { ShaderSources } from "../shader/shadersources";
 import { ImageSource, ImageToScreenRenderer, DefaultRenderer, ShadowMapRenderer, ShadowMapBlurCacheRenderer, SceneToImageRenderer, ImageFilterRenderer, BlurRenderer } from "./pipeline"
 import { IBLBaker } from "./iblbaker";
 import { ProbeBaker } from "./probebaker";
-import { Viewer } from "../scene/viewer";
+import { InputManager } from "../scene/input";
 import { Scene } from '../scene/scene';
 import { ObjectTypes, ParticleObject } from "../scene/object";
 import { ResourceTypes, Texture, AttributeRenderer, MultipleImagePreviewRenderer, SSAORenderer } from '@';
@@ -268,10 +268,10 @@ export class Renderer {
 
 		this.resetViewport();
 
-		if (typeof Viewer === "function") {
-			this.viewer = new Viewer(this);
+		if (typeof InputManager === "function") {
+			this.input = new InputManager(this);
 		} else {
-			this.viewer = null;
+			this.input = null;
 		}
 
 		this.cachedMeshes = {};
@@ -446,7 +446,12 @@ export class Renderer {
 	}
 
 	orthographicProject(m) {
-		const scale = this.viewer.originDistance;
+		// Ortho zoom is owned by the active camera now (was the global viewer rig
+		// originDistance). Camera controllers drive camera.orthoSize.
+		const cam = this.activeCamera;
+		const scale = (cam && typeof cam.orthoSize === "number" && cam.orthoSize > 0)
+			? cam.orthoSize
+			: 1;
 		m.ortho(-this.aspectRate * scale, this.aspectRate * scale, -scale, scale, -this.options.perspective.far, this.options.perspective.far);
 	}
 
@@ -465,6 +470,14 @@ export class Renderer {
 
 		if (this.initialized) {
 			const scene = this.currentScene;
+
+			// Drive the active camera's controller every animation frame. The
+			// controller integrates its own motion (incl. inertia) and calls
+			// scene.requireUpdateFrame() while it still has velocity, so an idle
+			// controller costs only an early-out here.
+			if (scene && scene.mainCamera && scene.mainCamera.controller) {
+				scene.mainCamera.controller.tick();
+			}
 
 			// FIXME: remove this
 			let clear2d = false;
@@ -977,20 +990,10 @@ export class Renderer {
 	}
 
 	makeViewMatrix(m) {
-		const viewer = this.viewer;
-
-		if (viewer) {
-			m.translateZ(-(viewer.originDistance) * 10);
-
-			if ((!viewer.location.equals(0, 0, 0) || !viewer.angle.equals(0, 0, 0)
-				// || !viewer.scale.equals(1, 1, 1)
-			)) {
-				m.rotate(viewer.angle)
-					.translate(viewer.location.x, viewer.location.y, viewer.location.z)
-					//.scale(viewer.scale.z, viewer.scale.z, viewer.scale.z)
-					;
-			}
-		}
+		// The global "viewer" orbit rig has been removed; the camera (a SceneObject
+		// posed by its CameraController) is now the single source of view transform.
+		// makeCameraMatrix() builds the eye transform, so the view matrix stays
+		// identity. Kept as a no-op hook for clarity and future per-view overrides.
 	}
 
 	makeProjectMatrix(projectMethod, m) {
