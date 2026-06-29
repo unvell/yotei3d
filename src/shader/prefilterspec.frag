@@ -70,6 +70,15 @@ float distributionGGX(float NdotH, float rough) {
 
 void main(void) {
 	vec3 N = normalize(vDir);
+
+	// roughness 0 (mip 0) is a perfect mirror: the GGX lobe collapses to the
+	// reflection direction, so the convolution is the identity. Copy the source
+	// directly — full sharpness, and no wasted samples on the largest mip.
+	if (roughness < 1.0e-3) {
+		gl_FragColor = vec4(textureCube(envMap, N).rgb, 1.0);
+		return;
+	}
+
 	// the split-sum prefilter assumes the view direction equals the normal, so
 	// the reflection vector R is N as well.
 	vec3 R = N;

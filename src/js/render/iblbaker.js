@@ -186,15 +186,26 @@ export class IBLBaker {
 	//
 	// Each mip level of the returned cube holds the environment convolved with
 	// the GGX specular lobe for a roughness of (mip / maxMip): mip 0 is a sharp
-	// mirror, the coarsest mip a fully rough blur. The standard shader then reads
-	// a physically blurred reflection with textureCube(refMap, R, roughness*maxLod)
-	// instead of the box-downsampled (still-sharp) mips a plain generateMipmap
-	// produces — which made even moderately rough surfaces mirror the sky.
+	// mirror (an identity copy of the source), the coarsest mip a fully rough
+	// blur. The standard shader then reads a physically blurred reflection with
+	// textureCube(refMap, R, roughness*maxLod) instead of the box-downsampled
+	// (still-sharp) mips a plain generateMipmap produces — which made even
+	// moderately rough surfaces mirror the sky.
+	//
+	// The target matches the source face resolution (capped) so a perfect mirror
+	// (roughness 0) stays as crisp as sampling the source env directly did; only
+	// the rougher mips are convolved.
 	//
 	// Returns the prefiltered CubeMap; `_maxLod` is the max mip index, which the
 	// renderer hands to the shader as maxEnvLod so roughness maps onto the chain.
-	prefilterSpecular(envCubemap, size = 256) {
+	prefilterSpecular(envCubemap, size) {
 		const gl = this.renderer.gl;
+
+		const srcFaceSize = (envCubemap.images && envCubemap.images[0] && envCubemap.images[0].width)
+			|| envCubemap.width || 256;
+		// match the source resolution so the mirror mip is full-sharpness; cap to
+		// keep the prefiltered chain's memory / bake cost bounded.
+		if (!size) size = Math.min(srcFaceSize, 1024);
 
 		const target = new CubeMap(this.renderer);
 		target.enableMipmap = true;
@@ -213,8 +224,29 @@ export class IBLBaker {
 		target.disuse();
 
 		const maxMip = Math.max(0, Math.floor(Math.log2(size)));
-		const srcFaceSize = (envCubemap.images && envCubemap.images[0] && envCubemap.images[0].width)
-			|| envCubemap.width || size;
+		const faces = target.getLoadingFaces();
+
+		// mip 0 (the perfect-mirror level) is a pixel-exact copy of the source
+		// env, so a roughness-0 reflection is identical to sampling the env cube
+		// directly — no resampling blur, and crucially no orientation drift. (A
+		// shader resample would inherit the FBO render-vs-sample vertical flip
+		// that's invisible once a level is GGX-blurred, but would mirror a sharp
+		// reflection.) Needs matching face sizes; falls back to the shader below.
+		const canCopyMip0 = size === srcFaceSize && envCubemap.glTexture;
+		if (canCopyMip0) {
+			const copyFbo = gl.createFramebuffer();
+			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, copyFbo);
+			target.use();
+			const srcFaces = envCubemap.getLoadingFaces();
+			for (let i = 0; i < 6; i++) {
+				gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+					srcFaces[i], envCubemap.glTexture, 0);
+				gl.copyTexSubImage2D(faces[i], 0, 0, 0, 0, 0, size, size);
+			}
+			target.disuse();
+			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+			gl.deleteFramebuffer(copyFbo);
+		}
 
 		const fbo = gl.createFramebuffer();
 		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -225,9 +257,10 @@ export class IBLBaker {
 		shader.envMapUniform.set(envCubemap);
 		shader.resolutionUniform.set(srcFaceSize);
 
-		const faces = target.getLoadingFaces();
-
-		for (let mip = 0; mip <= maxMip; mip++) {
+		// GGX-convolve the rougher mips. mip 0 is the copied mirror above (or, if
+		// sizes didn't match, the shader's own roughness-0 identity path).
+		const startMip = canCopyMip0 ? 1 : 0;
+		for (let mip = startMip; mip <= maxMip; mip++) {
 			const mipSize = Math.max(1, size >> mip);
 			gl.viewport(0, 0, mipSize, mipSize);
 
