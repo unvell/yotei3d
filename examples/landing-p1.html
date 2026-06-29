@@ -17,15 +17,16 @@
 	</style>
 	<script type="module">
 
-    import { Renderer, Scene, SceneObject, Ocean, HDRSkyBox, TouchController, LensFlare } from "@";
+    import { Renderer, Scene, SceneObject, Ocean, HDRSkyBox, OrbitController, LensFlare } from "@";
+    import { Vec3 } from "@/math";
 
     window.addEventListener("load", function() {
 
       // ----------------------------------------------------------------------
       // Carrier Landing simulation — Phase 1 (P1)
       // Goal of this phase: get the USS Eisenhower (CVN-69) glTF rendering on an
-      // open ocean under a clear-sky HDRI, framed and inspectable with a free
-      // fly camera. No flight model yet — that arrives in later phases.
+      // open ocean under a clear-sky HDRI, kept fixed at the centre and inspected
+      // with an orbit camera. No flight model yet — that arrives in later phases.
       // See LANDING-SPECS.md for the full roadmap.
       // ----------------------------------------------------------------------
 
@@ -52,7 +53,7 @@
       });
       scene.environment.mat = { color: [0.5, 0.5, 0.5] };
       scene.environment.intensity = 0.45;
-      scene.mainCamera.exposure = 1.0;
+      scene.mainCamera.exposure = 0.5;
 
       // haze the sea into the horizon and bleed the same haze into the bottom of
       // the sky so they meet at one colour instead of a hard line.
@@ -174,14 +175,23 @@
       });
       window._lensFlare = lensFlare;
 
-      // --- camera + free-fly controller --------------------------------------
-      // A 3/4 view from off the port bow, slightly above deck height, looking
-      // back toward the ship. WASD to fly, drag to look, wheel to dolly.
+      // --- camera + orbit controller -----------------------------------------
+      // Keep the carrier fixed at the centre and orbit the *camera* around it
+      // (docs/camera.md → OrbitController). The pivot sits at mid-ship height so
+      // the whole hull + island frame up. We place the camera first — a 3/4 view
+      // off the port bow, above deck — and let OrbitController derive its yaw /
+      // pitch / distance from that pose on attach (only `target` is pinned).
       scene.mainCamera.fieldOfView = 55;
       scene.mainCamera.location.set(-180, 90, 200);
-      scene.mainCamera.angle.set(-16, -40, 0);
 
-      const controller = new TouchController(scene, { speed: 1.2, distance: 8 });
+      const controller = new OrbitController({
+        target: new Vec3(0, 18, 0),   // mid-ship pivot (carrier is centred on X/Z)
+        minPitch: -2,                 // stay above the waterline
+        maxPitch: 82,
+        minDistance: 120,             // don't push the eye inside the hull
+        maxDistance: 1400,
+      });
+      scene.mainCamera.controller = controller;
       window._controller = controller;
 
       // --- drive the waves ---------------------------------------------------
@@ -200,16 +210,16 @@
 		<div class="menu hover:text-sky-600">
 			&lt; <a href="index.html">Back</a>
 		</div>
-    <div>Carrier Landing — P1: USS Eisenhower (CVN-69) on the open sea. WASD to fly, drag to look, scroll to dolly.</div>
+    <div>Carrier Landing — P1: USS Eisenhower (CVN-69) on the open sea. Drag to orbit, scroll to zoom, shift+drag to pan.</div>
 		<div class="logo">
       <img src="/img/logo.svg">
 		</div>
 	</div>
 
 	<div id="land-hud">
-		<div class="lh-title">Free camera</div>
-		<div><b>W</b><b>A</b><b>S</b><b>D</b> &nbsp;fly</div>
-		<div><b>drag</b> &nbsp;look &nbsp; <b>scroll</b> &nbsp;dolly</div>
+		<div class="lh-title">Orbit camera</div>
+		<div><b>drag</b> &nbsp;orbit &nbsp; <b>scroll</b> &nbsp;zoom</div>
+		<div><b>shift</b>+drag &nbsp;pan</div>
 		<div class="lh-dim" id="lh-dim">loading carrier…</div>
 	</div>
 

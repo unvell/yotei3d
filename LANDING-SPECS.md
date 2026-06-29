@@ -53,11 +53,13 @@ What P1 does:
 - **Fog + skyFog** so the sea fades into the horizon with no hard seam.
 - **Sun** key light + **LensFlare** bound to `scene.sun`.
 - Loads the **carrier glTF** and **auto-fits** it (see §5), sitting it on the water.
-- **TouchController** free-fly camera (WASD fly, drag look, wheel dolly).
+- **OrbitController** camera (carrier fixed at the centre; drag to orbit, scroll to
+  zoom, shift+drag to pan) — pivot at mid-ship `target (0, 18, 0)`.
 - Live HUD readout of the fitted deck dimensions.
 
 Verified in-browser (Playwright): hull number **"69"**, island/mast, angled flight
-deck, and deck markings all render; ship floats correctly with deck up.
+deck, and deck markings all render; ship floats correctly with deck up; the camera
+orbits while the carrier stays centered.
 
 ---
 
@@ -129,9 +131,21 @@ can move/turn the whole ship (carrier underway) via the holder.
 - **Bounds:** `obj.getBounds()` → world-space `BoundingBox3D { min, max, origin, size }`.
   Result is cached in `_cachedBbox` (per object). Changing a parent transform makes
   child caches stale → either measure once up front or clear caches recursively.
-- **Controllers:** `TouchController` = free-fly camera (mutates `mainCamera`).
-  `ObjectViewController` = spins the *target object* (camera fixed); zoom uses
-  `viewer.originDistance` (× 10 = camera dolly distance, clamped ≤ 50 → ≤ 500 u).
+- **Camera controllers (reworked — see `docs/camera.md`):** the camera is the
+  single source of the view transform (no more `renderer.viewer` rig; read input
+  from `renderer.input`). Attach one controller per camera via
+  `scene.mainCamera.controller = new XxxController(opts)` (assigning auto-detaches
+  the previous one). The renderer ticks the active camera's controller each frame.
+  - `OrbitController` — orbits the **camera** around a pivot `target`, always
+    looking at it (carrier stays centered). Options: `target` (Vec3 / `{x,y,z}`,
+    **not** an array), `distance`, `yaw`, `pitch`, `min/maxPitch`,
+    `min/maxDistance`, `rotate/zoom/panSpeed`, `inertia`, `enableRotate/Zoom/Pan`.
+    Built-in inertia. Non-pinned params are derived from the camera's pose on
+    attach, so place the camera first then pin only `target`. **P1 uses this.**
+  - `TurntableController` — spins the *object* (camera fixed); zoom dollies.
+  - `FlyWalkController` — free walk/fly (WASD + drag-look). `FPSController` — FPS walk.
+  - Legacy names `ModelViewer` / `ObjectViewController` / `TouchController` still
+    work as deprecated aliases.
 - **Ocean / sky / fog:** see `examples/ocean.html` — `Ocean`, `HDRSkyBox`,
   `scene.fog`, `scene.skyFog`, `scene.sun`, `LensFlare`.
 - **Static dir:** examples are served from `examples/` with `examples/public/` as
@@ -157,6 +171,11 @@ can move/turn the whole ship (carrier underway) via the holder.
 ## 8. Changelog
 
 - **2026-06-29 — P1:** Copied carrier glTF into `examples/public/models/carrier/`.
-  Created `examples/landing-p1.html` (HDRI + ocean + auto-fit carrier + free-fly
-  camera). Added auto-fit/reorient pipeline (ORIENT `[-90,0,0]`, `DECK_LENGTH 230`).
-  Registered the example + thumbnail. Verified in-browser. Created this spec.
+  Created `examples/landing-p1.html` (HDRI + ocean + auto-fit carrier). Added
+  auto-fit/reorient pipeline (ORIENT `[-90,0,0]`, `DECK_LENGTH 230`). Registered the
+  example + thumbnail. Verified in-browser. Created this spec.
+- **2026-06-29 — P1 camera:** Migrated the P1 camera from the old `TouchController`
+  free-fly rig to the reworked **`OrbitController`** (`docs/camera.md`) so the
+  carrier stays fixed at the centre and the camera orbits around it (pivot
+  `target (0,18,0)`). Updated §3/§6 to the new camera model (removed the stale
+  `viewer.originDistance` reference).
