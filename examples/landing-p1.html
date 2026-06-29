@@ -127,9 +127,26 @@
       const DECK_LENGTH = 230;
       const DRAFT = 8;   // how far the keel sits below the waterline (y=0)
 
-      const holder = new SceneObject();   // spin/move pivot for later phases
+      const holder = new SceneObject();   // the carrier rides this; we drive it forward
       scene.add(holder);
       window._carrierHolder = holder;
+
+      // The carrier is now under way, so the sea must travel with it (otherwise
+      // the ship sails off the 12000u grid). Follow the *holder* — the moving
+      // subject — not the camera eye; Ocean snaps the follow to a grid cell so
+      // the waves stay world-locked and never swim. The wake source is also the
+      // holder: the water shader lays a foam trail along the path it carves.
+      ocean.options.followTarget = holder;
+      ocean.options.wake = {
+        source: holder,
+        dropDistance: 5,     // sample the path every 5u (smooth trail)
+        life: 16,            // foam lingers 16s ≈ a long trail at this speed
+        maxPoints: 48,       // == shader WAKE_MAX
+        width: 22,           // half-width at the stern (ship beam ≈ 64u)
+        widthGrowth: 4,      // tail fans out to ~5× that
+        foamColor: [1.0, 1.05, 1.12],
+        foamIntensity: 1.0,
+      };
 
       const dimEl = () => document.getElementById("lh-dim");
 
@@ -185,11 +202,13 @@
       window._lensFlare = lensFlare;
 
       // --- camera + orbit controller -----------------------------------------
-      // Keep the carrier fixed at the centre and orbit the *camera* around it
-      // (docs/camera.md → OrbitController). The pivot sits at mid-ship height so
-      // the whole hull + island frame up. We place the camera first — a 3/4 view
-      // off the port bow, above deck — and let OrbitController derive its yaw /
-      // pitch / distance from that pose on attach (only `target` is pinned).
+      // Orbit the camera around the carrier (docs/camera.md → OrbitController).
+      // The pivot sits at mid-ship height so the whole hull + island frame up.
+      // The carrier is under way, so each frame we shift the orbit pivot by the
+      // ship's travel (see the frame loop): the camera rides along keeping the
+      // ship centred while the user's own orbit / zoom / pan are preserved.
+      // We place the camera first — a 3/4 view off the port bow — and let
+      // OrbitController derive its yaw / pitch / distance from that pose.
       scene.mainCamera.fieldOfView = 55;
       scene.mainCamera.location.set(-200, 30, 120);
 
@@ -209,9 +228,40 @@
       scene.mainCamera.controller = controller;
       window._controller = controller;
 
-      // --- drive the waves ---------------------------------------------------
+      // --- sail the carrier + drive the sea ----------------------------------
+      // Move the holder forward along its heading each frame, slide the orbit
+      // pivot by the same delta so the camera tracks the ship, then advance the
+      // ocean (which follows the holder and trails its wake). All motion is
+      // real-time delta-based so it runs at a fixed speed regardless of FPS.
+      //
+      // This glTF's bow is its local -Z (verified: the "69" bow number sits on
+      // that end), so "forward" is local -Z rotated into the world by HEADING.
+      // At HEADING 0 the carrier therefore steams bow-first toward world -Z.
+      const HEADING = 0;            // ship yaw in degrees (0 = sail toward -Z)
+      const SHIP_SPEED = 16;        // world units / second
+      const hdg = HEADING * Math.PI / 180;
+      const fwd = { x: -Math.sin(hdg), z: -Math.cos(hdg) };
+      holder.angle.y = HEADING;     // point the hull along the heading
+
+      let _lastT = 0;
       scene.on("frame", () => {
-        ocean.update();
+        const now = performance.now();
+        const dt = _lastT ? Math.min((now - _lastT) / 1000, 0.05) : 0.016;
+        _lastT = now;
+
+        const step = SHIP_SPEED * dt;
+        const dx = fwd.x * step, dz = fwd.z * step;
+
+        holder.location.x += dx;
+        holder.location.z += dz;
+
+        // shift the orbit pivot by the ship's travel → camera follows, while
+        // the user's orbit/zoom/pan offsets are kept intact.
+        controller.target.x += dx;
+        controller.target.z += dz;
+        controller.setTarget(controller.target);
+
+        ocean.update();             // follow (grid-snapped) + advance wake/waves
       });
       scene.animation = true;
 

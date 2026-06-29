@@ -9,6 +9,9 @@ import { CubeMap } from "../webgl/cubemap.js";
 // scene's environment cubemap (the skybox) — the same map IBL is baked from —
 // so the ocean costs no extra render pass.
 export class WaterShader extends Shader {
+	// Max wake trail samples; MUST match `#define WAKE_MAX` in water.frag.
+	static WAKE_MAX = 48;
+
 	constructor(renderer, vertShaderSrc, fragShaderSrc) {
 		super(renderer, vertShaderSrc, fragShaderSrc);
 
@@ -42,6 +45,13 @@ export class WaterShader extends Shader {
 		this.rippleStrengthUniform = this.bindUniform("rippleStrength", "float");
 		this.rippleDetailUniform = this.bindUniform("rippleDetail", "float");
 		this.reflectionBlurUniform = this.bindUniform("reflectionBlur", "float");
+
+		// ship wake foam (see water.frag). The trail is a polyline of recent
+		// world-space path samples streamed in from Ocean._wake each frame.
+		this.wakeCountUniform = this.bindUniform("uWakeCount", "int");
+		this.wakeUniforms = this.bindUniformArray("uWake", "vec4", WaterShader.WAKE_MAX);
+		this.wakeFoamColorUniform = this.bindUniform("uWakeFoamColor", "color3");
+		this.wakeFoamIntensityUniform = this.bindUniform("uWakeFoamIntensity", "float");
 
 		// environment cubemap (sky reflection)
 		this.envMapUniform = this.bindUniform("envMap", "texcube", 4);
@@ -146,9 +156,42 @@ export class WaterShader extends Shader {
 		this.rippleDetailUniform.set(num(o.rippleDetail, 1.0));
 		this.reflectionBlurUniform.set(num(o.reflectionBlur, 2.0));
 
+		this.setWakeUniforms(obj);
+
 		// the ocean grid is one-sided; show it from below too (e.g. underwater
 		// camera) instead of culling to nothing.
 		gl.disable(gl.CULL_FACE);
+	}
+
+	// Stream the rolling wake trail (Ocean._wake) into the foam uniforms. Each
+	// sample carries a strength that fades with age and a half-width that grows
+	// toward the tail, so the foam narrows + brightens at the stern and fans +
+	// dissolves behind. No trail (or wake disabled) → uWakeCount 0, foam off.
+	setWakeUniforms(obj) {
+		const wake = obj._wake;
+		const cfg = (obj.options && obj.options.wake) || null;
+
+		if (!cfg || !wake || wake.length < 2) {
+			this.wakeCountUniform.set(0);
+			return;
+		}
+
+		const life = num(cfg.life, 14);
+		const baseW = num(cfg.width, 18);
+		const growth = num(cfg.widthGrowth, 5);
+		const cap = Math.min(wake.length, this.wakeUniforms.length);
+
+		for (let i = 0; i < cap; i++) {
+			const p = wake[i];
+			const age01 = Math.min(Math.max(p.age / life, 0), 1);
+			const strength = 1 - age01;                  // fades behind the ship
+			const halfWidth = baseW * (1 + growth * age01); // spreads behind the ship
+			this.wakeUniforms[i].set([p.x, p.z, strength, halfWidth]);
+		}
+
+		this.wakeCountUniform.set(cap);
+		this.wakeFoamColorUniform.set(cfg.foamColor || [0.95, 1.0, 1.05]);
+		this.wakeFoamIntensityUniform.set(num(cfg.foamIntensity, 1.0));
 	}
 
 	endObject(obj) {

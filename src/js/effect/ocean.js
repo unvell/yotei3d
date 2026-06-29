@@ -51,13 +51,34 @@ export class Ocean extends SceneObject {
 			rippleDetail: 1.0,    // near-camera fine ripple octaves: breaks up "oily" close water (0 = off)
 			reflectionBlur: 2.0,  // distance/grazing reflection softening (0 = mirror-sharp)
 
-			followTarget: null,   // optional object/camera; grid recentres on its x/z
+			// Endless-sea follow. Pass an object/camera and the grid recentres on
+			// its x/z. The recentre is SNAPPED to a whole grid cell (see update())
+			// so the world-space wave lattice always lands on the same phase — the
+			// surface never "swims" while it slides. Follow the *subject* that
+			// actually travels (a ship/aircraft), never the orbiting camera eye.
+			followTarget: null,
+
+			// Ship wake. Pass { source } (any object with .location) to lay a foam
+			// trail behind it; the water shader paints turbulent white foam along
+			// the path. null = no wake. Tunables (all optional):
+			//   dropDistance  world units between trail samples (smaller = smoother)
+			//   life          seconds a foam sample lingers before it fades out
+			//   maxPoints     hard cap on trail samples (<= shader WAKE_MAX = 48)
+			//   width         half-width of the foam at the stern (world units)
+			//   widthGrowth   how much wider the foam gets at the tail (× width)
+			//   foamColor     [r,g,b] of the foam (slightly >1 blooms)
+			//   foamIntensity overall foam opacity
+			wake: null,
 		}, options);
 
 		// expose the live-readable shading/wave params on the object so the
 		// shader (which reads obj.options) picks up changes immediately.
 		this.time = 0;
 		this._lastTime = 0;
+
+		// rolling buffer of recent wake samples ({ x, z, age } in world space,
+		// oldest first); fed to the water shader each frame. See _updateWake().
+		this._wake = [];
 
 		this.shader = { name: "water" };
 		this.castShadow = false;
@@ -78,10 +99,18 @@ export class Ocean extends SceneObject {
 
 		this.time += dt * (this.options.timeScale || 1.0);
 
+		// Follow, snapped to a whole grid cell. The waves are evaluated in world
+		// space, so if the grid slid by arbitrary sub-cell amounts its vertex
+		// lattice would sample the wave field at shifting phases and the surface
+		// would "swim". Quantising location.x/z to the cell size keeps every
+		// vertex on the same world lattice, so the grid can chase the subject
+		// across an endless sea with the waves dead-still relative to the world.
 		const tgt = this.options.followTarget;
 		if (tgt && tgt.location) {
-			this.location.x = tgt.location.x;
-			this.location.z = tgt.location.z;
+			const seg = Math.max(1, Math.floor(this.options.segments));
+			const cell = this.options.size / seg;
+			this.location.x = Math.round(tgt.location.x / cell) * cell;
+			this.location.z = Math.round(tgt.location.z / cell) * cell;
 		}
 
 		// Height is driven by location.y so `ocean.location.set(...)` sticks.
@@ -90,6 +119,37 @@ export class Ocean extends SceneObject {
 		if (this.options.level !== this._appliedLevel) {
 			this.location.y = this.options.level;
 			this._appliedLevel = this.options.level;
+		}
+
+		this._updateWake(dt);
+	}
+
+	// Maintain the rolling wake trail: age existing samples, retire the ones
+	// past their lifetime, and drop a fresh sample at the source once it has
+	// moved `dropDistance`. The water shader reads this._wake to paint foam.
+	_updateWake(dt) {
+		const cfg = this.options.wake;
+		const w = this._wake;
+
+		if (!cfg || !cfg.source || !cfg.source.location) {
+			if (w.length) w.length = 0;   // wake turned off → clear the trail
+			return;
+		}
+
+		const life = cfg.life || 14;
+		const drop = cfg.dropDistance || 6;
+		const maxPoints = Math.min(cfg.maxPoints || 48, 48);   // shader WAKE_MAX
+
+		for (let i = 0; i < w.length; i++) w[i].age += dt;
+		while (w.length && w[0].age > life) w.shift();          // retire old foam
+
+		const src = cfg.source.location;
+		const head = w.length ? w[w.length - 1] : null;
+		const dx = head ? src.x - head.x : Infinity;
+		const dz = head ? src.z - head.z : Infinity;
+		if (!head || (dx * dx + dz * dz) >= drop * drop) {
+			w.push({ x: src.x, z: src.z, age: 0 });
+			if (w.length > maxPoints) w.shift();
 		}
 	}
 }

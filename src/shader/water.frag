@@ -38,6 +38,16 @@ uniform vec3 fogColor;
 uniform float fogNear;
 uniform float fogFar;
 
+// ship wake foam — a turbulent white trail painted along the path a moving
+// vessel has carved. The CPU streams the recent path samples (Ocean._wake) in
+// as a polyline; here we measure each fragment's distance to that line and lay
+// down foam, brightest along the centre and fanning/fading toward the tail.
+#define WAKE_MAX 48
+uniform int   uWakeCount;          // number of valid samples in uWake (0 = off)
+uniform vec4  uWake[WAKE_MAX];     // xy = world xz, z = strength 0..1, w = half-width
+uniform vec3  uWakeFoamColor;      // foam tint (slightly >1 to bloom)
+uniform float uWakeFoamIntensity;  // overall foam opacity
+
 varying vec3 vWorldPos;
 varying vec3 vNormal;
 varying vec2 vWorldXZ;
@@ -76,6 +86,36 @@ vec3 proceduralSky(vec3 dir) {
 	// a soft glow around the sun reflected off the water
 	float sun = pow(max(dot(dir, sundir), 0.0), 80.0);
 	return sky + sunlight * sun * 0.5;
+}
+
+// distance from point p to segment ab, with t = the closest-point parameter
+// (0 at a .. 1 at b) so per-sample strength/width can be interpolated along it.
+float segDist(vec2 p, vec2 a, vec2 b, out float t) {
+	vec2 ab = b - a;
+	float l2 = max(dot(ab, ab), 1.0e-4);
+	t = clamp(dot(p - a, ab) / l2, 0.0, 1.0);
+	return length(p - (a + ab * t));
+}
+
+// Foam coverage at world point P, walking the wake polyline. Returns 0..1.
+// Per segment: distance gives a soft-edged band (bright centre -> clear edge),
+// scaled by the sample's fading strength; we keep the strongest band hit.
+float wakeFoam(vec2 P) {
+	if (uWakeCount < 2) return 0.0;
+
+	float foam = 0.0;
+	for (int i = 0; i < WAKE_MAX - 1; i++) {
+		if (i >= uWakeCount - 1) break;
+		vec4 a = uWake[i];
+		vec4 b = uWake[i + 1];
+		float t;
+		float d = segDist(P, a.xy, b.xy, t);
+		float halfW = mix(a.w, b.w, t);
+		float strength = mix(a.z, b.z, t);
+		float band = 1.0 - smoothstep(halfW * 0.25, halfW, d);
+		foam = max(foam, band * strength);
+	}
+	return foam;
 }
 
 void main(void) {
@@ -152,6 +192,23 @@ void main(void) {
 	float ggx = a2 / (3.14159265 * dterm * dterm);
 	float sunUp = smoothstep(-0.05, 0.15, sundir.y);
 	color += sunlight * ggx * specStrength * sunUp;
+
+	// --- ship wake foam: turbulent white water churned up along the vessel's
+	// path. The coverage band comes from the wake polyline; two scrolling noise
+	// octaves break it into froth and boiling streaks so it reads as churn
+	// rather than a painted stripe. Laid over the water before fog so the far
+	// trail melts into the haze with the rest of the sea.
+	if (uWakeCount >= 2) {
+		float foam = wakeFoam(vWorldXZ);
+		if (foam > 0.0) {
+			vec2 fp = vWorldXZ * 0.18;
+			float n1 = valueNoise(fp + vec2(time * 0.6, -time * 0.4));
+			float n2 = valueNoise(fp * 2.7 - vec2(time * 0.9, time * 0.7));
+			float churn = mix(0.55, 1.15, n1) * mix(0.7, 1.1, n2);
+			foam = clamp(foam * churn * uWakeFoamIntensity, 0.0, 1.0);
+			color = mix(color, uWakeFoamColor, foam);
+		}
+	}
 
 	// distance fog toward the horizon
 	if (hasFog) {
