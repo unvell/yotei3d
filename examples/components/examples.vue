@@ -166,6 +166,12 @@ const exampleItems = ref([
     desc: 'Hold the mouse to fire the F-2\'s cannon — HDR over-bright tracers streak across the sky as a dashed line through the bloom pass, while a live Fire-particle muzzle flash spits hot sparks and the airframe shudders with recoil.',
   },
   {
+    title: 'Carrier Landing — P1',
+    thumbnail: '/img/examples/landing-p1.jpg',
+    link: 'landing-p1.html',
+    desc: 'Phase 1 of a carrier-landing simulation: the USS Dwight D. Eisenhower (CVN-69) glTF auto-fitted onto a GPU Gerstner-wave ocean under a clear-sky HDRI. The model is measured and reoriented on load (deck up, hull along Z) and scaled to keep the jet-to-ship ratio realistic for later phases. Free-fly camera — WASD to fly, drag to look, scroll to dolly.',
+  },
+  {
     title: 'WaterBottle (glTF PBR)',
     thumbnail: '/img/examples/waterbottle.png',
     link: 'waterbottle.html',

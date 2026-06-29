@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Carrier Landing — P1: Carrier — Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<style>
+		#land-hud{position:fixed;left:12px;bottom:12px;z-index:20;
+			background:rgba(18,26,38,.62);color:#eaf2ff;
+			font:12px/1.5 system-ui,-apple-system,sans-serif;
+			border-radius:8px;padding:8px 12px;backdrop-filter:blur(4px);user-select:none}
+		#land-hud .lh-title{font-weight:600;margin-bottom:4px;opacity:.85}
+		#land-hud b{display:inline-block;min-width:30px;text-align:center;
+			padding:0 4px;border-radius:4px;background:rgba(127,179,255,.22);
+			font-weight:600;font-variant-numeric:tabular-nums}
+		#land-hud .lh-dim{margin-top:6px;opacity:.7;font-variant-numeric:tabular-nums}
+	</style>
+	<script type="module">
+
+    import { Renderer, Scene, SceneObject, Ocean, HDRSkyBox, TouchController, LensFlare } from "@";
+
+    window.addEventListener("load", function() {
+
+      // ----------------------------------------------------------------------
+      // Carrier Landing simulation — Phase 1 (P1)
+      // Goal of this phase: get the USS Eisenhower (CVN-69) glTF rendering on an
+      // open ocean under a clear-sky HDRI, framed and inspectable with a free
+      // fly camera. No flight model yet — that arrives in later phases.
+      // See LANDING-SPECS.md for the full roadmap.
+      // ----------------------------------------------------------------------
+
+      const renderer = new Renderer({
+        backColor: [0.70, 0.82, 0.92, 1],
+        enablePostprocess: true,
+        enableAntialias: true,
+        enableShadow: false,        // open seascape: nothing else to cast onto
+        // Wide-open seascape + a 230-unit-long ship: push the far plane well out
+        // so the ocean reaches the horizon and the whole hull stays unclipped.
+        perspective: { method: "persp", angle: 55, near: 0.5, far: 6000 },
+        bloomEffect: { enabled: true, threshold: 0.6, gamma: 1.4, intensity: 0.8 },
+        renderingImage: { gamma: 1.1, resolutionRatio: 1 },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // --- sky: clear-blue HDRI. Lights the ship (IBL) and is the backdrop the
+      //     ocean reflects. -----------------------------------------------------
+      scene.environment = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+        faceSize: 1024,
+        rotation: 120,
+      });
+      scene.environment.mat = { color: [0.5, 0.5, 0.5] };
+      scene.environment.intensity = 0.45;
+      scene.mainCamera.exposure = 1.0;
+
+      // haze the sea into the horizon and bleed the same haze into the bottom of
+      // the sky so they meet at one colour instead of a hard line.
+      scene.fog = { near: 400, far: 4500, color: [0.66, 0.76, 0.86] };
+      scene.skyFog = {
+        color: [0.70, 0.80, 0.88],
+        lower: 0.0,
+        upper: 0.05,
+        density: 0.7,
+      };
+
+      // --- sun: warm daylight key, low-ish so the deck and island catch a clear
+      //     directional highlight on top of the sky's ambient. ------------------
+      scene.sun.direction = [0.4, 0.55, -0.7];
+      scene.sun.mat.color = [1.3, 1.2, 1.0];
+
+      // --- the ocean ---------------------------------------------------------
+      const ocean = new Ocean({
+        size: 12000,
+        segments: 120,
+        level: 0,
+        wind: [1.0, 0.5],
+        waveAmp: 0.35,
+        waveLen: 120,
+        waveSpeed: 0.12,
+        steepness: 0.6,
+        sunGlitter: 0.25,
+        specStrength: 0.18,
+        fresnelPower: 5.0,
+        fresnelBias: 0.2,
+        reflectivity: 0.32,
+        reflectionBlur: 1.5,
+        rippleScale: 1.0,
+        rippleStrength: 0.5,
+        rippleDetail: 3.0,
+        deepColor: [0.015, 0.08, 0.12],
+        shallowColor: [0.10, 0.34, 0.40],
+        followTarget: scene.mainCamera,   // endless sea: recentres on the camera
+      });
+      ocean.location.set(0, 0, 0);
+      scene.add(ocean);
+      window._ocean = ocean;
+
+      // --- the aircraft carrier (USS Dwight D. Eisenhower CVN-69, glTF) -------
+      // The model arrives standing on its stern (its long axis is the glTF +Y),
+      // so we first lay it flat with ORIENT, then measure its bounding box and
+      // auto-fit: scale the longest horizontal axis to DECK_LENGTH engine units,
+      // centre it on the origin in X/Z, and drop the keel below y=0 so the
+      // waterline cuts the hull.
+      //
+      // ORIENT (-90° about X) brings the deck face-up and the hull fore/aft onto
+      // the Z axis — verified against the model; the auto-fit numbers below
+      // (raw 293.9×241.8×1061.8 → deck ~230×64 u, height ~52 u) confirm it.
+      //
+      // DECK_LENGTH is chosen to match the F-2's scale for later phases: the F-2
+      // model is ~10 units long; a real Eisenhower deck (~333 m) is ~21× a real
+      // F-2 (~15.5 m), so ~230 units keeps the jet-to-ship ratio realistic when
+      // we drop the aircraft in.
+      const ORIENT = [-90, 0, 0];   // lay the ship flat, deck up, hull along Z
+      const DECK_LENGTH = 230;
+      const DRAFT = 6;   // how far the keel sits below the waterline (y=0)
+
+      const holder = new SceneObject();   // spin/move pivot for later phases
+      scene.add(holder);
+      window._carrierHolder = holder;
+
+      const dimEl = () => document.getElementById("lh-dim");
+
+      scene.createObjectFromURL("/models/carrier/scene.gltf", root => {
+        if (!root) { console.error("failed to load carrier scene.gltf"); return; }
+        window.carrier = root;
+        holder.add(root);
+
+        // lay the ship flat BEFORE measuring so the bounds are the oriented ones
+        root.angle.set(ORIENT[0], ORIENT[1], ORIENT[2]);
+
+        // oriented model-space bounds (this is the first getBounds call, so no
+        // stale child caches to worry about; scale/translate below are applied
+        // analytically — world = T + scale * boundsPoint — so we never re-measure)
+        const bb = root.getBounds();
+        const sz = bb.size, mn = bb.min, mx = bb.max;
+        const cx = (mn.x + mx.x) / 2, cz = (mn.z + mx.z) / 2;
+
+        // after ORIENT the hull length lies along Z; take the longest horizontal
+        // axis as the deck length and scale to DECK_LENGTH.
+        const longest = Math.max(sz.x, sz.z);
+        const s = DECK_LENGTH / longest;
+
+        root.scale.set(s, s, s);
+        // centre on origin in X/Z; lift so the scaled keel sits DRAFT below y=0.
+        root.location.set(-s * cx, -s * mn.y - DRAFT, -s * cz);
+
+        // report the fit so later phases can reuse the numbers
+        const fit = {
+          rawSize: { x: +sz.x.toFixed(2), y: +sz.y.toFixed(2), z: +sz.z.toFixed(2) },
+          scale: +s.toFixed(4),
+          deckLength: DECK_LENGTH,
+          worldSize: { x: +(sz.x * s).toFixed(1), y: +(sz.y * s).toFixed(1), z: +(sz.z * s).toFixed(1) },
+        };
+        window.carrierFit = fit;
+        console.log("[carrier] auto-fit", fit);
+
+        const el = dimEl();
+        if (el) {
+          el.textContent = `deck ≈ ${fit.worldSize.x}×${fit.worldSize.z} u · h ${fit.worldSize.y} u · scale ${fit.scale}`;
+        }
+
+        scene.requireUpdateFrame();
+      });
+
+      // --- sun / lens flare --------------------------------------------------
+      const lensFlare = new LensFlare(scene, {
+        follow: scene.sun,
+        occluders: [holder],
+        color: [1, 1, 0.95],
+        intensity: 2,
+        coreIntensity: 0.5,
+        scale: 2.0,
+      });
+      window._lensFlare = lensFlare;
+
+      // --- camera + free-fly controller --------------------------------------
+      // A 3/4 view from off the port bow, slightly above deck height, looking
+      // back toward the ship. WASD to fly, drag to look, wheel to dolly.
+      scene.mainCamera.fieldOfView = 55;
+      scene.mainCamera.location.set(-180, 90, 200);
+      scene.mainCamera.angle.set(-16, -40, 0);
+
+      const controller = new TouchController(scene, { speed: 1.2, distance: 8 });
+      window._controller = controller;
+
+      // --- drive the waves ---------------------------------------------------
+      scene.on("frame", () => {
+        ocean.update();
+      });
+      scene.animation = true;
+
+      scene.show();
+    });
+
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center bg-gray-800/40 text-white">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Carrier Landing — P1: USS Eisenhower (CVN-69) on the open sea. WASD to fly, drag to look, scroll to dolly.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="land-hud">
+		<div class="lh-title">Free camera</div>
+		<div><b>W</b><b>A</b><b>S</b><b>D</b> &nbsp;fly</div>
+		<div><b>drag</b> &nbsp;look &nbsp; <b>scroll</b> &nbsp;dolly</div>
+		<div class="lh-dim" id="lh-dim">loading carrier…</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+
+	<div class="fixed bottom-0 right-0 z-10 px-4 py-2" style="font-size:11px; opacity:0.55;">
+		Carrier: "USS Dwight D. Eisenhower CVN-69" by Muhamad Mirza Arrafi — CC-BY-4.0
+	</div>
+</body>
+</html>
