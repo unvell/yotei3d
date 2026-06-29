@@ -4,7 +4,8 @@
 > land it on the **USS Dwight D. Eisenhower (CVN-69)** aircraft carrier on the open
 > sea. This document is the single source of truth and is **updated every phase**.
 >
-> **Last updated:** 2026-06-29 — Phase **P1** complete.
+> **Last updated:** 2026-06-29 — Phase **P1** complete; carrier now steams under
+> way with a wake (parts of P5 pulled forward) and the camera/ocean follow it.
 
 ---
 
@@ -49,17 +50,22 @@ unit of work** (都度コミット) and keep this file current.
 What P1 does:
 
 - Clear-sky **HDRI** environment (`kloppenheim_06_puresky_4k.hdr`) for backdrop + IBL.
-- GPU Gerstner-wave **Ocean** (`followTarget: scene.mainCamera` → endless sea).
+- GPU Gerstner-wave **Ocean**, **grid-snapped follow** of the moving carrier (see §6)
+  → endless sea with no "swimming".
 - **Fog + skyFog** so the sea fades into the horizon with no hard seam.
 - **Sun** key light + **LensFlare** bound to `scene.sun`.
 - Loads the **carrier glTF** and **auto-fits** it (see §5), sitting it on the water.
-- **OrbitController** camera (carrier fixed at the centre; drag to orbit, scroll to
-  zoom, shift+drag to pan) — pivot at mid-ship `target (0, 18, 0)`.
+- **Carrier under way:** the `holder` is driven forward along the ship's heading
+  (`SHIP_SPEED`, bow = glTF local **−Z**), laying a **wake foam** trail (§6).
+- **OrbitController** camera that **follows the ship**: the orbit pivot is shifted
+  by the ship's per-frame travel each frame, so the carrier stays centred while the
+  user's own orbit / zoom / pan are preserved.
 - Live HUD readout of the fitted deck dimensions.
 
 Verified in-browser (Playwright): hull number **"69"**, island/mast, angled flight
-deck, and deck markings all render; ship floats correctly with deck up; the camera
-orbits while the carrier stays centered.
+deck, and deck markings all render; ship floats deck-up and steams **bow-first**;
+the wake streams off the **stern**; the sea stays world-stable while the camera
+orbits and while the ship travels (no fast-forward / swimming).
 
 ---
 
@@ -148,6 +154,20 @@ can move/turn the whole ship (carrier underway) via the holder.
     work as deprecated aliases.
 - **Ocean / sky / fog:** see `examples/ocean.html` — `Ocean`, `HDRSkyBox`,
   `scene.fog`, `scene.skyFog`, `scene.sun`, `LensFlare`.
+  - **Endless-sea follow:** `ocean.options.followTarget = <obj with .location>`.
+    Follow the **subject that travels** (the carrier `holder`), **never the camera
+    eye** — following an orbiting eye sweeps the surface through the world-locked
+    wave field and the waves churn/fast-forward as you look around. The recentre is
+    **snapped to a whole grid cell** (`size/segments`) so the vertex lattice always
+    lands on the same world phase and the waves never "swim" while the grid slides.
+  - **Ship wake foam (new):** `ocean.options.wake = { source, dropDistance, life,
+    maxPoints, width, widthGrowth, foamColor, foamIntensity }`. The Ocean grows a
+    rolling polyline of recent `source.location` samples; the `water` shader paints
+    turbulent white foam along it (per-sample strength fades with age, half-width
+    grows toward the tail), broken up by scrolling noise and faded into the fog.
+    `maxPoints ≤ 48` (= `WaterShader.WAKE_MAX`, must match `#define WAKE_MAX` in
+    `water.frag`). The foam is computed in **world space**, so it stays crisp
+    regardless of the (coarse) ocean mesh resolution.
 - **Static dir:** examples are served from `examples/` with `examples/public/` as
   the web root (so `/models/...`, `/textures/...`, `/img/...`).
 
@@ -155,10 +175,16 @@ can move/turn the whole ship (carrier underway) via the holder.
 
 ## 7. Open questions / decisions for later phases
 
-- **Ship heading:** P1 leaves the hull along Z with no yaw. P2/P3 should set the
-  ship's heading (and later, motion into the wind) and define the approach axis off
-  the **angled** deck (not the centerline) — measure the angled-deck bearing from
-  the model.
+- **Ship heading:** the hull's **bow is glTF local −Z** (the "69" bow number is on
+  that end), so `HEADING 0` steams toward world −Z; forward = `(-sin θ, -cos θ)`.
+  Straight-line motion is verified; the heading→forward sign for **turns** still
+  needs a check against the engine's `angle.y` rotation convention. P2/P3 should
+  define the approach axis off the **angled** deck (not the centerline) — measure
+  the angled-deck bearing from the model.
+- **Wake fidelity:** current wake is **foam only** (no geometric bow/stern waves)
+  and a **straight/curving polyline trail** with no Kelvin V arms. Geometric wake
+  displacement would need a finer mesh near the ship (mesh is ~100 u/cell) or a
+  displacement decal — future work. Tunables live in `ocean.options.wake`.
 - **Wire zone & touchdown:** need deck-surface height (top of deck ≈ keel + ~deck
   height; compute precisely from bounds/sampling) and a 2D landing box for the 3–4
   arresting wires.
@@ -179,3 +205,14 @@ can move/turn the whole ship (carrier underway) via the holder.
   carrier stays fixed at the centre and the camera orbits around it (pivot
   `target (0,18,0)`). Updated §3/§6 to the new camera model (removed the stale
   `viewer.originDistance` reference).
+- **2026-06-29 — ocean follow fix:** Dropped `followTarget: scene.mainCamera` from
+  P1 — following the orbiting eye swept the world-space waves under the camera, so
+  ripples churned and the swell fast-forwarded on every orbit. World-fixed ocean
+  while the ship was static.
+- **2026-06-29 — carrier under way + wake (P5 pulled forward):** `Ocean.update()`
+  now **snaps the follow to a grid cell** (no swimming while the grid slides) and
+  grows a **wake trail**; the `water` shader paints **turbulent foam** along it
+  (`uWake[WAKE_MAX=48]`). `landing-p1.html` drives the `holder` forward (bow-first,
+  local −Z), follows it with the ocean (not the eye) and the camera (pivot shifted
+  by the ship's travel, preserving user orbit/zoom/pan), and configures the wake.
+  Verified in-browser. Updated §3/§6/§7.
