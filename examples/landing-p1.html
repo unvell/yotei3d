@@ -91,7 +91,14 @@
         rippleDetail: 3.0,
         deepColor: [0.015, 0.08, 0.12],
         shallowColor: [0.10, 0.34, 0.40],
-        followTarget: scene.mainCamera,   // endless sea: recentres on the camera
+        // P1 keeps the ocean world-fixed (no followTarget). The waves/ripples are
+        // evaluated in world space, so recentring the grid on the *orbiting* eye
+        // would sweep the surface through the world-locked wave field — making the
+        // ripples churn and the swell "fast-forward" every time the camera turns.
+        // size 12000 (half-extent 6000) already reaches the horizon well past the
+        // 1400u max orbit distance, so no follow is needed. Later phases, once the
+        // carrier/aircraft actually travels, should follow that moving focus (the
+        // orbit target / holder) — never the camera eye.
       });
       ocean.location.set(0, 0, 0);
       scene.add(ocean);
