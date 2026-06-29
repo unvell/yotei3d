@@ -66,6 +66,7 @@ export class WaterShader extends Shader {
 		this.contactDistUniform = this.bindUniform("uContactDist", "float");
 		this.contactColorUniform = this.bindUniform("uContactColor", "color3");
 		this.contactIntensityUniform = this.bindUniform("uContactIntensity", "float");
+		this.invProjViewUniform = this.bindUniform("uInvProjView", "mat4");
 
 		this._contactDepthFB = null;       // depth render target (sized to main FB)
 		this._contactDepthTex = null;      // last frame's depth texture (or null)
@@ -212,6 +213,9 @@ export class WaterShader extends Shader {
 			this.contactDistUniform.set(num(cfg.distance, 10));
 			this.contactColorUniform.set(cfg.color || [1.0, 1.05, 1.12]);
 			this.contactIntensityUniform.set(num(cfg.intensity, 1.0));
+			// inverse projection·view to unproject the (precise) pre-pass depth back
+			// to a world position — see the contact-foam block in water.frag.
+			this.invProjViewUniform.set(this.renderer.projectionViewMatrix.inverse());
 		} else {
 			this.hasContactUniform.set(false);
 			this.contactDepthUniform.set(Shader.emptyTexture);

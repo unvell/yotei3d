@@ -61,6 +61,7 @@ uniform float     uContactFar;
 uniform float     uContactDist;      // foam fades out this far *below* the surface (world Y units)
 uniform vec3      uContactColor;
 uniform float     uContactIntensity;
+uniform mat4      uInvProjView;      // inverse projection·view, to unproject the solid to world
 
 varying vec3 vWorldPos;
 varying vec3 vNormal;
@@ -230,33 +231,32 @@ void main(void) {
 		}
 	}
 
-	// --- contact foam: white water where solid geometry breaks the surface.
-	// Compare this water pixel's linear depth to the nearest opaque depth in the
-	// pre-pass: a small positive gap means geometry sits just below the surface
-	// here (the hull's waterline, a beach, a rock), so we lay a foam band that
-	// rises off the exact contact line and fades out by uContactDist. The band
-	// is broken up by a slow noise so it churns instead of reading as a decal.
+	// --- contact foam: white water where solid geometry breaks the surface
+	// (hull waterline, beach, rock). Foam by how far the solid behind this pixel
+	// sits *below* the water surface (world Y) — a thin waterline band that
+	// excludes the deep submerged hull, props and rudder, and converges at the
+	// stem (no forward smear). The solid's world position is reconstructed from
+	// the pre-pass depth, which is 32-bit packed and so precise: the water
+	// fragment's own gl_FragCoord.z is NOT used, because the 16-bit depth buffer
+	// is only ~±5u accurate this far out and smeared foam over the whole hull.
 	float contactF = 0.0;
 	if (uHasContact) {
 		vec2 uv = gl_FragCoord.xy / uContactRes;
 		float sceneD = unpackDepth(texture2D(uContactDepth, uv));         // 0..1 linear
-		float zc = gl_FragCoord.z * 2.0 - 1.0;                            // NDC depth
-		float waterDist = (2.0 * uContactNear * uContactFar)
-		                / (uContactFar + uContactNear - zc * (uContactFar - uContactNear));
-		float sceneDist = sceneD * (uContactFar - uContactNear) + uContactNear;
-		// The solid behind this pixel lies on the SAME camera ray as the water
-		// fragment, so its world position scales with view distance. Reconstruct
-		// it and foam by how far it sits *below the water surface vertically* —
-		// NOT by the camera-space depth gap, which at grazing angles smears into a
-		// long tongue ahead of the bow (the ray skims the deep submerged forefoot).
-		// A vertical band instead stays a thin waterline and converges at the stem.
-		vec3 geoPos = cameraLoc + (vWorldPos - cameraLoc) * (sceneDist / waterDist);
-		float vgap = vWorldPos.y - geoPos.y;                             // >0 = solid below surface
-		float band = (1.0 - smoothstep(0.0, uContactDist, vgap))
-		           * smoothstep(0.0, uContactDist * 0.2, vgap);
-		float cn = valueNoise(vWorldXZ * 0.6 + vec2(time * 0.4, -time * 0.5));
-		contactF = clamp(band * mix(0.6, 1.25, cn) * uContactIntensity, 0.0, 1.0);
-		if (contactF > 0.0) color = mix(color, uContactColor, contactF);
+		if (sceneD < 0.999) {                                            // skip empty sky (far)
+			float vz = sceneD * (uContactFar - uContactNear) + uContactNear;   // solid view distance
+			vec2 ndc = uv * 2.0 - 1.0;
+			float ndcz = (uContactFar + uContactNear) / (uContactFar - uContactNear)
+			           - (2.0 * uContactFar * uContactNear) / ((uContactFar - uContactNear) * vz);
+			vec4 clip = uInvProjView * vec4(ndc, ndcz, 1.0);
+			vec3 solidPos = clip.xyz / clip.w;
+			float vgap = vWorldPos.y - solidPos.y;                          // >0 = solid below surface
+			float band = (1.0 - smoothstep(0.0, uContactDist, vgap))
+			           * smoothstep(0.0, uContactDist * 0.2, vgap);
+			float cn = valueNoise(vWorldXZ * 0.6 + vec2(time * 0.4, -time * 0.5));
+			contactF = clamp(band * mix(0.6, 1.25, cn) * uContactIntensity, 0.0, 1.0);
+			if (contactF > 0.0) color = mix(color, uContactColor, contactF);
+		}
 	}
 
 	// Sun sparkle across all the churned-up foam/spray: thousands of tiny
