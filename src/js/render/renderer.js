@@ -787,17 +787,22 @@ export class Renderer {
 
 		scene._iblIrradianceMap = this._iblBaker.bakeIrradiance(src);
 
-		// `_iblEnvMap` stays the sharp source environment — it backs mirror-sharp
-		// reflections (the ocean) and is the fallback. `_iblSpecularMap` is the
-		// GGX-prefiltered chain the standard shader samples for rough specular
-		// IBL, so roughness blurs the reflection physically instead of just
-		// downsampling a still-sharp sky.
+		// Specular IBL samples the sharp source env cube directly (its own
+		// box-downsample mip chain), so roughness 0 is a seam-free, pixel-exact
+		// mirror — exactly the pre-GGX behaviour. A GGX-prefiltered chain is the
+		// physically-correct way to blur rougher reflections, but the standard
+		// shader samples cubemaps with an auto-LOD *bias* (textureCube's 3rd arg),
+		// not an explicit textureLod; a GGX chain needs explicit LOD or its abrupt
+		// per-mip blur steps band across a curved surface (and its FBO-rendered
+		// mips drift in orientation from the copied mip 0, showing cube seams).
+		// Box-downsample mips are auto-LOD-friendly, so the env cube stays smooth.
+		// `_iblSpecularMap` left null → the standard shader falls back to _iblEnvMap.
+		// (IBLBaker.prefilterSpecular is kept for a future explicit-LOD/ES3 revival.)
 		scene._iblEnvMap = src;
-		scene._iblSpecularMap = this._iblBaker.prefilterSpecular(src);
+		scene._iblSpecularMap = null;
 
-		// roughness maps onto the prefiltered chain's mip levels (mip = rough * maxLod)
-		scene._iblMaxLod = (typeof scene._iblSpecularMap._maxLod === "number")
-			? scene._iblSpecularMap._maxLod : 6;
+		// roughness maps onto the env cube's mip levels (mip = rough * maxLod)
+		scene._iblMaxLod = Math.max(0, Math.floor(Math.log2(src.width || 256)));
 		scene._iblBakedFor = src;
 	}
 
