@@ -46,6 +46,7 @@ export class Scene {
 	_iblBakedFor: any;
 	_iblIrradianceMap: any;
 	_iblEnvMap: any;
+	_iblSpecularMap: any;
 	_iblMaxLod?: number;
 
 	mainCamera: Camera;

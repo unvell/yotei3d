@@ -29,6 +29,26 @@ const FACE_BASIS = [
 	{ forward: [ 0,  0, -1], right: [-1,  0,  0], up: [ 0, -1,  0] }, // -Z
 ];
 
+// Face basis for bakes that *re-sample an existing cubemap* (irradiance,
+// specular prefilter) rather than projecting a panorama / procedural sky.
+//
+// FACE_BASIS' two pole entries carry a hemisphere swap that is correct only for
+// the equirect/atmosky direction→colour lookups (see the comment above). When
+// the same swap is reused to sample a *cubemap* — whose vertical convention is
+// already the opposite — the +Y/-Y faces come out inverted, so an up-facing
+// surface (e.g. a ship deck) reads the dark lower hemisphere instead of the
+// bright sky. The poles here use the nominal (un-swapped) directions so a
+// resampled cube matches the source cube's orientation; the four side faces are
+// unchanged (verified identical between the source and resampled cubes).
+const CUBE_FACE_BASIS = [
+	FACE_BASIS[0], // +X
+	FACE_BASIS[1], // -X
+	{ forward: [ 0,  1,  0], right: [ 1,  0,  0], up: [ 0,  0,  1] }, // +Y (samples up)
+	{ forward: [ 0, -1,  0], right: [ 1,  0,  0], up: [ 0,  0, -1] }, // -Y (samples down)
+	FACE_BASIS[4], // +Z
+	FACE_BASIS[5], // -Z
+];
+
 export class IBLBaker {
 	constructor(renderer) {
 		this.renderer = renderer;
@@ -162,6 +182,87 @@ export class IBLBaker {
 		return target;
 	}
 
+	// GGX-prefilter a source environment cubemap into the specular IBL map.
+	//
+	// Each mip level of the returned cube holds the environment convolved with
+	// the GGX specular lobe for a roughness of (mip / maxMip): mip 0 is a sharp
+	// mirror, the coarsest mip a fully rough blur. The standard shader then reads
+	// a physically blurred reflection with textureCube(refMap, R, roughness*maxLod)
+	// instead of the box-downsampled (still-sharp) mips a plain generateMipmap
+	// produces — which made even moderately rough surfaces mirror the sky.
+	//
+	// Returns the prefiltered CubeMap; `_maxLod` is the max mip index, which the
+	// renderer hands to the shader as maxEnvLod so roughness maps onto the chain.
+	prefilterSpecular(envCubemap, size = 256) {
+		const gl = this.renderer.gl;
+
+		const target = new CubeMap(this.renderer);
+		target.enableMipmap = true;
+		target.trilinear = true;
+		target.create(size, size, null, { hdr: !!envCubemap.hdr }); // RGBA16F faces on WebGL2
+
+		// Allocate the full mip chain up front (generateMipmap fills it with a
+		// box-downsample we then overwrite mip-by-mip with the GGX prefilter).
+		target.use();
+		target.mipmappable = target.enableMipmap;
+		if (target.mipmappable) {
+			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+			target.mipmapped = true;
+		}
+		target.setParameters(); // trilinear min filter for smooth roughness blend
+		target.disuse();
+
+		const maxMip = Math.max(0, Math.floor(Math.log2(size)));
+		const srcFaceSize = (envCubemap.images && envCubemap.images[0] && envCubemap.images[0].width)
+			|| envCubemap.width || size;
+
+		const fbo = gl.createFramebuffer();
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+		gl.disable(gl.DEPTH_TEST);
+
+		const shader = ShaderSources.prefilterspec.instance;
+		this.renderer.useShader(shader);
+		shader.envMapUniform.set(envCubemap);
+		shader.resolutionUniform.set(srcFaceSize);
+
+		const faces = target.getLoadingFaces();
+
+		for (let mip = 0; mip <= maxMip; mip++) {
+			const mipSize = Math.max(1, size >> mip);
+			gl.viewport(0, 0, mipSize, mipSize);
+
+			// mip 0 -> roughness 0 (mirror), coarsest mip -> roughness 1
+			const roughness = maxMip > 0 ? mip / maxMip : 0;
+			shader.roughnessUniform.set(roughness);
+
+			for (let i = 0; i < 6; i++) {
+				gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+					faces[i], target.glTexture, mip);
+
+				const basis = CUBE_FACE_BASIS[i];
+				shader.setFace(basis.forward, basis.right, basis.up);
+
+				gl.clear(gl.COLOR_BUFFER_BIT);
+
+				shader.beginMesh(this.screenMesh);
+				this.screenMesh.draw(this.renderer);
+				shader.endMesh();
+			}
+		}
+
+		this.renderer.disuseCurrentShader();
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		gl.deleteFramebuffer(fbo);
+		gl.enable(gl.DEPTH_TEST);
+
+		// NB: no generateMipmap here — that would overwrite the prefiltered mips.
+		target.loaded = true;
+		target._maxLod = maxMip;
+
+		return target;
+	}
+
 	// Bake a diffuse irradiance cubemap from the given source environment
 	// cubemap. Returns a CubeMap usable as the diffuse ambient term in the
 	// standard shader — float (RGBA16F) when the source is HDR so highlights
@@ -188,7 +289,7 @@ export class IBLBaker {
 			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
 				faces[i], target.glTexture, 0);
 
-			const basis = FACE_BASIS[i];
+			const basis = CUBE_FACE_BASIS[i];
 			shader.setFace(basis.forward, basis.right, basis.up);
 
 			gl.clear(gl.COLOR_BUFFER_BIT);

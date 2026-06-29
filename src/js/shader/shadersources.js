@@ -21,6 +21,7 @@ import { ShadowMapShader } from './shadowmap';
 import { AttributeShader } from './attrib';
 import { SSAOShader } from './ssao';
 import { IrradianceShader } from './ibl';
+import { PrefilterSpecularShader } from './prefilter';
 import { EquirectShader } from './equirect';
 import { AtmosphereSkyShader } from './atmosky';
 import { VolumetricCloudShader } from './volcloud';
@@ -81,6 +82,7 @@ import ssaoVert from '../../shader/ssao.vert';
 import ssaoFrag from '../../shader/ssao.frag';
 import iblVert from '../../shader/ibl.vert';
 import irradianceFrag from '../../shader/irradiance.frag';
+import prefilterSpecFrag from '../../shader/prefilterspec.frag';
 import equirectFrag from '../../shader/equirect.frag';
 import atmoskyFrag from '../../shader/atmosky.frag';
 import volcloudVert from '../../shader/volcloud.vert';
@@ -128,6 +130,7 @@ export const ShaderSources = {
   attributemap: { vert: attribmapVert, frag: attribmapFrag, class: AttributeShader },
   ssao: { vert: ssaoVert, frag: ssaoFrag, class: SSAOShader },
   irradiance: { vert: iblVert, frag: irradianceFrag, class: IrradianceShader },
+  prefilterspec: { vert: iblVert, frag: prefilterSpecFrag, class: PrefilterSpecularShader },
   equirect: { vert: iblVert, frag: equirectFrag, class: EquirectShader },
   atmosky: { vert: iblVert, frag: atmoskyFrag, class: AtmosphereSkyShader },
   volcloud: { vert: volcloudVert, frag: volcloudFrag, class: VolumetricCloudShader },

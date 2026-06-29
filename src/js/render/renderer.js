@@ -774,20 +774,30 @@ export class Renderer {
 			this._iblBaker = new IBLBaker(this);
 		}
 
-		// release the previous irradiance map before re-baking so an animated
+		// release the previous baked maps before re-baking so an animated
 		// (re-baking) skybox like DynamicSky doesn't leak a cubemap per frame.
 		if (scene._iblIrradianceMap && scene._iblIrradianceMap !== src
 			&& scene._iblIrradianceMap.unbind) {
 			scene._iblIrradianceMap.unbind();
 		}
+		if (scene._iblSpecularMap && scene._iblSpecularMap !== src
+			&& scene._iblSpecularMap.unbind) {
+			scene._iblSpecularMap.unbind();
+		}
 
 		scene._iblIrradianceMap = this._iblBaker.bakeIrradiance(src);
-		scene._iblEnvMap = src;
 
-		// max specular mip level from the environment cubemap face size
-		const faceSize = (src.images && src.images[0] && src.images[0].width)
-			|| src.width || 256;
-		scene._iblMaxLod = Math.max(0, Math.floor(Math.log2(faceSize)) - 1);
+		// `_iblEnvMap` stays the sharp source environment — it backs mirror-sharp
+		// reflections (the ocean) and is the fallback. `_iblSpecularMap` is the
+		// GGX-prefiltered chain the standard shader samples for rough specular
+		// IBL, so roughness blurs the reflection physically instead of just
+		// downsampling a still-sharp sky.
+		scene._iblEnvMap = src;
+		scene._iblSpecularMap = this._iblBaker.prefilterSpecular(src);
+
+		// roughness maps onto the prefiltered chain's mip levels (mip = rough * maxLod)
+		scene._iblMaxLod = (typeof scene._iblSpecularMap._maxLod === "number")
+			? scene._iblSpecularMap._maxLod : 6;
 		scene._iblBakedFor = src;
 	}
 

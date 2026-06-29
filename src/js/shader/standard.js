@@ -287,7 +287,11 @@ export class StandardShader extends Shader {
 			&& scene._iblEnvMap instanceof CubeMap && scene._iblEnvMap.loaded;
 
 		this._iblActive = iblActive;
-		this._sceneEnvMap = iblActive ? scene._iblEnvMap : null;
+		// specular IBL samples the GGX-prefiltered chain when present (roughness
+		// blurs the reflection physically); falls back to the sharp source env.
+		const specMap = (scene._iblSpecularMap instanceof CubeMap && scene._iblSpecularMap.loaded)
+			? scene._iblSpecularMap : scene._iblEnvMap;
+		this._sceneEnvMap = iblActive ? specMap : null;
 
 		// These drive the unified ambient path and must be valid every frame —
 		// even for scenes that have only a per-object specular refMap (no baked
