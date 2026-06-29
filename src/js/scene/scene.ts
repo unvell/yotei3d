@@ -187,7 +187,7 @@ export class Scene {
     });
   }
 
-  createObjectFromURL(url: string, finishCallback?: any) {
+  createObjectFromURL(url: string, finishCallback?: any, options?: any) {
     if (url.endsWith('.toba') || url.endsWith('.tob')
       || url.endsWith('.soba') || url.endsWith('.sob')) {
       const rm = new ResourceManager();
@@ -206,7 +206,9 @@ export class Scene {
       return loadingSession;
     } else if (url.endsWith(".gltf")) {
       const loader = new GLTFLoader(this);
-      loader.loadFromUrl(url, (obj: any) => finishCallback(obj));
+      loader.loadFromUrl(url, (obj: any) => {
+        if (typeof finishCallback === "function") finishCallback(obj);
+      }, options);
     } else {
     const rm = new ResourceManager();
       const loadingSession = new LoadingSession(rm);

@@ -505,18 +505,18 @@ export class GLTFLoader {
     };
   }
 
-  loadFromUrl(url: string, callback: (obj: any) => void): void {
+  loadFromUrl(url: string, callback: (obj: any) => void, options?: any): void {
     const pathSplit = url.lastIndexOf('/');
     if (pathSplit >= 0) {
       this.basePath = url.substr(0, pathSplit);
     }
 
     ResourceManager.download(url, ResourceTypes.JSON, (json: any) => {
-      this.load(json, obj => callback(obj));
+      this.load(json, obj => callback(obj), options);
     });
   }
 
-  load(json: any, callback: (obj: any) => void): void {
+  load(json: any, callback: (obj: any) => void, options?: any): void {
     this.reset();
     this.session.json = json;
 
@@ -543,22 +543,52 @@ export class GLTFLoader {
         });
       }
 
-      rm.load(() => callback(this.loadJson(json)));
+      rm.load(() => callback(this.loadJson(json, options)));
     } else {
-      callback(this.loadJson(json));
+      callback(this.loadJson(json, options));
     }
   }
 
-  loadJson(json: any): any {
+  loadJson(json: any, options?: any): any {
 
     const root = new SceneObject();
     root.mat = {};
+
+    // Optional baked-in base transform. A fixed import correction — e.g. an
+    // orientation fix for a model authored Y-up or standing on its stern — is
+    // folded into an internal, caller-invisible node so the *returned* root
+    // keeps an identity transform. Callers then drive root.angle / .location /
+    // .scale from a clean [0,0,0] / [0,0,0] / [1,1,1] instead of having the
+    // correction permanently occupying root.angle.
+    //   options.baseTransform = { angle?: [x,y,z], location?: [x,y,z],
+    //                             scale?: number | [x,y,z] }
+    let container: any = root;
+    const baseTransform = options && options.baseTransform;
+    if (baseTransform) {
+      const base = new SceneObject();
+      base.name = "__baseTransform";
+
+      if (Array.isArray(baseTransform.angle)) {
+        base.angle.set(baseTransform.angle[0], baseTransform.angle[1], baseTransform.angle[2]);
+      }
+      if (Array.isArray(baseTransform.location)) {
+        base.location.set(baseTransform.location[0], baseTransform.location[1], baseTransform.location[2]);
+      }
+      if (typeof baseTransform.scale === "number") {
+        base.scale.set(baseTransform.scale, baseTransform.scale, baseTransform.scale);
+      } else if (Array.isArray(baseTransform.scale)) {
+        base.scale.set(baseTransform.scale[0], baseTransform.scale[1], baseTransform.scale[2]);
+      }
+
+      root.add(base);
+      container = base;
+    }
 
     for (const scene of json.scenes) {
       for (const nodeId of scene.nodes) {
         const obj = this.loadNode(nodeId);
         if (obj) {
-          root.add(obj);
+          container.add(obj);
         }
       }
     }
