@@ -53,7 +53,7 @@
       });
       scene.environment.mat = { color: [0.5, 0.5, 0.5] };
       scene.environment.intensity = 0.45;
-      scene.mainCamera.exposure = 0.5;
+      scene.mainCamera.exposure = 0.3;
 
       // haze the sea into the horizon and bleed the same haze into the bottom of
       // the sky so they meet at one colour instead of a hard line.
@@ -87,8 +87,8 @@
         reflectivity: 0.32,
         reflectionBlur: 1.5,
         rippleScale: 1.0,
-        rippleStrength: 0.5,
-        rippleDetail: 3.0,
+        rippleStrength: 0.5, // 0..1, higher = more ripple
+        rippleDetail: 10.0, // 1..5, higher = more detail
         deepColor: [0.015, 0.08, 0.12],
         shallowColor: [0.10, 0.34, 0.40],
         // P1 keeps the ocean world-fixed (no followTarget). The waves/ripples are
@@ -191,7 +191,7 @@
       // off the port bow, above deck — and let OrbitController derive its yaw /
       // pitch / distance from that pose on attach (only `target` is pinned).
       scene.mainCamera.fieldOfView = 55;
-      scene.mainCamera.location.set(-180, 90, 200);
+      scene.mainCamera.location.set(-200, 30, 120);
 
       const controller = new OrbitController({
         target: new Vec3(0, 18, 0),   // mid-ship pivot (carrier is centred on X/Z)
