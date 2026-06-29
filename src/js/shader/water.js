@@ -52,6 +52,7 @@ export class WaterShader extends Shader {
 		this.wakeUniforms = this.bindUniformArray("uWake", "vec4", WaterShader.WAKE_MAX);
 		this.wakeFoamColorUniform = this.bindUniform("uWakeFoamColor", "color3");
 		this.wakeFoamIntensityUniform = this.bindUniform("uWakeFoamIntensity", "float");
+		this.wakeSparkleUniform = this.bindUniform("uWakeSparkle", "float");
 
 		// environment cubemap (sky reflection)
 		this.envMapUniform = this.bindUniform("envMap", "texcube", 4);
@@ -192,6 +193,7 @@ export class WaterShader extends Shader {
 		this.wakeCountUniform.set(cap);
 		this.wakeFoamColorUniform.set(cfg.foamColor || [0.95, 1.0, 1.05]);
 		this.wakeFoamIntensityUniform.set(num(cfg.foamIntensity, 1.0));
+		this.wakeSparkleUniform.set(num(cfg.sparkle, 0.0));
 	}
 
 	endObject(obj) {

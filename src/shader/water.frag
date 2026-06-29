@@ -47,6 +47,7 @@ uniform int   uWakeCount;          // number of valid samples in uWake (0 = off)
 uniform vec4  uWake[WAKE_MAX];     // xy = world xz, z = strength 0..1, w = half-width
 uniform vec3  uWakeFoamColor;      // foam tint (slightly >1 to bloom)
 uniform float uWakeFoamIntensity;  // overall foam opacity
+uniform float uWakeSparkle;        // sun sparkle on the spray (HDR; 0 = off)
 
 varying vec3 vWorldPos;
 varying vec3 vNormal;
@@ -207,6 +208,23 @@ void main(void) {
 			float churn = mix(0.55, 1.15, n1) * mix(0.7, 1.1, n2);
 			foam = clamp(foam * churn * uWakeFoamIntensity, 0.0, 1.0);
 			color = mix(color, uWakeFoamColor, foam);
+
+			// Sun sparkle on the churned spray: thousands of tiny droplets each
+			// flash as they catch the sun, so we scatter sharp, fast-twinkling
+			// HDR glints across the foam. Two high-frequency noise fields scroll
+			// against each other and are raised to a high power to leave only
+			// sparse pinpoints; density follows the foam and they only fire when
+			// the sun is up. Added HDR-bright so the bloom pass makes them glitter.
+			if (uWakeSparkle > 0.0 && sunUp > 0.0) {
+				vec2 sp = vWorldXZ * 1.7;
+				float tw = valueNoise(sp + vec2(time * 2.3, -time * 1.7))
+				         * valueNoise(sp * 1.9 - vec2(time * 3.1, time * 2.2));
+				tw = pow(tw, 6.0);
+				// bias the glints toward the sun's specular direction so they
+				// read as sun reflections rather than uniform white noise.
+				float toSun = 0.5 + 0.5 * pow(NoH, 8.0);
+				color += sunlight * (tw * foam * uWakeSparkle * sunUp * toSun);
+			}
 		}
 	}
 

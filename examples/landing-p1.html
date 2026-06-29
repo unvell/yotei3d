@@ -53,7 +53,7 @@
       });
       scene.environment.mat = { color: [0.5, 0.5, 0.5] };
       scene.environment.intensity = 0.45;
-      scene.mainCamera.exposure = 0.3;
+      scene.mainCamera.exposure = 0.2;
 
       // haze the sea into the horizon and bleed the same haze into the bottom of
       // the sky so they meet at one colour instead of a hard line.
@@ -85,7 +85,7 @@
         fresnelPower: 5.0,
         fresnelBias: 0.2,
         reflectivity: 0.32,
-        reflectionBlur: 1.5,
+        reflectionBlur: 1.0,
         rippleScale: 1.0,
         rippleStrength: 0.5, // 0..1, higher = more ripple
         rippleDetail: 10.0, // 1..5, higher = more detail
@@ -146,6 +146,7 @@
         widthGrowth: 4,      // tail fans out to ~5× that
         foamColor: [1.0, 1.05, 1.12],
         foamIntensity: 1.0,
+        sparkle: 7,          // sun glints twinkling on the flying spray (HDR)
       };
 
       const dimEl = () => document.getElementById("lh-dim");
@@ -238,7 +239,7 @@
       // that end), so "forward" is local -Z rotated into the world by HEADING.
       // At HEADING 0 the carrier therefore steams bow-first toward world -Z.
       const HEADING = 0;            // ship yaw in degrees (0 = sail toward -Z)
-      const SHIP_SPEED = 16;        // world units / second
+      const SHIP_SPEED = 8;        // world units / second
       const hdg = HEADING * Math.PI / 180;
       const fwd = { x: -Math.sin(hdg), z: -Math.cos(hdg) };
       holder.angle.y = HEADING;     // point the hull along the heading

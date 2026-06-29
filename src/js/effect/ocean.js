@@ -68,6 +68,7 @@ export class Ocean extends SceneObject {
 			//   widthGrowth   how much wider the foam gets at the tail (× width)
 			//   foamColor     [r,g,b] of the foam (slightly >1 blooms)
 			//   foamIntensity overall foam opacity
+			//   sparkle       sun glints twinkling on the spray (HDR; 0 = off)
 			wake: null,
 		}, options);
 
