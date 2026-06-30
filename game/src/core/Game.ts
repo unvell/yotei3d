@@ -1,0 +1,132 @@
+import { Renderer } from '@';
+import type { Scene } from '@';
+import { Environment } from '../world/Environment';
+import { OceanWorld } from '../world/OceanWorld';
+import { Carrier } from '../world/Carrier';
+import { Aircraft } from '../aircraft/Aircraft';
+import { FlightModel } from '../aircraft/FlightModel';
+import { FlightChaseController } from '../camera/FlightChaseController';
+import { InputController } from '../input/InputController';
+import type { Controls } from '../input/controls';
+import type { Telemetry } from './telemetry';
+
+const RENDERER_OPTIONS = {
+  backColor: [0.7, 0.82, 0.92, 1],
+  enablePostprocess: true,
+  enableAntialias: true,
+  enableShadow: false,
+  perspective: { method: 'persp', angle: 55, near: 0.5, far: 8000 },
+  bloomEffect: { enabled: true, threshold: 0.6, gamma: 1.4, intensity: 0.9 },
+  renderingImage: { gamma: 1.1, resolutionRatio: 1 },
+};
+
+/**
+ * Top-level orchestrator for the Carrier Landing game. Owns the renderer, the
+ * scene, and every subsystem (environment, ocean, carrier, aircraft, flight
+ * model, chase camera, input), and runs the per-frame loop that ties the
+ * simulation to the view and the HUD. This is the class that replaces
+ * landing-p2.html's inline `window.onload` body.
+ */
+export class Game {
+  readonly renderer: Renderer;
+  readonly scene: Scene;
+
+  readonly environment: Environment;
+  readonly ocean: OceanWorld;
+  readonly carrier: Carrier;
+  readonly aircraft: Aircraft;
+  readonly flight = new FlightModel();
+  readonly chaseCam: FlightChaseController;
+  private readonly input: InputController;
+
+  private _lastT = 0;
+  private _disposed = false;
+
+  constructor(
+    private readonly container: HTMLElement,
+    private readonly controls: Controls,
+    private readonly telemetry: Telemetry,
+  ) {
+    // The engine locates its canvas by container id; ensure ours has it.
+    if (!container.id) container.id = 'canvas-container';
+
+    this.renderer = new Renderer({ ...RENDERER_OPTIONS, containerId: container.id });
+    this.scene = this.renderer.createScene();
+
+    // --- world ---
+    this.environment = new Environment(this.renderer, this.scene);
+    this.environment.setup();
+
+    this.ocean = new OceanWorld(this.scene);
+
+    this.carrier = new Carrier(this.scene);
+    this.carrier.load().catch((e) => console.error(e));
+
+    // lens flare needs the carrier hull as an occluder
+    this.environment.addSunFlare([this.carrier.holder]);
+
+    // --- aircraft ---
+    this.aircraft = new Aircraft(this.scene);
+    this.aircraft.load().catch((e) => console.error(e));
+
+    // --- chase camera ---
+    this.scene.mainCamera.fieldOfView = 55;
+    this.chaseCam = new FlightChaseController({
+      getState: () => this.flight.getCameraState(),
+      distance: 12,
+      restEl: 15,
+      minDistance: 18,
+      maxDistance: 600,
+    });
+    this.scene.mainCamera.controller = this.chaseCam;
+
+    // --- input ---
+    this.input = new InputController(this.controls);
+
+    // expose a debug handle, like landing-p2 did on window
+    (window as any).game = this;
+  }
+
+  start(): void {
+    this.input.attach();
+    this.scene.on('frame', () => this._frame());
+    this.scene.animation = true;
+    this.scene.show();
+  }
+
+  private _frame(): void {
+    if (this._disposed) return;
+
+    const now = performance.now();
+    const dt = this._lastT ? Math.min((now - this._lastT) / 1000, 0.05) : 0.016;
+    this._lastT = now;
+
+    this.ocean.update();
+
+    if (this.controls.consumeReset()) this.flight.reset();
+    this.flight.update(dt, this.controls);
+    this.aircraft.applyState(this.flight);
+
+    // --- publish telemetry to the HUD ---
+    this.telemetry.speed = this.flight.speed;
+    this.telemetry.speedKmh = this.flight.speed * 3.6;
+    this.telemetry.alt = this.flight.pos.y;
+    this.telemetry.throttlePct = this.flight.throttle * 100;
+    this.telemetry.stallT = this.flight.stallT;
+    this.telemetry.stalled = this.flight.stalled;
+
+    // (the chase camera positions itself from the renderer's controller tick.)
+  }
+
+  dispose(): void {
+    this._disposed = true;
+    this.input.detach();
+    try {
+      this.scene.mainCamera.controller = null;
+    } catch {
+      /* ignore */
+    }
+    // remove the engine-created canvases so HMR / remounts don't stack them up.
+    while (this.container.firstChild) this.container.removeChild(this.container.firstChild);
+  }
+}

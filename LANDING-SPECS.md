@@ -6,7 +6,10 @@
 >
 > **Last updated:** 2026-06-30 — Phase **P2** in place: the F-2 flies a controllable
 > arcade approach toward the carrier (keyboard + on-screen pads, stall model, chase
-> cam, airspeed bar). P1 carrier steams under way with a wake.
+> cam, airspeed bar). P1 carrier steams under way with a wake. **The P1/P2 prototypes
+> are now refactored into a Vue 3 + TypeScript app under `game/`** (classes for carrier,
+> aircraft, ocean, environment, flight model, chase cam, controls, HUD) — run with
+> `yarn game`; P2.1+ is developed there. See the changelog tail for details.
 
 ---
 
@@ -384,3 +387,26 @@ can move/turn the whole ship (carrier underway) via the holder.
   emits no scene release event). While `_pressed`, the recenter is suppressed entirely;
   it only eases back ~0.6 s **after the pointer actually lifts**. Window listeners are
   removed in `onDetach`. *Verification deferred to the user (Playwright unavailable).*
+- **2026-06-30 — Game app: `game/` (Vue 3 + TypeScript) — P1/P2 inline prototypes
+  refactored into a real, accumulating codebase (per request).** The inline-`<script>`
+  HTML examples (which had to be copy-pasted to evolve) are now reusable classes under
+  `game/src/`, consuming the engine **from source** (`@` → `../src/js`) and reusing
+  `../examples/public` assets (no duplication). Split: **`core/Game.ts`** (orchestrator:
+  renderer + scene + frame loop, replaces the `window.onload` body), **`aircraft/
+  FlightModel.ts`** (the arcade physics, now **pure** — no engine/DOM imports, unit-
+  testable), **`aircraft/Aircraft.ts`** (F-2 model + skin + afterburner; `applyState()`
+  renders the model from the sim), **`aircraft/tunables.ts`** (flight constants + START
+  pose, single source), **`world/{Environment,OceanWorld,Carrier}.ts`** (sky/fog/sun/
+  flare; ocean config + wake/contact-foam hooks; carrier auto-fit + deck material +
+  cull-bounds repair), **`camera/FlightChaseController.ts`** (the P2 chase cam, extracted
+  unchanged), **`input/{controls,InputController}.ts`** (shared `Controls` struct +
+  keyboard), and **Vue `ui/{Hud,VirtualPads}.vue`** (the airspeed bar + pads, ported from
+  the inline CSS, reading a reactive `Telemetry`). Runs via root scripts (`yarn game`,
+  `game:build`, `game:preview`) reusing the repo's existing toolchain — no extra install;
+  dev server on **:5180**, `publicDir` → `../examples/public`, `vite-plugin-string` for
+  the engine's GLSL. Engine typed for the game via a hand-written ambient `engine.d.ts`
+  (subset only). **Verified in-browser (Playwright):** carrier auto-fit reproduces the
+  spec numbers (scale 0.2166, deck 230×63.7×52.4), F-2 loads, the flight model integrates
+  and the reactive HUD tracks it, the chase cam + render are correct (HDRI sky, reflective
+  ocean, jet + afterburner). **Future phases (P2.1 onward) are developed in `game/`, not
+  in `landing-p2.html`** (the HTML examples remain as the P1/P2 reference snapshots).
