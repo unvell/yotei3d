@@ -20,6 +20,15 @@ import { ScreenMesh } from './pipeline';
 //      residual mirror so cloud detail stays continuous across the pole/side
 //      seams. This makes the two pole entries intentionally left-handed
 //      (right × up === -forward); that is the correction, not a bug.
+//
+// This single basis is used for EVERY cube bake — equirect/atmosky projection
+// AND cube re-sampling (irradiance, specular prefilter). Its FBO-mirror pole
+// correction is what makes a re-sampled cube match the source env's orientation,
+// so a low-roughness prefilter mip equals the env and the irradiance is seam-
+// free. (A previous CUBE_FACE_BASIS used *nominal* poles for the re-sampling
+// bakes; lacking the side faces' FBO compensation, its pole/side boundary was
+// discontinuous — a visible cube seam on diffuse + glossy surfaces. Verified
+// in-browser: FACE_BASIS gives a seam-free, correctly-lit up-facing surface.)
 const FACE_BASIS = [
 	{ forward: [ 1,  0,  0], right: [ 0,  0, -1], up: [ 0, -1,  0] }, // +X
 	{ forward: [-1,  0,  0], right: [ 0,  0,  1], up: [ 0, -1,  0] }, // -X
@@ -27,26 +36,6 @@ const FACE_BASIS = [
 	{ forward: [ 0,  1,  0], right: [ 1,  0,  0], up: [ 0,  0,  1] }, // -Y target (samples up, mirrored)
 	{ forward: [ 0,  0,  1], right: [ 1,  0,  0], up: [ 0, -1,  0] }, // +Z
 	{ forward: [ 0,  0, -1], right: [-1,  0,  0], up: [ 0, -1,  0] }, // -Z
-];
-
-// Face basis for bakes that *re-sample an existing cubemap* (irradiance,
-// specular prefilter) rather than projecting a panorama / procedural sky.
-//
-// FACE_BASIS' two pole entries carry a hemisphere swap that is correct only for
-// the equirect/atmosky direction→colour lookups (see the comment above). When
-// the same swap is reused to sample a *cubemap* — whose vertical convention is
-// already the opposite — the +Y/-Y faces come out inverted, so an up-facing
-// surface (e.g. a ship deck) reads the dark lower hemisphere instead of the
-// bright sky. The poles here use the nominal (un-swapped) directions so a
-// resampled cube matches the source cube's orientation; the four side faces are
-// unchanged (verified identical between the source and resampled cubes).
-const CUBE_FACE_BASIS = [
-	FACE_BASIS[0], // +X
-	FACE_BASIS[1], // -X
-	{ forward: [ 0,  1,  0], right: [ 1,  0,  0], up: [ 0,  0,  1] }, // +Y (samples up)
-	{ forward: [ 0, -1,  0], right: [ 1,  0,  0], up: [ 0,  0, -1] }, // -Y (samples down)
-	FACE_BASIS[4], // +Z
-	FACE_BASIS[5], // -Z
 ];
 
 export class IBLBaker {
@@ -272,13 +261,9 @@ export class IBLBaker {
 				gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
 					faces[i], target.glTexture, mip);
 
-				// FACE_BASIS (not CUBE_FACE_BASIS): the prefilter must reproduce the
-				// env cube's own orientation. equirectToCubemap built the env with
-				// FACE_BASIS, so FACE_BASIS is exactly the texel->world-direction map
-				// the cube samples by; using it here makes a low-roughness mip equal
-				// the source env (seam-free) and every mip mutually aligned. (The
-				// irradiance bake keeps CUBE_FACE_BASIS — its hemisphere integral is
-				// insensitive to the pole orientation, so either works there.)
+				// FACE_BASIS reproduces the env cube's own orientation (equirect built
+				// it with FACE_BASIS), so a low-roughness mip equals the source env
+				// (seam-free) and every mip stays mutually aligned.
 				const basis = FACE_BASIS[i];
 				shader.setFace(basis.forward, basis.right, basis.up);
 
@@ -329,7 +314,10 @@ export class IBLBaker {
 			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
 				faces[i], target.glTexture, 0);
 
-			const basis = CUBE_FACE_BASIS[i];
+			// FACE_BASIS (same as every other cube bake): a re-sampled cube must
+			// match the env's orientation, and its FBO-compensated poles keep the
+			// pole/side boundary continuous — no cube seam on diffuse surfaces.
+			const basis = FACE_BASIS[i];
 			shader.setFace(basis.forward, basis.right, basis.up);
 
 			gl.clear(gl.COLOR_BUFFER_BIT);
