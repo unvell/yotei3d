@@ -787,22 +787,21 @@ export class Renderer {
 
 		scene._iblIrradianceMap = this._iblBaker.bakeIrradiance(src);
 
-		// Specular IBL samples the sharp source env cube directly (its own
-		// box-downsample mip chain), so roughness 0 is a seam-free, pixel-exact
-		// mirror — exactly the pre-GGX behaviour. A GGX-prefiltered chain is the
-		// physically-correct way to blur rougher reflections, but the standard
-		// shader samples cubemaps with an auto-LOD *bias* (textureCube's 3rd arg),
-		// not an explicit textureLod; a GGX chain needs explicit LOD or its abrupt
-		// per-mip blur steps band across a curved surface (and its FBO-rendered
-		// mips drift in orientation from the copied mip 0, showing cube seams).
-		// Box-downsample mips are auto-LOD-friendly, so the env cube stays smooth.
-		// `_iblSpecularMap` left null → the standard shader falls back to _iblEnvMap.
-		// (IBLBaker.prefilterSpecular is kept for a future explicit-LOD/ES3 revival.)
+		// Dual specular IBL. `_iblEnvMap` is the sharp source env — a seam-free,
+		// pixel-exact mirror at roughness 0 (its box-downsample mips are auto-LOD
+		// friendly, so a curved mirror stays smooth). `_iblSpecularMap` is its GGX
+		// prefilter: a smooth spherical blur for rougher surfaces, where the env
+		// cube's own coarse box-downsample mips would instead show per-face "cube"
+		// faceting. The standard shader reads the sharp env at low roughness and
+		// cross-fades to the prefilter as roughness rises (see standard.frag).
+		// The prefilter is baked with FACE_BASIS so its mip orientation matches the
+		// env cube (a mismatched basis shows cube seams in the reflection).
 		scene._iblEnvMap = src;
-		scene._iblSpecularMap = null;
+		scene._iblSpecularMap = this._iblBaker.prefilterSpecular(src);
 
-		// roughness maps onto the env cube's mip levels (mip = rough * maxLod)
-		scene._iblMaxLod = Math.max(0, Math.floor(Math.log2(src.width || 256)));
+		// roughness maps onto the prefiltered chain's mip levels (mip = rough * maxLod)
+		scene._iblMaxLod = (typeof scene._iblSpecularMap._maxLod === "number")
+			? scene._iblSpecularMap._maxLod : 6;
 		scene._iblBakedFor = src;
 	}
 

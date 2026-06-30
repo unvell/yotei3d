@@ -71,6 +71,7 @@ uniform sampler2D normalMap;
 uniform sampler2D lightMap;
 uniform sampler2D shadowMap2D;
 uniform samplerCube refMap;
+uniform samplerCube envSharpMap;   // sharp source env (mirror); refMap is its GGX prefilter
 uniform samplerCube shadowMap;
 
 varying vec3 vertex;
@@ -367,7 +368,16 @@ void main(void) {
 		// Flip X to match the skybox sampling convention (panorama.vert negates
 		// texcoord.x) so reflections line up left-right with the visible sky.
 		R.x = -R.x;
-		vec3 prefiltered = textureCube(refMap, R, iblRoughness * maxEnvLod).rgb;
+		// Low roughness samples the sharp source env (envSharpMap): seam-free and
+		// pixel-exact, a true mirror at roughness 0. Higher roughness samples its
+		// GGX prefilter (refMap): a smooth spherical blur — the env cube's own
+		// coarse box-downsample mips would instead show per-face "cube" faceting.
+		// When no prefilter exists (per-object probe, or none baked) refMap ==
+		// envSharpMap, so this blend is a harmless no-op.
+		float iblLod = iblRoughness * maxEnvLod;
+		vec3 sharpRefl = textureCube(envSharpMap, R, iblLod).rgb;
+		vec3 blurRefl  = textureCube(refMap, R, iblLod).rgb;
+		vec3 prefiltered = mix(sharpRefl, blurRefl, smoothstep(0.0, 0.08, iblRoughness));
 		vec2 ab = envBRDFApprox(NdotV, matRoughness);
 		indirectSpecular = prefiltered * (F0 * ab.x + ab.y) * iblIntensity;
 	}

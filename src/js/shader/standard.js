@@ -56,6 +56,10 @@ export class StandardShader extends Shader {
 		this.lightMapUniform = this.bindUniform("lightMap", "tex", 2);
 		this.refMapUniform = this.bindUniform("refMap", "texcube", 4);
 		this.irradianceMapUniform = this.bindUniform("irradianceMap", "texcube", 6);
+		// sharp source env cube — paired with refMap (the GGX prefilter) so the
+		// indirect-specular term reads a seam-free mirror at low roughness and the
+		// smooth prefilter blur at high roughness (see standard.frag).
+		this.envSharpMapUniform = this.bindUniform("envSharpMap", "texcube", 11);
 
 		// PBR material maps (glTF metallic-roughness workflow)
 		this.metalRoughMapUniform = this.bindUniform("metalRoughMap", "tex", 7);
@@ -292,6 +296,10 @@ export class StandardShader extends Shader {
 		const specMap = (scene._iblSpecularMap instanceof CubeMap && scene._iblSpecularMap.loaded)
 			? scene._iblSpecularMap : scene._iblEnvMap;
 		this._sceneEnvMap = iblActive ? specMap : null;
+		// sharp source env cube, paired with the (prefiltered) specular map so the
+		// shader can keep a crisp mirror at low roughness; same cube when there is
+		// no separate prefilter, so the shader's low/high-roughness blend is a no-op.
+		this._sceneSharpEnvMap = iblActive ? scene._iblEnvMap : null;
 
 		// These drive the unified ambient path and must be valid every frame —
 		// even for scenes that have only a per-object specular refMap (no baked
@@ -522,6 +530,7 @@ export class StandardShader extends Shader {
 		// refmap
 		if (typeof obj.refmap && (obj.refmap instanceof CubeMap) && obj.refmap.loaded) {
 			this.refMapUniform.set(obj.refmap);
+			this.envSharpMapUniform.set(obj.refmap); // no separate prefilter for a per-object probe
 			this.refMapTypeUniform.set(1);
 
 			if (!obj.refmap.bbox) {
@@ -533,10 +542,12 @@ export class StandardShader extends Shader {
 		} else if (this._iblActive) {
 			// fall back to the scene environment cubemap for specular IBL
 			this.refMapUniform.set(this._sceneEnvMap);
+			this.envSharpMapUniform.set(this._sceneSharpEnvMap);
 			this.refmapBoxUniform.set(this.emptyBoundingBox);
 			this.refMapTypeUniform.set(1);
 		} else {
 			this.refMapUniform.set(this.emptyCubemap);
+			this.envSharpMapUniform.set(this.emptyCubemap);
 			this.refMapTypeUniform.set(0);
 		}
 
@@ -619,6 +630,7 @@ export class StandardShader extends Shader {
 		// refmap
 		if (typeof mesh._refmap === "object" && mesh._refmap instanceof CubeMap && mesh._refmap.loaded) {
 			this.refMapUniform.set(mesh._refmap);
+			this.envSharpMapUniform.set(mesh._refmap); // no separate prefilter for a per-object probe
 			this.refMapTypeUniform.set(1);
 
 			if (!mesh._refmap.bbox) {
@@ -630,10 +642,12 @@ export class StandardShader extends Shader {
 		} else if (this._iblActive) {
 			// fall back to the scene environment cubemap for specular IBL
 			this.refMapUniform.set(this._sceneEnvMap);
+			this.envSharpMapUniform.set(this._sceneSharpEnvMap);
 			this.refmapBoxUniform.set(this.emptyBoundingBox);
 			this.refMapTypeUniform.set(1);
 		} else {
 			this.refMapUniform.set(this.emptyCubemap);
+			this.envSharpMapUniform.set(this.emptyCubemap);
 			this.refMapTypeUniform.set(0);
 		}
 	}
@@ -646,6 +660,7 @@ export class StandardShader extends Shader {
 		this.textureUniform.unset();
 		this.lightMapUniform.unset();
 		this.refMapUniform.unset();
+		this.envSharpMapUniform.unset();
     this.normalMapUniform.unset();
 		this.metalRoughMapUniform.unset();
 		this.aoMapUniform.unset();

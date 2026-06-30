@@ -272,7 +272,14 @@ export class IBLBaker {
 				gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
 					faces[i], target.glTexture, mip);
 
-				const basis = CUBE_FACE_BASIS[i];
+				// FACE_BASIS (not CUBE_FACE_BASIS): the prefilter must reproduce the
+				// env cube's own orientation. equirectToCubemap built the env with
+				// FACE_BASIS, so FACE_BASIS is exactly the texel->world-direction map
+				// the cube samples by; using it here makes a low-roughness mip equal
+				// the source env (seam-free) and every mip mutually aligned. (The
+				// irradiance bake keeps CUBE_FACE_BASIS — its hemisphere integral is
+				// insensitive to the pole orientation, so either works there.)
+				const basis = FACE_BASIS[i];
 				shader.setFace(basis.forward, basis.right, basis.up);
 
 				gl.clear(gl.COLOR_BUFFER_BIT);
