@@ -4,8 +4,9 @@
 > land it on the **USS Dwight D. Eisenhower (CVN-69)** aircraft carrier on the open
 > sea. This document is the single source of truth and is **updated every phase**.
 >
-> **Last updated:** 2026-06-29 — Phase **P1** complete; carrier now steams under
-> way with a wake (parts of P5 pulled forward) and the camera/ocean follow it.
+> **Last updated:** 2026-06-30 — Phase **P2** in place: the F-2 flies a controllable
+> arcade approach toward the carrier (keyboard + on-screen pads, stall model, chase
+> cam, airspeed bar). P1 carrier steams under way with a wake.
 
 ---
 
@@ -30,7 +31,8 @@ own. Reuse the existing F-2 assets/examples (`f2-flight.html`) and the ocean
 | Phase | Goal | Status |
 |---|---|---|
 | **P1** | Render the carrier on the ocean under HDRI; free-fly camera to inspect. | ✅ **Done** |
-| **P2** | Add the F-2 in the air; basic flight model (throttle, pitch/roll/yaw), chase camera. Carrier static. | ⬜ Planned |
+| **P2** | Add the F-2 in the air; basic flight model (throttle, pitch/yaw/bank, stall), virtual controls + chase camera. Carrier static. | ✅ **Done** |
+| **P2.1** | Simplify to a landable set (yaw + throttle, pitch optional) and actually put it down on the deck. | ◑ Next |
 | **P3** | Approach framing: position the F-2 on a rear approach to the angled deck; HUD (airspeed, altitude, sink rate, lineup); landing-area markings. | ⬜ Planned |
 | **P4** | Touchdown + arresting gear: detect deck contact in the wire zone, catch/trap (decelerate), bolter (miss → full power go-around), wave-off. | ⬜ Planned |
 | **P5** | Polish: deck crew/lights, meatball (Fresnel lens optical landing system), wake/spray, carrier underway (moving + heading into wind), sound. | ⬜ Planned |
@@ -66,6 +68,68 @@ Verified in-browser (Playwright): hull number **"69"**, island/mast, angled flig
 deck, and deck markings all render; ship floats deck-up and steams **bow-first**;
 the wake streams off the **stern**; the sea stays world-stable while the camera
 orbits and while the ship travels (no fast-forward / swimming).
+
+---
+
+## 3b. Current state (P2 — F-2 flight & controls)
+
+**Scene file:** `examples/landing-p2.html` (served at `/landing-p2.html`).
+**Registered** in the examples grid as "Carrier Landing — P2".
+
+What P2 does (carrier is **static** here to keep the flight tractable):
+
+- Loads the **F-2** (`/models/F2/F2.obj` + `skin1.jpg`), wiring the paint/nav-lights/
+  canopy/HUD materials like `f2-flight.html`, plus a throttle-reactive afterburner.
+- The jet **spawns off the starboard quarter** (`START` = `(400, 300, 1550)`, heading
+  ≈ 14.5° — ≈1.6 km out, 300 m up, right-rear of the ship) and tracks in on a
+  **right-diagonal approach** toward the angled deck (**heading 0 = world −Z**, the way
+  the bow points; the small +heading crosses it left onto the deck line).
+- **Arcade flight model** (`scene.on("frame")`, real-time `dt`): throttle eases speed
+  toward `throttle·MAX_SPEED`; a single **yaw** input steers (a coordinated visual
+  bank follows the turn); **pitch** adds climb/dive on top. **Vertical motion is a
+  lift-vs-weight model** — lift ∝ speed², so at/above `TRIM_SPEED` level flight holds
+  altitude, and below it the lift deficit (`gravSink = SINK_MAX·max(0, 1−(v/TRIM)²)`)
+  makes the jet **sink more and more → a gradual, believable descent** (not the old
+  level-or-stall switch). **Stall is a smooth ramp** (`stallT` over `STALL_MARGIN`
+  below `STALL_SPEED`): control authority fades 1.0→0.3 and the nose droops down by
+  `STALL_DROP`, both blended by `stallT`. Key tunables at the top of the file
+  (`MAX_SPEED 130`, `TRIM_SPEED 75`, `STALL_SPEED 42`, `STALL_MARGIN 12`, `SINK_MAX 24`,
+  `YAW_RATE`, `MAX_PITCH`, …). Fly an approach by **easing the throttle back** so speed
+  drops below trim and the jet settles into a gentle sink.
+- **Controls** — keyboard: `←/→` **and** `A/D` yaw (identical effect, no longer
+  stack) · `↑/↓` pitch (**↑ = push-down/descend**, ↓ = pull-up/climb) · `W/S` throttle
+  · `R` reset. On-screen **virtual pads** (pointer + touch): left cross = pitch/yaw,
+  right = throttle.
+- **Airspeed readout in km/h** (internal speed stays u/s; the SPD field shows
+  `speed·3.6`).
+- **Flight chase camera** — a dedicated `FlightChaseController` (a `CameraController`
+  subclass defined in the example) locked **behind + above the jet that banks AND
+  pitches with the airframe** (the horizon rolls in a turn). **Drag** (mouse/touch) to
+  look around the jet's flanks; the free-look is **held the whole time the pointer is
+  down** (even motionless) and only **eases back behind** ~0.6 s **after you release**.
+  Press/release are tracked via scene `mousedown` + `enddrag`/`mouseup` plus raw window
+  `pointerup`/`touchend`/`touchcancel` as a fail-safe (a touch tap that never dragged
+  emits no scene release event). **Scroll** to zoom (dolly along the back vector,
+  18..600 u). It reads live flight state via a `getState()` callback and positions
+  `mainCamera` from the renderer's controller `tick()`. Replaces the earlier
+  direct-drive chase / orbit cam.
+- **Airspeed bar** (bottom-centre): fill = speed, a yellow **stall-boundary marker**
+  at `STALL_SPEED/MAX_SPEED`, fill turns **green → amber → red** approaching/below
+  stall, with SPD / ALT / THR readout and a blinking STALL warning.
+- `window` debug handles: `flight` (`pos`, `reset()`, `state()`, `place(z,y,spd)`),
+  `jet`, `carrier`, `_carrierHolder`, `_scene`, `_ocean`.
+
+**Carrier frustum-culling gotcha (important):** the renderer frustum-culls each
+object by its cached bounds (`_cachedBbox`). The load-time `getBounds()` we use to
+auto-fit caches the **pre-scale** box; leaving that stale (or clearing it to
+`undefined`) makes the carrier get **culled from most camera angles** (it vanishes).
+Fix in `landing-p2.html`: after scaling/positioning, invalidate the holder subtree's
+`_cachedBbox` **and immediately call `carrierHolder.getBounds()`** to repopulate the
+correct world bounds. (P1's close follow-cam masks this; P2's roaming chase cam
+exposed it.)
+
+**Next (P2.1):** detect deck touchdown and actually land — reduce to yaw + throttle,
+add a glideslope/lineup aid, and a simple trap (or at least a "landed" state).
 
 ---
 
@@ -198,10 +262,12 @@ can move/turn the whole ship (carrier underway) via the holder.
 
 - **Ship heading:** the hull's **bow is glTF local −Z** (the "69" bow number is on
   that end), so `HEADING 0` steams toward world −Z; forward = `(-sin θ, -cos θ)`.
-  Straight-line motion is verified; the heading→forward sign for **turns** still
-  needs a check against the engine's `angle.y` rotation convention. P2/P3 should
-  define the approach axis off the **angled** deck (not the centerline) — measure
-  the angled-deck bearing from the model.
+  In P2 the jet uses the same convention and **turns are verified** (yaw to the
+  right banks the right wing down + curves right; `jet.angle.set(-pitch, 180+heading,
+  roll)` with **`_angleOrder = "YXZ"`** so pitch is about the body's lateral axis —
+  the default `XYZ` pitches about world-X, which **inverts nose up/down with heading**;
+  see the 2026-06-30 rework note). P3 should define the approach axis off the **angled** deck (not the
+  centerline) — measure the angled-deck bearing from the model.
 - **Wake / foam fidelity:** there are now two foam systems — the path-trail
   **wake** (`options.wake`) and **depth-based contact foam** (`options.contactFoam`,
   hull waterline / shoreline), with shared sun **sparkle**. Both are **foam only**:
@@ -249,3 +315,72 @@ can move/turn the whole ship (carrier underway) via the holder.
   Wake + contact foam unified so the sparkle covers both. Verified in-browser
   (waterline band wraps the hull bow→stern; wake trails behind; open water clean).
   Updated §6/§7.
+- **2026-06-30 — P2 (F-2 flight & controls):** Created `examples/landing-p2.html`:
+  F-2 spawns astern of a static carrier and flies an **arcade flight model** (yaw +
+  bank-to-turn + pitch + throttle, **stall** below `STALL_SPEED`), driven by
+  **keyboard + on-screen virtual pads**, with a smoothed **chase camera**. Found &
+  fixed a **frustum-culling gotcha** (stale/missing `_cachedBbox` from the load-time
+  fit culls the carrier from most angles → invalidate the holder subtree then
+  `getBounds()` to repopulate; see §3b). Registered the example + thumbnail.
+- **2026-06-30 — P2 controls tuning:** Keyboard finalised to **`←/→` yaw · `↑/↓`
+  pitch (↑ = pull-up/climb) · `A/D` bank · `W/S` throttle · `R` reset** (bank
+  direction corrected; Up/Down un-reversed). Added a bottom-centre **airspeed bar**
+  with a stall-boundary marker and green→amber→red fill + SPD/ALT/THR readout
+  (replaces the top-left text HUD). *Functional verification deferred to the user
+  (local browser); changes are code-reviewed, not Playwright-verified.*
+- **2026-06-30 — P2 controls rework (per request):** **`←/→` and `A/D` are now the
+  same single yaw input** (they no longer stack into a faster turn; a coordinated
+  visual bank follows the yaw). **Pitch inverted** to joystick convention — **↑ /
+  pad-up = push-down (descend), ↓ / pad-down = pull-up (climb)**; pad labels and help
+  text updated to match. **Airspeed readout switched to km/h** (`speed·3.6`; internal
+  units stay u/s). **Spawn moved** to `(0, 100, 1120)` — 100 m altitude, 500 m further
+  astern than before. *Verification deferred to the user (Playwright unavailable).*
+- **2026-06-30 — P2 right-diagonal approach + pitch-axis fix:** **Spawn relocated** to
+  the **starboard rear quarter** `(400, 300, 1550)`, heading ≈14.5° (≈1.6 km out, 300 m
+  up), so the F-2 flies a **right-diagonal approach** onto the angled deck instead of
+  dead astern. **Root-caused the "pitch inverts with heading" bug:** the model's
+  rotation used the engine's default `XYZ` Euler order, which applies **pitch about the
+  world X axis** — so nose up/down flipped sign depending on whether the jet faced −Z
+  or +Z (push-down felt reversed at spawn, correct after a 180° turn). **Fix:** set the
+  jet's `_angleOrder = "YXZ"` (yaw → pitch → roll) so pitch happens about the **body's
+  lateral axis** and is heading-independent. (No quaternions needed; the engine's
+  `_quaternion`/`rotationType:'q'` path stays available for future full-6-DOF work.)
+  *Verification deferred to the user (Playwright unavailable).*
+- **2026-06-30 — P2 orbit camera follows the jet (per request):** Replaced the
+  direct-drive chase camera with an **`OrbitController`** whose **pivot tracks the
+  jet** — each frame the target is shifted by the jet's travel (`prevJet` delta), so
+  **drag-orbit / scroll-zoom / shift-pan stay live** while the jet remains centred
+  (the controller fully owns the camera; no more direct `cam.location`/`lookAt` per
+  frame). Initial 3/4 chase-style pose (behind + above: yaw 0, pitch 15, distance 64),
+  `rotateSpeed 6` / `zoomSpeed 50` tuned for the ~10 u jet. *Verification deferred to
+  the user (Playwright unavailable).*
+- **2026-06-30 — P2 dedicated flight chase camera (per request):** Replaced the orbit
+  camera with a purpose-built **`FlightChaseController`** (a `CameraController`
+  subclass, inline in the example): **locks behind + above the jet and follows its
+  full attitude — bank (roll) + pitch** (camera `up` = the jet's body-up so the horizon
+  tilts in turns); **scroll-zoom** (dolly 18..600 u); **drag to free-look** around the
+  flanks, then **auto-recentres behind** ~0.6 s after release / touch-idle (tracked by
+  time since the last `drag` event, so mouse-up and touch-idle share one path). Builds
+  the jet's world body frame (N/U/R via yaw→pitch→roll) each frame from a `getState()`
+  callback. Racing/flight-game feel. *Verification deferred to the user (Playwright
+  unavailable).*
+- **2026-06-30 — P2 gradual-descent flight model (per request):** Replaced the binary
+  *level-or-stall* vertical model with a **lift-vs-weight** one. Lift ∝ speed²; a new
+  **`TRIM_SPEED` (75 u/s)** is the level-flight speed — at/above it `pitch 0` holds
+  altitude, below it `gravSink = SINK_MAX·max(0, 1−(v/TRIM)²)` makes the jet **sink
+  progressively** (gentle near trim, steeper as it slows) for a believable continuous
+  descent. **Stall is now a smooth ramp** (`stallT` over `STALL_MARGIN` below
+  `STALL_SPEED`) driving both the authority fade (1.0→0.3) and the nose-drop, blended
+  instead of switched; the HUD amber **CAUTION** now follows the whole ramp and the red
+  **STALL** triggers at full departure. Added tunables `TRIM_SPEED`, `STALL_MARGIN`,
+  `SINK_MAX` (removed `SINK_RATE`). To descend on approach, **ease the throttle back**.
+  *Verification deferred to the user (Playwright unavailable).*
+- **2026-06-30 — P2 chase-cam recenters on release, not on idle (per request):** The
+  free-look used to recenter on *time since the last `drag` event*, so holding the
+  button/finger still (without releasing) wrongly snapped the view back. Now it tracks
+  an explicit **`_pressed`** flag — set on scene `mousedown` (fires for mouse *and*
+  touch), cleared on `enddrag`/`mouseup` **plus** raw window `pointerup`/`touchend`/
+  `touchcancel`/`pointercancel` (fail-safe for a touch tap that drags zero pixels and
+  emits no scene release event). While `_pressed`, the recenter is suppressed entirely;
+  it only eases back ~0.6 s **after the pointer actually lifts**. Window listeners are
+  removed in `onDetach`. *Verification deferred to the user (Playwright unavailable).*

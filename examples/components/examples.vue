@@ -169,7 +169,13 @@ const exampleItems = ref([
     title: 'Carrier Landing — P1',
     thumbnail: '/img/examples/landing-p1.jpg',
     link: 'landing-p1.html',
-    desc: 'Phase 1 of a carrier-landing simulation: the USS Dwight D. Eisenhower (CVN-69) glTF auto-fitted onto a GPU Gerstner-wave ocean under a clear-sky HDRI. The model is measured and reoriented on load (deck up, hull along Z) and scaled to keep the jet-to-ship ratio realistic for later phases. Free-fly camera — WASD to fly, drag to look, scroll to dolly.',
+    desc: 'Phase 1 of a carrier-landing simulation: the USS Dwight D. Eisenhower (CVN-69) glTF auto-fitted onto a GPU Gerstner-wave ocean under a clear-sky HDRI. The model is measured and reoriented on load (deck up, hull along Z) and scaled to keep the jet-to-ship ratio realistic for later phases. The carrier steams under way leaving a foam wake; an orbit camera keeps it centred — drag to orbit, scroll to zoom, shift+drag to pan.',
+  },
+  {
+    title: 'Carrier Landing — P2',
+    thumbnail: '/img/examples/landing-p2.jpg',
+    link: 'landing-p2.html',
+    desc: 'Phase 2: fly the F-2 toward the carrier with a simple arcade flight model and on-screen virtual controls — a left cross-pad for pitch / yaw and a right pad for throttle (or the arrow keys + W/S). Fly too slow and the wing stalls: lift collapses, the nose drops and the jet sinks until you add power. A chase camera trails the aircraft.',
   },
   {
     title: 'WaterBottle (glTF PBR)',
