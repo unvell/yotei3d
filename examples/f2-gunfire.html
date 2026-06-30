@@ -23,8 +23,8 @@
     window.addEventListener("load", function() {
 
       // ====== tunables — tweak these to re-aim the shot ======================
-      const JET_POS  = [4.0, 0.2, 0];   // parked on the right of the frame
-      const JET_YAW  = -30;             // deg about Y. 315 = front-three-quarter,
+      const JET_POS  = [3.0, 0.2, 0];   // parked on the right of the frame
+      const JET_YAW  = 200;             // deg about Y. 315 = front-three-quarter,
                                         // nose toward the camera's LEFT. Yaw-only
                                         // keeps the gun line = world +Z·Ry(yaw).
       // gun muzzle in model-local space: under the cockpit, fuselage left side,
@@ -33,7 +33,7 @@
       const MUZZLE_LOCAL = [0.5, -0.5, 1.5];
 
       const BULLET_SPEED    = 240;   // units/sec down the gun line
-      const BULLET_LIFE     = 3.8;   // seconds before a tracer recycles
+      const BULLET_LIFE     = 4.8;   // seconds before a tracer recycles
       const FIRE_INTERVAL   = 0.055; // ~18 rounds/sec — spacing makes the dashes
       const MAX_BULLETS     = 96;
       // tracer shape: a thin, long streak. diameter = thickness across the line,
@@ -74,9 +74,9 @@
         faceSize: 1024,
         rotation: 115,
       });
-      scene.environment.mat = { color: [0.1, 0.1, 0.1] };
-      scene.environment.intensity = 0.5;
-      scene.mainCamera.exposure = 1.0;
+      scene.environment.mat = { color: [0.2, 0.2, 0.2] };
+      scene.environment.intensity = 1.0;
+      scene.mainCamera.exposure = 0.5;
       scene.fog = { near: 120, far: 1600, color: [0.74, 0.82, 0.92] };
 
       // warm daylight key light
@@ -90,9 +90,9 @@
         height: -60, heightVariance: 40,
         clusterRadius: 30, clusterThickness: 20,
         puffsPerCluster: 48,
-        puffSizeMin: 24, puffSizeMax: 110,
+        puffSizeMin: 70, puffSizeMax: 150,
         wind: [10, 6],
-        opacity: 0.3,
+        opacity: 0.02,
         bottomColor: [0.84, 0.88, 0.95],
         selfShadow: 0.3,
         fadeIn: 2.5, fadeMargin: 0.3,
@@ -238,15 +238,15 @@
         count: 48,
         radius: 0.3,
         baseY: 0.1,
-        height: 2.2,          // how far a puff drifts before it dies
+        height: 1.2,          // how far a puff drifts before it dies
         riseSpeed: 15.6,       // drift speed down the barrel
         riseVariance: 0.4,
         wind: [0, 0],
         swirl: 0.06, swirlFreq: 1.6,
-        spread: 0.7,          // puffs fan out a little as they go
-        color: [0.2, 0.2, 0.2],
-        opacity: 0.6,        // faint
-        sizeStart: 8, sizeEnd: 46,   // small at the muzzle, billows as it drifts
+        spread: 0.02,          // puffs fan out a little as they go
+        color: [0.05, 0.05, 0.05],
+        opacity: 0.9,        // faint
+        sizeStart: 16, sizeEnd: 32,   // small at the muzzle, billows as it drifts
         sizeScale: 30,
       });
       muzzleSmoke.angle.set(-90, -0, 0);   // drift forward (+Z)
@@ -393,11 +393,11 @@
           recoil *= Math.max(0, 1 - 6 * dt);
           const r = recoil;
           jet.angle.set(
-            (Math.random() - 0.5) * r * 18,
-            jetYaw + (Math.random() - 0.5) * r * 12,
-            (Math.random() - 0.5) * r * 12
+            (Math.random() - 0.5) * r * 9,
+            jetYaw + (Math.random() - 0.5) * r * 6,
+            (Math.random() - 0.5) * r * 6
           );
-          jet.location.y = JET_POS[1] + Math.sin(t * 1.5) * 0.03;
+          jet.location.y = JET_POS[1] + Math.sin(t * 1.0) * 0.03;
           jet.updateTransform();   // refresh the muzzle marker's world position
 
           // 2) plant the gun line at the barrel and aim it down the nose (pure

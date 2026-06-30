@@ -52,12 +52,12 @@
         faceSize: 1024,
         rotation: 130,
       });
-      scene.environment.mat = { color: [0.4, 0.4, 0.4] };
-      scene.environment.intensity = 0.2;
-      scene.mainCamera.exposure = 0.3;
+      scene.environment.mat = { color: [0.2, 0.2, 0.2] };
+      scene.environment.intensity = 1.0;
+      scene.mainCamera.exposure = 1.0;
 
       // haze the sea into the horizon so the water plane's far edge is hidden
-      scene.fog = { near: 100, far: 2000, color: [0.24, 0.33, 0.40] };
+      scene.fog = { near: 100, far: 2000, color: [0.14, 0.23, 0.30] };
 
       // ...and bleed the same haze into the bottom of the skybox so the sky and
       // the fogged sea meet at one colour instead of a hard horizon line.
@@ -65,39 +65,37 @@
         color: [0.34, 0.43, 0.50],
         lower: 0.0,
         upper: 0.02,
-        density: 0.7,
+        density: 0.2,
       };
 
       // --- the ocean ---------------------------------------------------------
       // Start from the tuned preset used by ocean.html; every value here is then
       // live-editable from the panel on the right.
       let ocean = new Ocean({
-        size: 10000,
-        segments: 100,  // grid resolution per axis (wave detail)
-        level: 0,
-        wind: [1.0, 0.4],
-        waveAmp: 0.1,   // amplitude of the largest wave
-        waveLen: 100,   // wavelength of the largest wave
-        waveSpeed: 0.1, // crest travel speed
-        steepness: 0.75, // 0 rolling swell .. 1 sharp choppy crests
-        timeScale: 1.0,
-
-        sunGlitter: 0.2,    // 0 = no glitter, 1 = full glitter
-        specStrength: 0.15, // 0 = no specular, 1 = full specular
-
-        fresnelPower: 5.0,
-        fresnelBias: 0.2,
-        reflectivity: 0.3,
-        reflectionBlur: 1.5,  // distance/grazing reflection softening (0 = mirror-sharp)
-
-        rippleScale: 1.0,
-        rippleStrength: 0.5,
-        rippleDetail: 3.0,    // breaks up "oily" near-water into fine choppy facets (0 = off)
-
-        deepColor: [0.012, 0.07, 0.10],
-        shallowColor: [0.10, 0.36, 0.40],
-        followTarget: scene.mainCamera,   // endless sea: recentres on the camera
-      });
+        "size": 10000,
+        "segments": 10,
+        "level": 0,
+        "wind": [
+          1,
+          0.4
+        ],
+        "waveAmp": 0.02,
+        "waveLen": 6,
+        "waveSpeed": 0,
+        "steepness": 0.53,
+        "timeScale": 1,
+        "sunGlitter": 0.21,
+        "specStrength": 0.08,
+        "fresnelPower": 6.7,
+        "fresnelBias": 0.2,
+        "reflectivity": 0.1,
+        "reflectionBlur": 1.5,
+        "rippleScale": 1,
+        "rippleStrength": 0.15,
+        "rippleDetail": 2.5,
+        "deepColor": [ 0.012, 0.039, 0.067 ],
+        "shallowColor": [ 0.051, 0.114, 0.149 ]
+      })
       ocean.location.set(0, 0, 0);
       scene.add(ocean);
       window._ocean = ocean;

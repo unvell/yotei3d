@@ -51,18 +51,18 @@
         faceSize: 1024,
         rotation: 180,
       });
-      scene.environment.mat = { color: [0.5, 0.5, 0.5] };
-      scene.environment.intensity = 0.45;
-      scene.mainCamera.exposure = 0.2;
+      scene.environment.mat = { color: [0.3, 0.3, 0.3] };
+      scene.environment.intensity = 1.0;
+      scene.mainCamera.exposure = 0.5;
 
       // haze the sea into the horizon and bleed the same haze into the bottom of
       // the sky so they meet at one colour instead of a hard line.
-      scene.fog = { near: 400, far: 4500, color: [0.66, 0.76, 0.86] };
+      scene.fog = { near: 400, far: 4500, color: [0.16, 0.26, 0.36] };
       scene.skyFog = {
-        color: [0.70, 0.80, 0.88],
+        color: [0.30, 0.40, 0.48],
         lower: 0.0,
-        upper: 0.05,
-        density: 0.7,
+        upper: 0.02,
+        density: 0.5,
       };
 
       // --- sun: warm daylight key, low-ish so the deck and island catch a clear
@@ -72,59 +72,30 @@
 
       // --- the ocean ---------------------------------------------------------
       const ocean = new Ocean({
-        "size": 10000,
+        "size": 100000,
         "segments": 10,
         "level": 0,
         "wind": [ 1, 0.4 ],
         "waveAmp": 0.01,
         "waveLen": 100,
-        "waveSpeed": 0.1,
+        "waveSpeed": 0.0,
         "steepness": 0.01,
         "timeScale": 1,
         
         "sunGlitter": 0.2,
-        "specStrength": 0.15,
+        "specStrength": 0.05,
 
         "fresnelPower": 5,
         "fresnelBias": 0.01,
-        "reflectivity": 0.5,
-        "reflectionBlur": 0.5,
+        "reflectivity": 0.2,
+        "reflectionBlur": 1.50,
+
         "rippleScale": 0.5,
-        "rippleStrength": 0.5,
+        "rippleStrength": 0.15,
         "rippleDetail": 3,
         "deepColor": [ 0.016, 0.067, 0.125 ],
         "shallowColor": [ 0.078, 0.157, 0.243 ],
       })
-
-      // const ocean = new Ocean({
-      //   size: 12000,
-      //   segments: 20,
-      //   level: 0,
-      //   wind: [1.0, 0.5],
-      //   waveAmp: 0.1,
-      //   waveLen: 120,
-      //   waveSpeed: 0.12,
-      //   steepness: 0.6,
-      //   sunGlitter: 0.25,
-      //   specStrength: 0.18,
-      //   fresnelPower: 3.0,
-      //   fresnelBias: 0.01,
-      //   reflectivity: 0.4,
-      //   reflectionBlur: 1.0,
-      //   rippleScale: 1.0,
-      //   rippleStrength: 1.0, // 0..1, higher = more ripple
-      //   rippleDetail: 0.1, // 1..5, higher = more detail
-      //   deepColor: [0.015, 0.08, 0.12],
-      //   shallowColor: [0.10, 0.34, 0.40],
-      //   // P1 keeps the ocean world-fixed (no followTarget). The waves/ripples are
-      //   // evaluated in world space, so recentring the grid on the *orbiting* eye
-      //   // would sweep the surface through the world-locked wave field — making the
-      //   // ripples churn and the swell "fast-forward" every time the camera turns.
-      //   // size 12000 (half-extent 6000) already reaches the horizon well past the
-      //   // 1400u max orbit distance, so no follow is needed. Later phases, once the
-      //   // carrier/aircraft actually travels, should follow that moving focus (the
-      //   // orbit target / holder) — never the camera eye.
-      // });
       ocean.location.set(0, 0, 0);
       scene.add(ocean);
       window._ocean = ocean;
@@ -164,14 +135,14 @@
       ocean.options.followTarget = holder;
       ocean.options.wake = {
         source: holder,
-        dropDistance: 10,     // sample the path every 5u (smooth trail)
+        dropDistance: 20,     // sample the path every 5u (smooth trail)
         life: 50,            // foam lingers 16s ≈ a long trail at this speed
         maxPoints: 48,       // == shader WAKE_MAX
         width: 22,           // half-width at the stern (ship beam ≈ 64u)
         widthGrowth: 2,      // tail fans out to ~5× that
         foamColor: [1.0, 1.05, 1.12],
         foamIntensity: 0.5,
-        sparkle: 12,          // sun glints twinkling on the flying spray (HDR)
+        sparkle: 6,          // sun glints twinkling on the flying spray (HDR)
       };
       // Depth-based contact foam: white water where the hull breaks the surface
       // (and any future shoreline/rocks). A scene depth pre-pass detects solids
@@ -189,6 +160,8 @@
         if (!root) { console.error("failed to load carrier scene.gltf"); return; }
         window.carrier = root;
         holder.add(root);
+
+        console.log(root);
 
         // ORIENT is baked in at load (baseTransform below), so root is already
         // lying flat and root.angle is a clean [0,0,0]. The bounds come back
@@ -217,6 +190,14 @@
         window.carrierFit = fit;
         console.log("[carrier] auto-fit", fit);
 
+        _carrierHolder.eachChild(c=>{
+          if(c.name=="Object_3") {
+            // change deck material
+            c.mat.roughness = 0.7;
+            c.mat.metallic = 0.5;
+          }
+        });
+
         const el = dimEl();
         if (el) {
           el.textContent = `deck ≈ ${fit.worldSize.x}×${fit.worldSize.z} u · h ${fit.worldSize.y} u · scale ${fit.scale}`;
@@ -231,8 +212,8 @@
         occluders: [holder],
         color: [1, 1, 0.95],
         intensity: 1,
-        coreIntensity: 0.5,
-        scale: 1.0,
+        coreIntensity: 0.1,
+        scale: 2.0,
       });
       window._lensFlare = lensFlare;
 
@@ -273,7 +254,7 @@
       // that end), so "forward" is local -Z rotated into the world by HEADING.
       // At HEADING 0 the carrier therefore steams bow-first toward world -Z.
       const HEADING = 0;            // ship yaw in degrees (0 = sail toward -Z)
-      const SHIP_SPEED = 8;        // world units / second
+      const SHIP_SPEED = 5;        // world units / second
       const hdg = HEADING * Math.PI / 180;
       const fwd = { x: -Math.sin(hdg), z: -Math.cos(hdg) };
       holder.angle.y = HEADING;     // point the hull along the heading
