@@ -6,10 +6,11 @@ export interface Telemetry {
   speedKmh: number; // displayed airspeed (km/h)
   alt: number; // altitude (world units)
   throttlePct: number; // 0..100
-  stallT: number; // 0 (clean) → 1 (departed)
+  aoa: number; // angle of attack (deg) — wing bite
+  stallT: number; // 0 (clean) → 1 (at/over stall angle)
   stalled: boolean;
 }
 
 export function createTelemetry(): Telemetry {
-  return { speed: 0, speedKmh: 0, alt: 0, throttlePct: 0, stallT: 0, stalled: false };
+  return { speed: 0, speedKmh: 0, alt: 0, throttlePct: 0, aoa: 0, stallT: 0, stalled: false };
 }

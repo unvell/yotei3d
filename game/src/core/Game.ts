@@ -112,6 +112,7 @@ export class Game {
     this.telemetry.speedKmh = this.flight.speed * 3.6;
     this.telemetry.alt = this.flight.pos.y;
     this.telemetry.throttlePct = this.flight.throttle * 100;
+    this.telemetry.aoa = this.flight.alpha;
     this.telemetry.stallT = this.flight.stallT;
     this.telemetry.stalled = this.flight.stalled;
 

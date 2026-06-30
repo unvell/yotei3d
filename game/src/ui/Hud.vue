@@ -4,14 +4,17 @@
 // green → amber → red approaching / below stall.
 import { computed } from 'vue';
 import type { Telemetry } from '../core/telemetry';
-import { FLIGHT } from '../aircraft/tunables';
+import { HUD_SPEED_SCALE } from '../aircraft/tunables';
+import { stallSpeed } from '../aircraft/aero';
 
 const props = defineProps<{ telemetry: Telemetry }>();
 
+// the bar shows speed/energy; its colour now comes from AoA (stall is AoA-based).
 const fillPct = computed(() =>
-  Math.max(0, Math.min(100, (props.telemetry.speed / FLIGHT.MAX_SPEED) * 100)),
+  Math.max(0, Math.min(100, (props.telemetry.speed / HUD_SPEED_SCALE) * 100)),
 );
-const markPct = (FLIGHT.STALL_SPEED / FLIGHT.MAX_SPEED) * 100;
+// yellow marker = the level-flight stall speed (slowest speed that can hold weight)
+const markPct = (stallSpeed() / HUD_SPEED_SCALE) * 100;
 const stateClass = computed(() => ({
   stall: props.telemetry.stalled,
   caution: !props.telemetry.stalled && props.telemetry.stallT > 0,
@@ -27,6 +30,7 @@ const stateClass = computed(() => ({
     <div class="sb-read">
       <span>SPD <b>{{ telemetry.speedKmh.toFixed(0) }}</b> km/h</span>
       <span>ALT <b>{{ telemetry.alt.toFixed(0) }}</b> u</span>
+      <span>AoA <b>{{ telemetry.aoa.toFixed(1) }}</b>°</span>
       <span>THR <b>{{ telemetry.throttlePct.toFixed(0) }}</b>%</span>
     </div>
     <div class="sb-warn">⚠ STALL — ADD POWER</div>

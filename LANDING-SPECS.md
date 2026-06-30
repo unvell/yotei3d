@@ -410,3 +410,26 @@ can move/turn the whole ship (carrier underway) via the holder.
   and the reactive HUD tracks it, the chase cam + render are correct (HDRI sky, reflective
   ocean, jet + afterburner). **Future phases (P2.1 onward) are developed in `game/`, not
   in `landing-p2.html`** (the HTML examples remain as the P1/P2 reference snapshots).
+- **2026-06-30 — Physics-based flight model: angle-of-attack point-mass (per request).**
+  Replaced the arcade vertical model (pitch directly drove climb and auto-returned to
+  level) with a proper **longitudinal point-mass model** in `game/src/aircraft/`. Now the
+  **nose attitude θ (`pitch`) and the flight path γ (`gamma`, the direction the jet
+  actually moves) are separate**; their difference is the **angle of attack α = θ − γ**.
+  Lift comes from α and speed (`L = ½ρV²S·CL(α)`), with a soft post-stall CL falloff;
+  drag is `CD0 + k·CL²`; the canonical EoM `V̇ = T·cosα − D − W·sinγ` and
+  `γ̇ = (L + T·sinα − W·cosγ)/V` curve the velocity vector and change speed. **Pitch is a
+  rate command that leaves a persistent attitude** (hold to rotate, release and it stays —
+  no auto-return; push the other way to level). A **fly-by-wire AoA limiter** (F-16/F-2
+  style) fades elevator authority near `AOA_LIMIT` so you can't peg the nose into a deep-
+  stall mush — an envelope limit, not a return. Trim speed / stall speed / top speed now
+  **emerge** from the coefficients (pure helpers in `aero.ts`: `liftCoeff`, `dragCoeff`,
+  `trimPitchDeg`, `trimThrottle`, `stallSpeed`); the jet **spawns trimmed** for
+  `START.speed`. Stall + HUD warnings are now **AoA-based** (not speed-based); the HUD
+  gained an **AoA readout**. Lateral motion (yaw + visual bank) kept simple/coordinated.
+  New files `aircraft/aero.ts` + reworked `aircraft/{FlightModel,tunables}.ts`; `core/
+  telemetry.ts` + `ui/Hud.vue` carry AoA. **Verified in-browser (Playwright, deterministic
+  hand-stepping):** trim holds altitude hands-off (AoA 4.1°, alt 300.0→300.1 / 3 s);
+  attitude persists after release (Δpitch 0); pull-up climbs and bleeds speed; the AoA
+  limiter caps α ≈ 20° under a 4 s hard pull (was 48°); dive builds speed; stall is
+  reachable and **recovers** by lowering the nose + power; approach descent is a controlled
+  sink when power is eased. The model is **engine/DOM-free and unit-testable.**
