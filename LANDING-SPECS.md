@@ -433,3 +433,18 @@ can move/turn the whole ship (carrier underway) via the holder.
   limiter caps α ≈ 20° under a 4 s hard pull (was 48°); dive builds speed; stall is
   reachable and **recovers** by lowering the nose + power; approach descent is a controlled
   sink when power is eased. The model is **engine/DOM-free and unit-testable.**
+- **2026-07-01 — Flight model retuned to real F-2 / F-16-class speeds (per request).**
+  The user understood that idle ≠ stopping (the jet *glides* — correct physics; the speed
+  floor is the stall speed) and asked for realistic speeds + the real **nose-high approach**
+  done **without adding controls** (no flaps/airbrake keys — see the control-simplicity
+  note). Retuned `aircraft/tunables.ts` aero coefficients (`QS 0.00168`, `CL_ALPHA 5`,
+  `ALPHA_STALL 15`, `THRUST_MAX 3.7`, `AOA_LIMIT 24`, `HUD_SPEED_SCALE 220`) so the emergent
+  envelope is realistic: **stall ≈ 240 km/h, approach ≈ 280 km/h at ~11° nose-up (AoA ~11°,
+  ~26 % throttle), level top ≈ 1190 km/h** (at full throttle it climbs unless the nose is
+  pushed down — realistic excess-thrust behaviour). The **nose-high approach needs no new
+  inputs**: the on-speed technique — *pitch = airspeed/AoA (hold the nose-up attitude),
+  throttle = descent rate/glidepath* — already works (slow + high AoA = nose up while
+  descending). Verified in-browser (Playwright): stall floor 240 km/h, 280 km/h approach
+  trims to 11° nose-up, idle settles into a glide (~318 km/h, descending). **Decided to keep
+  controls minimal for now** (throttle + pitch/yaw only); drag devices/flaps deferred until
+  the user opts into more inputs.
