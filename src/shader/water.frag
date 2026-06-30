@@ -68,13 +68,29 @@ varying vec3 vNormal;
 varying vec2 vWorldXZ;
 varying float vCrest;
 
+// The procedural noise below is evaluated in WORLD space (vWorldXZ), so its
+// input grows without bound as the surface drifts from the origin — e.g. a
+// followed aircraft flying far out to sea. Once the lattice index reaches a few
+// thousand, hash()'s `p * vec2(123.34, 456.21)` lands in the millions and
+// float32 fract() quantises to a handful of values: adjacent cells collapse to
+// the same hash and the sea degenerates into axis-aligned streaks. The cure is
+// a PERIODIC (tileable) noise: wrap the lattice to a fixed period so every hash
+// input stays small and precise no matter how far out we are. The wrap is
+// seamless (hash is periodic with the same period), so the field never pops.
+// 256 keeps the hash input < 256*456 ≈ 117k (fract still has headroom) while
+// the spatial repeat (period / frequency, hundreds of world units) is far too
+// coarse to read on open water.
+const float NOISE_PERIOD = 256.0;
+
 float hash(vec2 p) {
+	p = mod(p, NOISE_PERIOD);              // tileable + keeps the hash input small
 	p = fract(p * vec2(123.34, 456.21));
 	p += dot(p, p + 45.32);
 	return fract(p.x * p.y);
 }
 
 float valueNoise(vec2 p) {
+	p = mod(p, NOISE_PERIOD);              // bounded domain -> precise floor()/fract()
 	vec2 i = floor(p);
 	vec2 f = fract(p);
 	vec2 u = f * f * (3.0 - 2.0 * f);
