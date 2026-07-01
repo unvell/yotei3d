@@ -71,7 +71,7 @@ export const HUD_SPEED_SCALE = 220;
 // regardless of how the coefficients above are tuned. Press R to return here.
 export const START = {
   x: 0,
-  y: 300,
+  y: 100,
   z: 3550,
   heading: 0,
   speed: 110,

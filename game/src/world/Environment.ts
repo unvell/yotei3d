@@ -24,7 +24,7 @@ export class Environment {
 
     scene.environment = new HDRSkyBox(this.renderer, HDRI_URL, {
       faceSize: 1024,
-      rotation: 180,
+      rotation: 115,
     });
     scene.environment.mat = { color: [0.4, 0.4, 0.4] };
     scene.environment.intensity = 1.0;
@@ -32,11 +32,11 @@ export class Environment {
 
     // haze the sea into the horizon and bleed the same haze into the bottom of
     // the sky so they meet at one colour instead of a hard line.
-    scene.fog = { near: 600, far: 6000, color: [0.16, 0.26, 0.36] };
-    scene.skyFog = { color: [0.3, 0.4, 0.48], lower: 0.0, upper: 0.02, density: 0.5 };
+    scene.fog = { near: 600, far: 5000, color: [0.16, 0.26, 0.36] };
+    scene.skyFog = { color: [0.2, 0.3, 0.38], lower: 0.0, upper: 0.05, density: 0.3 };
 
     // warm daylight key, low-ish so the deck and island catch a clear highlight.
-    scene.sun.direction = [1.7, 0.2, -1.4];
+    scene.sun.direction = [-0.25, 0.12, -1];
     scene.sun.mat.color = [1.3, 1.18, 0.95];
   }
 
