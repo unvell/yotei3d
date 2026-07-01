@@ -3,6 +3,11 @@ import type { Scene } from '@';
 import { Vec3 } from '@/math';
 
 const CARRIER_URL = '/models/carrier/scene.gltf';
+// Landing markers authored in Blender (scene.blend) and exported alongside the
+// carrier: `landing-runway` (a quad on the angled deck) + `landing-wire-origin`
+// (an empty at the centre of the 4 arresting wires). Loaded separately and given
+// the SAME fit as the carrier so they sit exactly where they were authored.
+const MARKERS_URL = '/models/carrier/landing-markers.gltf';
 
 // The model arrives standing on its stern (long axis = glTF +Y), so we bake a
 // −90° about X at load time → deck up, hull length along Z, bow = local −Z.
@@ -37,6 +42,14 @@ export class Carrier {
   root: SceneObject | null = null;
   deckTopY = 14; // jet-origin resting height on the deck (deck surface + gear); measured on load
   fit: CarrierFit | null = null;
+
+  // Arresting-wire landing zone, read from the Blender markers after the fit.
+  // World space; null until the markers load (judge then falls back to a box).
+  wireOrigin: Vec3 | null = null; // centre of the 4 wires (ideal touchdown)
+  deckAlong: Vec3 | null = null; // unit vector along the angled landing deck
+  deckAcross: Vec3 | null = null; // unit vector across the deck
+  runwayHalfWidth = 10; // world half-width of the landing strip
+  deckBearingDeg = 0; // angled-deck heading offset (deg), for reference/HUD
 
   constructor(private readonly scene: Scene) {
     scene.add(this.holder);
@@ -111,10 +124,75 @@ export class Carrier {
           // the touchdown judge pins the jet's origin to — so fold the gear height in.
           this.deckTopY = this._measureDeckTop() + AIRCRAFT_GEAR_HEIGHT;
 
-          this.scene.requireUpdateFrame();
-          resolve(this.fit);
+          // Load the Blender landing markers with the SAME fit, then resolve. The
+          // markers are optional — a failure just leaves the wire zone null and the
+          // judge falls back to the deck box.
+          this._loadMarkers(s, root.location).then(() => {
+            this.scene.requireUpdateFrame();
+            resolve(this.fit as CarrierFit);
+          });
         },
         { baseTransform: { angle: ORIENT } },
+      );
+    });
+  }
+
+  /**
+   * Load the Blender landing markers and place them with the carrier's fit
+   * (scale + offset), so they land on the deck exactly where authored. Reads the
+   * wire centre + the angled-deck axes for the touchdown judge, then hides the
+   * runway quad (it's a helper, not shown).
+   */
+  private _loadMarkers(scale: number, loc: any): Promise<void> {
+    return new Promise((resolve) => {
+      this.scene.createObjectFromURL(
+        MARKERS_URL,
+        (mroot: any) => {
+          if (!mroot) {
+            resolve();
+            return;
+          }
+          mroot.scale.set(scale, scale, scale);
+          mroot.location.set(loc.x, loc.y, loc.z);
+          this.holder.add(mroot);
+          mroot.updateTransform(); // eagerly resolve the new subtree's transforms
+
+          let runway: any = null;
+          let wire: any = null;
+          mroot.eachChild((c: any) => {
+            if (c.name === 'landing-runway') runway = c;
+            else if (c.name === 'landing-wire-origin') wire = c;
+          });
+
+          if (wire) this.wireOrigin = wire.worldLocation.clone();
+
+          if (runway) {
+            // Probe the runway's world axes by reading local points through the
+            // engine's own transform (robust; no manual matrix math). The Blender
+            // quad is local [-1..1] in X (width) and Z (length).
+            const probe = (x: number, z: number): Vec3 => {
+              const p = new SceneObject();
+              p.location.set(x, 0, z);
+              runway.add(p);
+              const w = p.worldLocation.clone();
+              runway.remove(p);
+              return w;
+            };
+            const c0 = probe(0, 0);
+            const dAlong = probe(0, 1).sub(c0);
+            const dAcross = probe(1, 0).sub(c0);
+            const along = dAlong.normalize();
+            this.runwayHalfWidth = dAcross.length();
+            this.deckAlong = along;
+            this.deckAcross = dAcross.normalize();
+            this.deckBearingDeg = (Math.atan2(along.x, along.z) * 180) / Math.PI;
+            if (!this.wireOrigin) this.wireOrigin = c0;
+            runway.visible = false;
+          }
+
+          resolve();
+        },
+        {},
       );
     });
   }

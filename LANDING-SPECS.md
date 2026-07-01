@@ -38,7 +38,7 @@ own. Reuse the existing F-2 assets/examples (`f2-flight.html`) and the ocean
 | **P1** | Render the carrier on the ocean under HDRI; free-fly camera to inspect. | ✅ **Done** |
 | **P2** | Add the F-2 in the air; basic flight model (throttle, pitch/yaw/bank, stall), virtual controls + chase camera. Carrier static. | ✅ **Done** |
 | **P2.1** | Actually put it down on the deck: touchdown judge (trap / crash / ditch), arresting-gear stop, landing/crash HUD banner + sink-rate readout. | ✅ **Done** |
-| **P3** | Approach framing: position the F-2 on a rear approach to the **angled** deck; wire-zone touchdown + landing grade by wire; lineup/glideslope aid; landing-area markings. | ⬜ Planned |
+| **P3** | Approach framing: **angled-deck wire zone** from Blender markers (done — trap only in the wire zone, "missed the wires" outside it); still TODO: rear approach lined up on the angled bearing, lineup/glideslope aid, per-wire grade. | ◑ In progress |
 | **P4** | Touchdown + arresting gear: detect deck contact in the wire zone, catch/trap (decelerate), bolter (miss → full power go-around), wave-off. | ⬜ Planned |
 | **P5** | Polish: deck crew/lights, meatball (Fresnel lens optical landing system), wake/spray, carrier underway (moving + heading into wind), sound. | ⬜ Planned |
 | **P6** | Game loop: scoring (centerline/glideslope/wire #), restart, difficulty (sea state, wind). | ⬜ Planned |
@@ -282,11 +282,14 @@ can move/turn the whole ship (carrier underway) via the holder.
   ~100 u/cell) or a displacement decal — future work. The contact-foam depth
   pre-pass is full-res every frame; if cost matters, drop it to half-res (sampling
   is normalized so only sharpness changes) — but then force NEAREST or keep 1:1.
-- **Wire zone & touchdown:** the **deck-surface height is now measured** (P2.1) —
+- **Wire zone & touchdown:** the **deck-surface height is measured** (P2.1) —
   `Carrier._measureDeckTop()` ray-casts straight down onto the deck (centreline aft
-  samples, median) → deck top ≈ **y 12.4**; the touchdown judge pins the trapped jet
-  to it. Still TODO for P3+: a 2D landing box for the 3–4 arresting **wires** and the
-  **angled-deck** bearing (the current box is the axis-aligned full-hull footprint).
+  samples, median) → deck top ≈ **y 12.4**; the trapped jet pins to it (+ gear).
+  The **arresting-wire landing area is now authored in Blender** (P3, see §5b): the
+  `landing-runway` quad + `landing-wire-origin` empty give the angled-deck touchdown
+  zone (centre ≈ **z +66, x −0.8, bearing 9.55°**, ~68×22 u); a clean trap must land
+  in it. Still TODO: the rear **approach** lined up on the angled bearing (the jet
+  still flies a straight-in centreline), a lineup/glideslope aid, and per-wire grade.
 - **Flight model fidelity:** start arcade (the `f2-flight.html` easing model), move
   toward a basic angle-of-attack/sink-rate model for a believable trap.
 - **Performance:** ocean `segments` and `resolutionRatio` are the main knobs.
@@ -506,3 +509,27 @@ can move/turn the whole ship (carrier underway) via the holder.
   **on the flight deck** (verified in-browser: land → `y = 12.41`, sitting on the deck
   markings). **Where to tune deck height:** `game/src/world/Carrier.ts` — it is now
   auto-measured; `DECK_HEIGHT_FRAC` is the fallback only.
+- **2026-07-01 — jet sits on its gear:** trapped-jet resting height = measured deck
+  surface **+ `AIRCRAFT_GEAR_HEIGHT` (2.5)** → `deckTopY ≈ 14.9`. One value drives both
+  the touchdown-contact threshold and the resting pin. (`game/src/world/Carrier.ts`.)
+- **2026-07-02 — P3 start: angled-deck wire zone from Blender markers (per request, to
+  raise realism without changing the physics).** The arresting-wire landing area is now
+  **authored in Blender** (`examples/public/models/carrier/scene.blend`): a `landing-runway`
+  quad aligned to the angled flight deck + a `landing-wire-origin` empty at the centre of
+  the 4 wires. `export-landing-markers.py` exports just those two objects to
+  `landing-markers.gltf` (no carrier mesh). `Carrier` loads that markers glTF and gives it
+  the **same fit transform** as the carrier (`_loadMarkers`), so the markers land exactly
+  where authored; it then reads the **wire centre** (world ≈ **x −0.8, z +66.6, y 13.2**),
+  the **angled-deck axes** (bearing **9.55°**) and the **runway half-width** (7.07 u) by
+  probing the runway's world transform, and hides the quad. `LandingZone` gained an
+  **oriented `WireZone`**: a clean **trap now requires touching down in the wire zone**
+  (≈ 68 × 22 u on the aft angled deck), a deck touchdown **outside** it is a **“missed the
+  wires”** crash, and off-deck is still a ditch (falls back to the old deck box if the
+  markers are absent). **This also fixes the abrupt-stop** the user saw: because a trap can
+  only happen in the aft wire zone, the arresting rollout (~67 u / 1.75 s) always fits on
+  the deck and never hits the bow-edge hard-stop. **Verified in-browser (Playwright):**
+  markers place at the predicted spot; the runway overlays the angled deck (top-down); land
+  in-zone (z 50–66) → **TRAP GOOD, 67 u / 1.75 s** rollout stopping mid-deck; land forward
+  of the wires → **“missed the wires”**; short → **ditch**. Physics/arrest **unchanged**.
+  *(Note: the straight-in centreline approach is unchanged; lining the rear approach up on
+  the 9.55° angled bearing + a lineup/glideslope aid + per-wire grade remain P3 TODO.)*

@@ -3,7 +3,7 @@ import type { Scene } from '@';
 import { Environment } from '../world/Environment';
 import { OceanWorld } from '../world/OceanWorld';
 import { Carrier } from '../world/Carrier';
-import { LandingJudge } from '../world/LandingZone';
+import { LandingJudge, LANDING } from '../world/LandingZone';
 import { Aircraft } from '../aircraft/Aircraft';
 import { FlightModel } from '../aircraft/FlightModel';
 import { FlightChaseController } from '../camera/FlightChaseController';
@@ -68,8 +68,22 @@ export class Game {
     this.carrier
       .load()
       .then((fit) => {
-        // The jet approaches down the centreline; the deck box comes from the fit.
-        this.judge = LandingJudge.fromCarrier(fit, this.carrier.deckTopY);
+        // Deck box from the fit; the wire zone from the Blender markers (if present).
+        const c = this.carrier;
+        const wire =
+          c.wireOrigin && c.deckAlong && c.deckAcross
+            ? {
+                cx: c.wireOrigin.x,
+                cz: c.wireOrigin.z,
+                alongX: c.deckAlong.x,
+                alongZ: c.deckAlong.z,
+                acrossX: c.deckAcross.x,
+                acrossZ: c.deckAcross.z,
+                halfLen: LANDING.WIRE_BAND,
+                halfWid: c.runwayHalfWidth + LANDING.WIRE_WIDTH_MARGIN,
+              }
+            : null;
+        this.judge = LandingJudge.fromCarrier(fit, c.deckTopY, wire);
       })
       .catch((e) => console.error(e));
 
