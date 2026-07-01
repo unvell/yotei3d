@@ -23,7 +23,11 @@ const AUDIO = {
   AUTOPILOT: '/audio/autopilot-disconnect.mp3',
   PULLUP: '/audio/pull-up.mp3',
   ALT: '/audio/alt-callouts.mp3',
+  THUMP: '/audio/deck-thump.mp3',
 };
+
+// Deck-roll rumble: replay the thump every this many seconds while rolling out.
+const DECK_THUMP_INTERVAL = 0.1;
 
 // Radar-altitude callout marks (height above the deck, world units ≈ metres).
 const ALT_MARKS = [50, 40, 30, 20, 10];
@@ -43,6 +47,7 @@ export class AudioManager {
   // trigger state
   private pullUpCooldown = 0; // s remaining before "pull up" can fire again
   private altIdx = 0; // next ALT_MARKS index to announce (advances downward)
+  private deckRollAccum = 0; // s accumulated toward the next deck-roll thump
   private startCueTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Preload + decode all clips. Safe to call before any user gesture. */
@@ -65,6 +70,7 @@ export class AudioManager {
         load('autopilot', AUDIO.AUTOPILOT),
         load('pullup', AUDIO.PULLUP),
         load('alt', AUDIO.ALT),
+        load('thump', AUDIO.THUMP),
       ]);
       if (this.buffers.alt) this.altSegs = splitBySilence(this.buffers.alt);
     } catch (e) {
@@ -138,6 +144,19 @@ export class AudioManager {
       const k = Math.min(1, 3 * dt);
       this.engineGain.gain.value += (targetGain - this.engineGain.gain.value) * k;
       this.engineSrc.playbackRate.value += (targetRate - this.engineSrc.playbackRate.value) * k;
+    }
+
+    // --- deck-roll rumble: a thump every 0.1 s while rolling out after a trap,
+    //     fading with speed so it eases off as the jet decelerates to a stop. ---
+    if (f.phase === 'arrested' && f.speed > 2) {
+      this.deckRollAccum += dt;
+      while (this.deckRollAccum >= DECK_THUMP_INTERVAL) {
+        this.deckRollAccum -= DECK_THUMP_INTERVAL;
+        const vol = 0.25 + 0.45 * Math.min(1, f.speed / 60);
+        this._playOneShot('thump', vol);
+      }
+    } else {
+      this.deckRollAccum = 0;
     }
 
     if (!flying) return; // warnings + callouts only while airborne

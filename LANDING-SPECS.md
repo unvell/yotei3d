@@ -551,3 +551,8 @@ can move/turn the whole ship (carrier underway) via the holder.
   normal approach). *(Actual audibility/mix is left to the user — Playwright can't listen.)*
   Attribution: autopilot cue by *freesound_community* (Pixabay); `pull-up` from the user's
   Albatross Squadron assets.
+- **2026-07-02 — deck-roll rumble (per request):** added `deck-thump.mp3` — a thump replayed
+  **every 0.1 s** while the trapped jet rolls out on the deck (`phase === 'arrested'`, speed
+  > 2 u/s), its volume **fading with speed** so it eases off as the jet stops. Verified
+  (Playwright hand-step): touchdown → **16 thumps at 0.1 s intervals**, volume 0.70 → 0.30
+  over the ~1.75 s rollout. Attribution: *freesound_community* (Pixabay).
