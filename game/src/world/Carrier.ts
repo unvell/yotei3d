@@ -14,6 +14,8 @@ const DRAFT = 8; // how far the keel sits below the waterline (y = 0)
 // the ray-cast measurement (measureDeckTop) fails. Measured deck ≈ y 12.5 → ≈ 0.39.
 const DECK_HEIGHT_FRAC = 0.39;
 
+const AIRCRAFT_GEAR_HEIGHT = 2.5; // how high the jet sits above the keel when on its gear (for touchdown judge)
+
 export interface CarrierFit {
   rawSize: { x: number; y: number; z: number };
   scale: number;
@@ -33,7 +35,7 @@ export interface CarrierFit {
 export class Carrier {
   readonly holder = new SceneObject();
   root: SceneObject | null = null;
-  deckTopY = 14; // refined from the model bounds once it loads
+  deckTopY = 14; // jet-origin resting height on the deck (deck surface + gear); measured on load
   fit: CarrierFit | null = null;
 
   constructor(private readonly scene: Scene) {
@@ -104,9 +106,10 @@ export class Carrier {
 
           // getBounds() above ensures the world transforms, so we can now ray-cast
           // straight down onto the deck to measure its true surface height (the
-          // fraction heuristic above is only a fallback). This is what the touchdown
-          // judge pins the jet to, so it must match the visible deck.
-          this.deckTopY = this._measureDeckTop();
+          // fraction heuristic above is only a fallback). The jet's origin rests on
+          // its gear AIRCRAFT_GEAR_HEIGHT above that surface, and this deckTopY is what
+          // the touchdown judge pins the jet's origin to — so fold the gear height in.
+          this.deckTopY = this._measureDeckTop() + AIRCRAFT_GEAR_HEIGHT;
 
           this.scene.requireUpdateFrame();
           resolve(this.fit);
