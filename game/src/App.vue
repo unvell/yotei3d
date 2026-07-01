@@ -33,8 +33,8 @@ onBeforeUnmount(() => {
   <header class="topbar">
     <div class="title">Carrier Landing — Yotei3D</div>
     <div class="hint">
-      ←/→ &amp; A/D yaw · ↑/↓ pitch (↑ down / ↓ up) · W/S throttle (S past idle = airbrake) ·
-      R reset · drag look · scroll zoom
+      Land on the deck: hold the nose up, ease throttle to sink · ←/→ &amp; A/D yaw · ↑/↓ pitch
+      (↑ down / ↓ up) · W/S throttle (S past idle = airbrake) · R reset · drag look · scroll zoom
     </div>
   </header>
 

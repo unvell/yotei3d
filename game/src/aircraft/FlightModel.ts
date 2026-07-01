@@ -20,6 +20,14 @@ export interface CameraState {
 }
 
 /**
+ * Simulation phase. `flying` runs the full aero model; once the jet touches the
+ * deck it switches to `arrested` (a hard deck roll to a stop) or `crashed` (a
+ * botched touchdown / ditch). The landing judge (world/LandingZone) drives the
+ * transition; both terminal phases hold until `reset()`.
+ */
+export type FlightPhase = 'flying' | 'arrested' | 'crashed';
+
+/**
  * Angle-of-attack point-mass flight model (longitudinal / vertical plane).
  *
  * The key realism over the old arcade model: the nose attitude (θ = `pitch`) and
@@ -43,12 +51,18 @@ export class FlightModel {
   gamma = 0; // γ — flight-path angle (deg, +climb)
   alpha = this.pitch; // α = θ − γ — angle of attack (deg)
   roll = 0; // deg (visual bank)
-  speed = START.speed; // V — airspeed (u/s)
+  speed: number = START.speed; // V — airspeed (u/s)
   throttle = trimThrottle(START.speed); // 0..1
 
   // derived, exposed for the HUD
   stallT = 0; // 0 (clean) → 1 (at/over the stall angle)
   stalled = false;
+  sinkRate = 0; // vertical speed, + = descending (u/s) — HUD + touchdown judge
+
+  // landing state
+  phase: FlightPhase = 'flying';
+  private deckY = 0; // deck surface captured on arrest
+  private deckFwdZ = -Infinity; // most-forward Z the deck roll may reach (bow edge)
 
   /** Return the jet to the start of the approach, trimmed for START.speed. */
   reset(): void {
@@ -62,6 +76,25 @@ export class FlightModel {
     this.throttle = trimThrottle(START.speed);
     this.stallT = 0;
     this.stalled = false;
+    this.sinkRate = 0;
+    this.phase = 'flying';
+  }
+
+  /**
+   * Trap the jet on the deck at height `deckY` — decelerate to a stop. `fwdStopZ`
+   * is the most-forward Z the roll may reach (the bow edge): a jet that lands long
+   * is halted there rather than sliding off the front of the ship.
+   */
+  arrest(deckY: number, fwdStopZ = -Infinity): void {
+    this.phase = 'arrested';
+    this.deckY = deckY;
+    this.deckFwdZ = fwdStopZ;
+    this.pos.y = deckY;
+  }
+
+  /** Botched touchdown / ditch — freeze where it hit and bleed off. */
+  crash(): void {
+    this.phase = 'crashed';
   }
 
   /** Drop the jet onto a given approach point, trimmed for `spd` (debug/framing). */
@@ -88,6 +121,9 @@ export class FlightModel {
 
   /** Advance one frame. `dt` is seconds (caller clamps big gaps). */
   update(dt: number, ctrl: Controls): void {
+    if (this.phase === 'arrested') return this._arrestRoll(dt);
+    if (this.phase === 'crashed') return this._crashSettle(dt);
+
     const A = AERO;
 
     // --- throttle axis (−1..+1) → thrust OR airbrake ---
@@ -164,11 +200,49 @@ export class FlightModel {
     this.pos.x += -Math.sin(hr) * horiz * dt;
     this.pos.z += -Math.cos(hr) * horiz * dt;
     this.pos.y += vy * dt;
+    this.sinkRate = -vy; // + = descending
 
     // sea-surface guard: don't sink through the water; level the path if we hit.
+    // (contact with the deck / sea is resolved by the landing judge in the Game,
+    // which flips us to 'arrested'/'crashed'; this only stops a runaway plunge
+    // before that check runs, e.g. in the first frames before the carrier loads.)
     if (this.pos.y < A.MIN_ALT) {
       this.pos.y = A.MIN_ALT;
       if (this.gamma < 0) this.gamma = 0;
     }
+  }
+
+  /** Trapped: pinned to the deck, decelerating to a stop, wings levelling. */
+  private _arrestRoll(dt: number): void {
+    const A = AERO;
+    this.throttle = 0;
+    this.gamma = 0;
+    this.alpha = 0;
+    this.sinkRate = 0;
+    // settle to a level-ish deck stance
+    this.pitch += (2 - this.pitch) * Math.min(1, 4 * dt);
+    this.roll += (0 - this.roll) * Math.min(1, 6 * dt);
+    // arresting-gear deceleration, rolling forward along the current heading
+    this.speed = Math.max(0, this.speed - A.ARREST_DECEL * dt);
+    const hr = this.heading * DEG;
+    this.pos.x += -Math.sin(hr) * this.speed * dt;
+    this.pos.z += -Math.cos(hr) * this.speed * dt;
+    this.pos.y = this.deckY;
+    // don't slide off the bow: halt at the forward deck edge if we land long
+    if (this.pos.z < this.deckFwdZ) {
+      this.pos.z = this.deckFwdZ;
+      this.speed = 0;
+    }
+  }
+
+  /** Crashed: kill thrust, bleed off to a rest, hold the wreck where it hit. */
+  private _crashSettle(dt: number): void {
+    this.throttle = 0;
+    this.gamma = 0;
+    this.sinkRate = 0;
+    this.speed = Math.max(0, this.speed - 60 * dt);
+    const hr = this.heading * DEG;
+    this.pos.x += -Math.sin(hr) * this.speed * dt;
+    this.pos.z += -Math.cos(hr) * this.speed * dt;
   }
 }

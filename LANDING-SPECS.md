@@ -4,12 +4,14 @@
 > land it on the **USS Dwight D. Eisenhower (CVN-69)** aircraft carrier on the open
 > sea. This document is the single source of truth and is **updated every phase**.
 >
-> **Last updated:** 2026-06-30 — Phase **P2** in place: the F-2 flies a controllable
-> arcade approach toward the carrier (keyboard + on-screen pads, stall model, chase
-> cam, airspeed bar). P1 carrier steams under way with a wake. **The P1/P2 prototypes
-> are now refactored into a Vue 3 + TypeScript app under `game/`** (classes for carrier,
-> aircraft, ocean, environment, flight model, chase cam, controls, HUD) — run with
-> `yarn game`; P2.1+ is developed there. See the changelog tail for details.
+> **Last updated:** 2026-07-01 — Phase **P2.1** in place: the F-2 now **actually lands
+> on the deck** — a pure touchdown judge (`game/src/world/LandingZone.ts`) traps a
+> good pass (arresting-gear roll to a stop on the deck) or calls a crash (hard/fast/
+> banked touchdown, or a ditch clear of the ship), with a green/red HUD banner + a V/S
+> readout. Flight model gained a landing phase (`flying`/`arrested`/`crashed`). P2 flew
+> a physics-based angle-of-attack approach (keyboard + pads, chase cam, airspeed bar);
+> P1 carrier steams under way with a wake. **The prototypes are refactored into a Vue 3
+> + TypeScript app under `game/`** — run with `yarn game`. See the changelog tail.
 
 ---
 
@@ -35,8 +37,8 @@ own. Reuse the existing F-2 assets/examples (`f2-flight.html`) and the ocean
 |---|---|---|
 | **P1** | Render the carrier on the ocean under HDRI; free-fly camera to inspect. | ✅ **Done** |
 | **P2** | Add the F-2 in the air; basic flight model (throttle, pitch/yaw/bank, stall), virtual controls + chase camera. Carrier static. | ✅ **Done** |
-| **P2.1** | Simplify to a landable set (yaw + throttle, pitch optional) and actually put it down on the deck. | ◑ Next |
-| **P3** | Approach framing: position the F-2 on a rear approach to the angled deck; HUD (airspeed, altitude, sink rate, lineup); landing-area markings. | ⬜ Planned |
+| **P2.1** | Actually put it down on the deck: touchdown judge (trap / crash / ditch), arresting-gear stop, landing/crash HUD banner + sink-rate readout. | ✅ **Done** |
+| **P3** | Approach framing: position the F-2 on a rear approach to the **angled** deck; wire-zone touchdown + landing grade by wire; lineup/glideslope aid; landing-area markings. | ⬜ Planned |
 | **P4** | Touchdown + arresting gear: detect deck contact in the wire zone, catch/trap (decelerate), bolter (miss → full power go-around), wave-off. | ⬜ Planned |
 | **P5** | Polish: deck crew/lights, meatball (Fresnel lens optical landing system), wake/spray, carrier underway (moving + heading into wind), sound. | ⬜ Planned |
 | **P6** | Game loop: scoring (centerline/glideslope/wire #), restart, difficulty (sea state, wind). | ⬜ Planned |
@@ -131,8 +133,9 @@ Fix in `landing-p2.html`: after scaling/positioning, invalidate the holder subtr
 correct world bounds. (P1's close follow-cam masks this; P2's roaming chase cam
 exposed it.)
 
-**Next (P2.1):** detect deck touchdown and actually land — reduce to yaw + throttle,
-add a glideslope/lineup aid, and a simple trap (or at least a "landed" state).
+**P2.1 done:** deck touchdown is detected and the jet actually lands (trap → arrested
+roll to a stop, or crash/ditch), with a HUD banner + sink-rate (V/S) readout. Straight-in
+**centreline** approach for now; the **angled-deck** lineup + wire-zone grading move to P3.
 
 ---
 
@@ -469,3 +472,24 @@ can move/turn the whole ship (carrier underway) via the holder.
   caps at ~26° AoA and settles; below-limit attitude still persists (Δpitch 0). Controls
   stay unchanged (W/S only). *(Note: `world/Environment.ts` fog `far` was separately tweaked
   6000 → 2000 by the user; not part of this change.)*
+- **2026-07-01 — P2.1 deck touchdown / landing (per request "着艦HitCheck").** The F-2 now
+  **actually lands**. New **pure** judge `game/src/world/LandingZone.ts` (`LandingJudge`,
+  no engine/DOM — testable) builds a deck box from the fitted carrier (holder at origin:
+  deck centre X=0/Z=0, `halfLenZ`/`halfWidX` from `fit.worldSize`, surface = `deckTopY`
+  ≈ 6.14) and each frame returns **`trap` / `crash` / `none`**: a touchdown over the deck
+  footprint within the landing envelope (sink ≤ 12 u/s, speed ≤ 115 u/s, |roll| ≤ 8°, not
+  stalled) **traps**; outside those it **crashes** (hard/fast/banked), and reaching the sea
+  clear of the deck is a **ditch**. `FlightModel` gained a **phase** (`flying` | `arrested`
+  | `crashed`) + a `sinkRate`: on a trap it switches to an **arresting-gear roll**
+  (`ARREST_DECEL 45 u/s²`, pinned to the deck, wings/nose levelling, **halted at the bow
+  edge** so a long landing can't slide off the front); a crash freezes the wreck. The
+  `Game` builds the judge once the carrier fit resolves and drives the transition; new
+  telemetry (`phase`, `sinkRate`, `landingMsg`) feeds `ui/Hud.vue`, which adds a **V/S
+  readout** and a centred **green “TRAP! LANDED” / red “CRASH”** banner (grade PERFECT/
+  GOOD/FIRM by sink, + “Press R to reset”). **Verified in-browser (Playwright, hand-stepped
+  + live):** all 8 judge boundary cases correct; a shallow centreline pass → **LANDED GOOD
+  (4.6 u/s, 279 km/h)** stopping on-deck at z≈−33 (within ±115); a long pass halts at the
+  bow instead of overrunning; a short pass → **ditch crash**; **R resets** to START and
+  clears the banner; carrier renders whole (the close on-deck chase-cam view is just very
+  low). **Straight-in centreline** approach only for now — **angled-deck lineup + wire-zone
+  grading are P3.** Controls unchanged (W/S throttle, ↑/↓ pitch, ←/→ + A/D yaw, R reset).

@@ -3,6 +3,7 @@ import type { Scene } from '@';
 import { Environment } from '../world/Environment';
 import { OceanWorld } from '../world/OceanWorld';
 import { Carrier } from '../world/Carrier';
+import { LandingJudge } from '../world/LandingZone';
 import { Aircraft } from '../aircraft/Aircraft';
 import { FlightModel } from '../aircraft/FlightModel';
 import { FlightChaseController } from '../camera/FlightChaseController';
@@ -17,7 +18,7 @@ const RENDERER_OPTIONS = {
   enableShadow: false,
   perspective: { method: 'persp', angle: 55, near: 0.5, far: 8000 },
   bloomEffect: { enabled: true, threshold: 0.6, gamma: 1.4, intensity: 0.9 },
-  renderingImage: { gamma: 1.1, resolutionRatio: 1 },
+  renderingImage: { gamma: 1.1, resolutionRatio: 0.5 },
 };
 
 /**
@@ -38,6 +39,10 @@ export class Game {
   readonly flight = new FlightModel();
   readonly chaseCam: FlightChaseController;
   private readonly input: InputController;
+
+  // Touchdown judge — built once the carrier fit is known (async load).
+  private judge: LandingJudge | null = null;
+  private landingMsg = '';
 
   private _lastT = 0;
   private _disposed = false;
@@ -60,7 +65,13 @@ export class Game {
     this.ocean = new OceanWorld(this.scene);
 
     this.carrier = new Carrier(this.scene);
-    this.carrier.load().catch((e) => console.error(e));
+    this.carrier
+      .load()
+      .then((fit) => {
+        // The jet approaches down the centreline; the deck box comes from the fit.
+        this.judge = LandingJudge.fromCarrier(fit, this.carrier.deckTopY);
+      })
+      .catch((e) => console.error(e));
 
     // lens flare needs the carrier hull as an occluder
     this.environment.addSunFlare([this.carrier.holder]);
@@ -103,18 +114,38 @@ export class Game {
 
     this.ocean.update();
 
-    if (this.controls.consumeReset()) this.flight.reset();
+    if (this.controls.consumeReset()) {
+      this.flight.reset();
+      this.landingMsg = '';
+    }
     this.flight.update(dt, this.controls);
+
+    // --- deck touchdown / crash judging (only while still flying) ---
+    if (this.judge && this.flight.phase === 'flying') {
+      const v = this.judge.evaluate(this.flight);
+      if (v.kind === 'trap') {
+        // halt the roll a little short of the bow so it never slides off the front
+        this.flight.arrest(v.deckY, -(this.judge.deck.halfLenZ - 6));
+        this.landingMsg = `LANDED — ${v.grade}  (${v.sinkRate.toFixed(1)} u/s, ${v.speedKmh.toFixed(0)} km/h)`;
+      } else if (v.kind === 'crash') {
+        this.flight.crash();
+        this.landingMsg = `CRASH — ${v.reason}`;
+      }
+    }
+
     this.aircraft.applyState(this.flight);
 
     // --- publish telemetry to the HUD ---
     this.telemetry.speed = this.flight.speed;
     this.telemetry.speedKmh = this.flight.speed * 3.6;
     this.telemetry.alt = this.flight.pos.y;
+    this.telemetry.sinkRate = this.flight.sinkRate;
     this.telemetry.throttlePct = this.flight.throttle * 100;
     this.telemetry.aoa = this.flight.alpha;
     this.telemetry.stallT = this.flight.stallT;
     this.telemetry.stalled = this.flight.stalled;
+    this.telemetry.phase = this.flight.phase;
+    this.telemetry.landingMsg = this.landingMsg;
 
     // (the chase camera positions itself from the renderer's controller tick.)
   }

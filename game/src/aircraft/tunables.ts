@@ -55,6 +55,10 @@ export const AERO = {
   V_MIN: 8, // speed floor (keeps the γ̇ = .../V term finite)
   MIN_ALT: 3, // sea-surface guard
   STALL_WARN_MARGIN: 3, // deg before the stall angle the HUD starts cautioning
+
+  // Arresting gear: constant deceleration once trapped on the deck (u/s²). From
+  // the ~78 u/s approach this stops the jet in ~68 u — well within the deck run.
+  ARREST_DECEL: 45,
 } as const;
 
 // HUD airspeed-bar full-scale (u/s). Display-only; the bar shows energy/speed
