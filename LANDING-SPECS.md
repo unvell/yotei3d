@@ -448,3 +448,24 @@ can move/turn the whole ship (carrier underway) via the holder.
   trims to 11° nose-up, idle settles into a glide (~318 km/h, descending). **Decided to keep
   controls minimal for now** (throttle + pitch/yaw only); drag devices/flaps deferred until
   the user opts into more inputs.
+- **2026-07-01 — Airbrake on negative throttle + stall break (per request).** The user
+  found the clean jet glided too far to land at idle (correct physics — a slick jet has a
+  long glide; the earlier fix chased this with high induced drag). The user's own idea, and
+  the chosen solution: **let the throttle axis run −1..+1 and make the negative half a
+  speedbrake — no new key** (just hold `S` past idle). Implemented in
+  `aircraft/{FlightModel,tunables}.ts`: thrust `T = max(0, throttle)·THRUST_MAX`; when
+  throttle < 0 it stows thrust and adds parasitic drag `AIRBRAKE_CD·|throttle|` to the polar
+  (so the brake bites hard when fast, eases when slow — like a real speedbrake). Restored the
+  **fast clean jet** (`CD0 0.022`, `K_INDUCED 0.10`, `THRUST_MAX 4.0` → L/D ≈ 10.7, top ≈
+  1180 km/h; stall 240 / approach 280 unchanged) and set `AIRBRAKE_CD 0.32` (a big flat-plate
+  brake). Also added a **stall break** (`STALL_BREAK`): past `AOA_LIMIT` the nose drops back
+  toward the velocity vector (real airframes pitch down at the stall), so holding the stick
+  back while the path falls can't produce a runaway deep-stall falling-leaf; below the limit
+  attitude still fully persists. HUD throttle readout is now bipolar — shows **`THR nn%`**
+  (thrust) or a blue **`BRK nn%`** (speedbrake); top-bar hint notes “S past idle = airbrake”.
+  Verified in-browser (Playwright, hand-stepped, descent from 150 m at 280 km/h): **idle
+  5.6° / 1474 u / touchdown 273 km/h; full airbrake 10.6° / 769 u / touchdown 239 km/h**
+  (half the distance, slower); airbrake + nose-down 24°; the previous 54° falling-leaf now
+  caps at ~26° AoA and settles; below-limit attitude still persists (Δpitch 0). Controls
+  stay unchanged (W/S only). *(Note: `world/Environment.ts` fog `far` was separately tweaked
+  6000 → 2000 by the user; not part of this change.)*

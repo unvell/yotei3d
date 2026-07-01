@@ -90,10 +90,13 @@ export class FlightModel {
   update(dt: number, ctrl: Controls): void {
     const A = AERO;
 
-    // --- throttle → thrust ---
+    // --- throttle axis (−1..+1) → thrust OR airbrake ---
+    // Above 0 the throttle is engine thrust; below 0 (hold S past idle) it stows
+    // thrust and deploys the speedbrake instead — the drag term is added below.
     this.throttle += ((ctrl.thrUp ? 1 : 0) - (ctrl.thrDown ? 1 : 0)) * A.THR_RATE * dt;
-    this.throttle = clamp(this.throttle, 0, 1);
-    const T = this.throttle * A.THRUST_MAX;
+    this.throttle = clamp(this.throttle, -1, 1);
+    const T = Math.max(0, this.throttle) * A.THRUST_MAX;
+    const airbrake = Math.max(0, -this.throttle); // 0..1 speedbrake deployment
 
     // --- pitch: a RATE command that leaves a persistent attitude (no auto-return).
     //     down = pull up = nose up (+); up = push down = nose down (−). The wing
@@ -108,12 +111,24 @@ export class FlightModel {
     }
     this.pitch = clamp(this.pitch + elevator * A.PITCH_RATE * dt, A.PITCH_MIN, A.PITCH_MAX);
 
+    // --- stall break / longitudinal stability: past the AoA limit the nose drops
+    //     back toward the velocity vector, the way a real airframe pitches down at
+    //     the stall. This keeps the angle of attack from running away (e.g. holding
+    //     the stick back while the flight path falls) into an unrealistic deep-stall
+    //     falling-leaf. Below the limit it never fires, so normal attitude persists. ---
+    this.alpha = this.pitch - this.gamma;
+    if (this.alpha > A.AOA_LIMIT) {
+      this.pitch += (this.gamma + A.AOA_LIMIT - this.pitch) * Math.min(1, A.STALL_BREAK * dt);
+    } else if (this.alpha < -A.AOA_LIMIT) {
+      this.pitch += (this.gamma - A.AOA_LIMIT - this.pitch) * Math.min(1, A.STALL_BREAK * dt);
+    }
+
     // --- angle of attack and the aero forces (per unit mass) ---
     this.alpha = this.pitch - this.gamma;
     const aRad = this.alpha * DEG;
     const gRad = this.gamma * DEG;
     const cl = liftCoeff(this.alpha);
-    const cd = dragCoeff(cl);
+    const cd = dragCoeff(cl) + A.AIRBRAKE_CD * airbrake; // speedbrake adds parasitic drag
     const q = A.QS * this.speed * this.speed; // dynamic pressure factor
     const L = q * cl;
     const D = q * cd;

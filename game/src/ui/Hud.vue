@@ -19,6 +19,11 @@ const stateClass = computed(() => ({
   stall: props.telemetry.stalled,
   caution: !props.telemetry.stalled && props.telemetry.stallT > 0,
 }));
+
+// Throttle axis is −100..+100: positive = engine thrust, negative = speedbrake.
+const powerLabel = computed(() => (props.telemetry.throttlePct < 0 ? 'BRK' : 'THR'));
+const powerValue = computed(() => Math.abs(props.telemetry.throttlePct).toFixed(0));
+const braking = computed(() => props.telemetry.throttlePct < 0);
 </script>
 
 <template>
@@ -31,7 +36,7 @@ const stateClass = computed(() => ({
       <span>SPD <b>{{ telemetry.speedKmh.toFixed(0) }}</b> km/h</span>
       <span>ALT <b>{{ telemetry.alt.toFixed(0) }}</b> u</span>
       <span>AoA <b>{{ telemetry.aoa.toFixed(1) }}</b>°</span>
-      <span>THR <b>{{ telemetry.throttlePct.toFixed(0) }}</b>%</span>
+      <span :class="{ brk: braking }">{{ powerLabel }} <b>{{ powerValue }}</b>%</span>
     </div>
     <div class="sb-warn">⚠ STALL — ADD POWER</div>
   </div>
@@ -92,6 +97,12 @@ const stateClass = computed(() => ({
 .sb-read b {
   font-variant-numeric: tabular-nums;
   color: #fff;
+}
+.sb-read .brk {
+  color: #6fd0ff;
+}
+.sb-read .brk b {
+  color: #aee7ff;
 }
 .sb-warn {
   margin-top: 3px;

@@ -21,11 +21,21 @@ export const AERO = {
   POST_STALL_BAND: 15, // deg — lift falls off over this band past the stall angle
   CL_PLATEAU: 0.4, // post-stall residual lift fraction (keeps it recoverable, not a tumble)
 
-  CD0: 0.02, // parasitic drag coefficient
-  K_INDUCED: 0.08, // induced-drag factor in CD = CD0 + k·CL²
+  // Drag polar — a realistic fast-jet glide (L/D ≈ 10.7 clean), not a sailplane.
+  // The clean jet still glides well (that's real); the decisive way to come down /
+  // slow down is the AIRBRAKE on negative throttle (see below), as on the real jet.
+  CD0: 0.022, // parasitic drag coefficient
+  K_INDUCED: 0.1, // induced-drag factor in CD = CD0 + k·CL²
 
-  THRUST_MAX: 3.7, // full-throttle thrust (accel, u/s²) — high T/W, sets top ≈ 1190 km/h
-  THR_RATE: 0.45, // throttle change per second (0..1)
+  // Airbrake / speedbrake. The throttle axis runs −1..+1: above 0 it is thrust,
+  // below 0 it deploys the speedbrake (no new key — just hold S past idle). The
+  // brake adds parasitic drag ∝ deploy·V², so it bites hard when fast and eases
+  // off when slow, exactly like a real speedbrake. This is the decisive
+  // energy-management tool for the approach: hold S below idle to sink / slow.
+  AIRBRAKE_CD: 0.32, // extra CD at full deploy (throttle = −1) — a big flat-plate brake
+
+  THRUST_MAX: 4.0, // full-throttle thrust (accel, u/s²) — high T/W, sets top ≈ 1180 km/h
+  THR_RATE: 0.5, // throttle change per second (covers the −1..+1 axis)
 
   PITCH_RATE: 18, // deg/s — elevator authority (nose rotation rate while held)
   PITCH_MIN: -60, // deg — clamp the persistent pitch attitude
@@ -37,6 +47,7 @@ export const AERO = {
   // envelope limit, NOT an auto-return — release and the attitude still persists.
   AOA_LIMIT: 24, // deg — max usable angle of attack (F-16-class limiter)
   AOA_LIMIT_BAND: 6, // deg — authority fades over this band up to the limit
+  STALL_BREAK: 2.5, // 1/s — how fast the nose drops back once past the AoA limit (stall break)
 
   YAW_RATE: 5, // heading change (deg/s) from yaw input (turn kept simple/coordinated)
   MAX_BANK: 10, // visual bank at full yaw input (deg)
