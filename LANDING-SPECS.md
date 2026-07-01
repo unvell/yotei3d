@@ -40,7 +40,7 @@ own. Reuse the existing F-2 assets/examples (`f2-flight.html`) and the ocean
 | **P2.1** | Actually put it down on the deck: touchdown judge (trap / crash / ditch), arresting-gear stop, landing/crash HUD banner + sink-rate readout. | ✅ **Done** |
 | **P3** | Approach framing: **angled-deck wire zone** from Blender markers (done — trap only in the wire zone, "missed the wires" outside it); still TODO: rear approach lined up on the angled bearing, lineup/glideslope aid, per-wire grade. | ◑ In progress |
 | **P4** | Touchdown + arresting gear: detect deck contact in the wire zone, catch/trap (decelerate), bolter (miss → full power go-around), wave-off. | ⬜ Planned |
-| **P5** | Polish: deck crew/lights, meatball (Fresnel lens optical landing system), wake/spray, carrier underway (moving + heading into wind), sound. | ⬜ Planned |
+| **P5** | Polish: deck crew/lights, meatball (Fresnel lens optical landing system), wake/spray, carrier underway (moving + heading into wind), sound. | ◑ Sound started |
 | **P6** | Game loop: scoring (centerline/glideslope/wire #), restart, difficulty (sea state, wind). | ⬜ Planned |
 
 Phases may be split further. Per workspace convention we **commit per completed
@@ -533,3 +533,21 @@ can move/turn the whole ship (carrier underway) via the holder.
   of the wires → **“missed the wires”**; short → **ditch**. Physics/arrest **unchanged**.
   *(Note: the straight-in centreline approach is unchanged; lining the rear approach up on
   the 9.55° angled bearing + a lineup/glideslope aid + per-wire grade remain P3 TODO.)*
+- **2026-07-02 — P5 audio (per request).** Added a self-contained Web-Audio system
+  `game/src/audio/AudioManager.ts` (no engine/DOM coupling). Clips under
+  `examples/public/audio/`: `jet-turbine.mp3` (existing) loops as the engine — gain +
+  pitch track throttle/speed; `autopilot-disconnect.mp3` fires ~3 s after control begins
+  ("you have control"); `pull-up.mp3` is a GPWS "PULL UP" on **stall** or an **imminent
+  hard impact** (sink > 12 u/s & time-to-surface < 1.3 s, with a 3.5 s cooldown; a gentle
+  approach does not trip it); `alt-callouts.mp3` holds "fifty…forty…thirty…twenty…ten" in
+  one file — **split by silence at load** (Web Audio RMS envelope → 5 segments) and each
+  word played as the **height above the deck** passes its mark on a descending approach.
+  Browsers block audio until a gesture, so playback is **armed on the first key/tap**
+  (`unlock()` resumes the context, starts the engine, schedules the start cue); reset (R)
+  re-arms the callouts and re-cues "you have control". **Verified in-browser (Playwright):**
+  all four clips decode, the context resumes on the first key and the engine loop spools
+  with throttle, the callout file splits into 5, and the triggers fire correctly (callouts
+  at 50/40/30/20/10; pull-up on stall and on a fast low sink; **no** false pull-up on a
+  normal approach). *(Actual audibility/mix is left to the user — Playwright can't listen.)*
+  Attribution: autopilot cue by *freesound_community* (Pixabay); `pull-up` from the user's
+  Albatross Squadron assets.

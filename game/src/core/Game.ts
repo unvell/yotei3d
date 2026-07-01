@@ -8,6 +8,7 @@ import { Aircraft } from '../aircraft/Aircraft';
 import { FlightModel } from '../aircraft/FlightModel';
 import { FlightChaseController } from '../camera/FlightChaseController';
 import { InputController } from '../input/InputController';
+import { AudioManager } from '../audio/AudioManager';
 import type { Controls } from '../input/controls';
 import type { Telemetry } from './telemetry';
 
@@ -39,6 +40,7 @@ export class Game {
   readonly flight = new FlightModel();
   readonly chaseCam: FlightChaseController;
   private readonly input: InputController;
+  private readonly audio = new AudioManager();
 
   // Touchdown judge — built once the carrier fit is known (async load).
   private judge: LandingJudge | null = null;
@@ -108,12 +110,24 @@ export class Game {
     // --- input ---
     this.input = new InputController(this.controls);
 
+    // --- audio (preload now; playback is armed by the first user gesture) ---
+    this.audio.init();
+
     // expose a debug handle, like landing-p2 did on window
     (window as any).game = this;
   }
 
+  private _unlockAudio = (): void => {
+    this.audio.unlock();
+    window.removeEventListener('keydown', this._unlockAudio);
+    window.removeEventListener('pointerdown', this._unlockAudio);
+  };
+
   start(): void {
     this.input.attach();
+    // browsers block audio until a user gesture — arm it on the first key/tap
+    window.addEventListener('keydown', this._unlockAudio);
+    window.addEventListener('pointerdown', this._unlockAudio);
     this.scene.on('frame', () => this._frame());
     this.scene.animation = true;
     this.scene.show();
@@ -131,6 +145,7 @@ export class Game {
     if (this.controls.consumeReset()) {
       this.flight.reset();
       this.landingMsg = '';
+      this.audio.onReset();
     }
     this.flight.update(dt, this.controls);
 
@@ -161,12 +176,18 @@ export class Game {
     this.telemetry.phase = this.flight.phase;
     this.telemetry.landingMsg = this.landingMsg;
 
+    // --- audio: engine loop + stall/GPWS warnings + altitude callouts ---
+    this.audio.update(dt, this.flight, this.carrier.deckTopY);
+
     // (the chase camera positions itself from the renderer's controller tick.)
   }
 
   dispose(): void {
     this._disposed = true;
     this.input.detach();
+    this.audio.dispose();
+    window.removeEventListener('keydown', this._unlockAudio);
+    window.removeEventListener('pointerdown', this._unlockAudio);
     try {
       this.scene.mainCamera.controller = null;
     } catch {
