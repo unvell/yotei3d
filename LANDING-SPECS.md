@@ -282,9 +282,11 @@ can move/turn the whole ship (carrier underway) via the holder.
   ~100 u/cell) or a displacement decal — future work. The contact-foam depth
   pre-pass is full-res every frame; if cost matters, drop it to half-res (sampling
   is normalized so only sharpness changes) — but then force NEAREST or keep 1:1.
-- **Wire zone & touchdown:** need deck-surface height (top of deck ≈ keel + ~deck
-  height; compute precisely from bounds/sampling) and a 2D landing box for the 3–4
-  arresting wires.
+- **Wire zone & touchdown:** the **deck-surface height is now measured** (P2.1) —
+  `Carrier._measureDeckTop()` ray-casts straight down onto the deck (centreline aft
+  samples, median) → deck top ≈ **y 12.4**; the touchdown judge pins the trapped jet
+  to it. Still TODO for P3+: a 2D landing box for the 3–4 arresting **wires** and the
+  **angled-deck** bearing (the current box is the axis-aligned full-hull footprint).
 - **Flight model fidelity:** start arcade (the `f2-flight.html` easing model), move
   toward a basic angle-of-attack/sink-rate model for a believable trap.
 - **Performance:** ocean `segments` and `resolutionRatio` are the main knobs.
@@ -493,3 +495,14 @@ can move/turn the whole ship (carrier underway) via the holder.
   clears the banner; carrier renders whole (the close on-deck chase-cam view is just very
   low). **Straight-in centreline** approach only for now — **angled-deck lineup + wire-zone
   grading are P3.** Controls unchanged (W/S throttle, ↑/↓ pitch, ←/→ + A/D yaw, R reset).
+- **2026-07-01 — P2.1 deck-height fix: measure the real deck surface.** The trapped jet
+  was pinning to `deckTopY ≈ 6.1` (from the old “~0.27 up the hull” **guess**), which is
+  near the waterline — so a good landing looked like it stopped **on the sea**. Replaced
+  the fraction heuristic with a **ray-cast measurement** (`Carrier._measureDeckTop()`):
+  after the fit + bounds repair (world transforms ensured), it casts vertical rays down
+  the **centreline aft touchdown zone** (z = 10/30/50/70, avoiding the starboard island)
+  via `scene.findObjectsByWorldRay` and takes the median hit → **deck top ≈ y 12.4** (the
+  fraction is kept only as a sanity-checked fallback, retuned to 0.39). The jet now rests
+  **on the flight deck** (verified in-browser: land → `y = 12.41`, sitting on the deck
+  markings). **Where to tune deck height:** `game/src/world/Carrier.ts` — it is now
+  auto-measured; `DECK_HEIGHT_FRAC` is the fallback only.
