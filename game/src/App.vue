@@ -40,7 +40,7 @@ onBeforeUnmount(() => {
 
   <!-- DOM overlay HUD -->
   <Hud :telemetry="telemetry" />
-  <VirtualPads :controls="controls" />
+  <VirtualPads :controls="controls" :telemetry="telemetry" />
 </template>
 
 <style scoped>
