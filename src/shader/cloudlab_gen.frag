@@ -42,11 +42,47 @@ uniform float uTime;        // 調整つまみ（時間・実験用）
 //  実験のパラメータとして自由に使ってください（使わなくても OK）。
 // ============================================================================
 
+float hash13(vec3 p) {
+      p = fract(p * 0.1031);
+      p += dot(p, p.zyx + 31.32);
+      return fract((p.x + p.y) * p.z);
+}
+
+float vnoise(vec3 x) {
+      vec3 i = floor(x);
+      vec3 f = fract(x);
+      f = f * f * (3.0 - 2.0 * f);          // smoothstep 補間重み
+      return mix(
+              mix(mix(hash13(i + vec3(0,0,0)), hash13(i + vec3(1,0,0)), f.x),
+                  mix(hash13(i + vec3(0,1,0)), hash13(i + vec3(1,1,0)), f.x), f.y),
+              mix(mix(hash13(i + vec3(0,0,1)), hash13(i + vec3(1,0,1)), f.x),
+                  mix(hash13(i + vec3(0,1,1)), hash13(i + vec3(1,1,1)), f.x), f.y),
+              f.z);
+}
+
+float fbm(vec3 p) {
+      float sum = 0.0, amp = 0.5;
+      for (int i = 0; i < 5; i++) {
+              sum += amp * vnoise(p);
+              p *= 2.0;
+              amp *= 0.5;
+      }
+      return sum;                            // だいたい [0,1)
+}
+
 float density(vec3 cell) {
 	// cell は [0,1]^3。中心を原点に置いて、球の内側を密度 1 にする最も簡単な例。
-	vec3 p = cell - 0.5;                  // [-0.5, 0.5]
-	float r = length(p);
-	float d = smoothstep(0.35, 0.20, r);  // r<0.20 で 1、r>0.35 で 0 のやわらかい球
+	vec3 p = cell * (4.0 * uScale) + uTime;     // [-0.5, 0.5]
+	// float r = length(p);
+	
+	// float d = 0.0;
+	// d = smoothstep(0.35, 0.20, r);  // r<0.20 で 1、r>0.35 で 0 のやわらかい球
+	// d = hash13(floor(cell*8.0));
+	// d = vnoise(cell * 5.0);
+	// d = fbm(cell * 4.0);
+	float n = fbm(p);
+	float d = clamp(n - (1.0 - uCoverage), 0.0, 1.0);
+	d *= smoothstep(0.5, 0.25, length(cell - 0.5));
 	return d;
 }
 
