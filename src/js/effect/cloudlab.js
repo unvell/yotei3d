@@ -63,6 +63,10 @@ export class CloudLab {
 		// --- view tunables (used by cloudlab_view.frag; no rebake needed) ---
 		this.sigma = numberOr(options.sigma, 40.0);   // density -> extinction scale (濃さ)
 		this.steps = options.steps || 96;
+		// sun (world-space direction TOWARD the sun) + its radiance. Default ≈ 40°
+		// elevation, 35° azimuth. The example drives this from elevation/azimuth.
+		this.sunDir = options.sunDir || [0.44, 0.64, 0.63];
+		this.sunColor = options.sunColor || [1.0, 0.96, 0.9];
 		this.colorBase = options.colorBase || [0.62, 0.66, 0.74];
 		this.colorTop = options.colorTop || [1.0, 1.0, 1.0];
 		this.skyTop = options.skyTop || [0.30, 0.50, 0.82];

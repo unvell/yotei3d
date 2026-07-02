@@ -60,6 +60,8 @@ export class CloudViewShader extends Shader {
 		this.boxMaxUniform = this.bindUniform("uBoxMax", "vec3");
 		this.sigmaUniform = this.bindUniform("uSigma", "float");
 		this.stepsUniform = this.bindUniform("uSteps", "int");
+		this.sunDirUniform = this.bindUniform("uSunDir", "vec3");
+		this.sunColorUniform = this.bindUniform("uSunColor", "color3");
 		this.colorBaseUniform = this.bindUniform("uColorBase", "color3");
 		this.colorTopUniform = this.bindUniform("uColorTop", "color3");
 		this.skyTopUniform = this.bindUniform("uSkyTop", "color3");
@@ -93,6 +95,8 @@ export class CloudViewShader extends Shader {
 		this.boxMaxUniform.set(driver.boxMax);
 		this.sigmaUniform.set(driver.sigma);
 		this.stepsUniform.set(driver.steps | 0);
+		this.sunDirUniform.set(driver.sunDir);
+		this.sunColorUniform.set(driver.sunColor);
 		this.colorBaseUniform.set(driver.colorBase);
 		this.colorTopUniform.set(driver.colorTop);
 		this.skyTopUniform.set(driver.skyTop);

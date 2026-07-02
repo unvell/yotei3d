@@ -65,6 +65,14 @@
 
 			scene.show();
 
+			// sun direction from elevation/azimuth (view-only; no rebake).
+			let sunEl = 40, sunAz = 35;
+			function applySun() {
+				const e = sunEl * Math.PI / 180, a = sunAz * Math.PI / 180;
+				lab.sunDir = [Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a)];
+			}
+			applySun();
+
 			// ---- parameter panel --------------------------------------------------
 			// `bake:true` rows feed density() → changing them re-runs the GPU bake.
 			// `bake:false` rows only affect the viewer → just redraw, no rebake.
@@ -73,6 +81,10 @@
 				{ label: 'coverage 量',  min: 0,   max: 1,   step: 0.01, bake: true,  set: v => lab.coverage = v, get: () => lab.coverage },
 				{ label: 'scale 細かさ',  min: 0.2, max: 4,   step: 0.05, bake: true,  set: v => lab.scale = v,    get: () => lab.scale },
 				{ label: 'time 実験用',   min: 0,   max: 10,  step: 0.05, bake: true,  set: v => lab.time = v,     get: () => lab.time },
+
+				{ sec: 'Sun（太陽・自己影）' },
+				{ label: 'elevation 高度', min: -10, max: 90,  step: 1,   bake: false, set: v => { sunEl = v; applySun(); }, get: () => sunEl },
+				{ label: 'azimuth 方位',   min: 0,   max: 360, step: 1,   bake: false, set: v => { sunAz = v; applySun(); }, get: () => sunAz },
 
 				{ sec: 'View（レイマーチ表示）' },
 				{ label: 'σ 濃さ',        min: 1,   max: 160, step: 1,    bake: false, set: v => lab.sigma = v,    get: () => lab.sigma },
