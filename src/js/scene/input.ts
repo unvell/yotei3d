@@ -3,10 +3,14 @@
 // Copyright(c) 2024-2025 Jingwood, All Rights Reserved.
 ////////////////////////////////////////////////////////////////////////////////
 
-import { Vec3, Vec4, Matrix4 } from "@/math";
-import { BoundingBox3D } from "@/math";
+// InputManager — the engine's input hub. It owns mouse / keyboard / touch state
+// and dispatches the corresponding events onto the current scene. It carries no
+// camera transform anymore: camera posing is done entirely by CameraController
+// implementations acting on a Camera (see view/cameracontroller.ts). This class
+// replaces the former `Viewer` (which mixed input with a global orbit rig).
+
+import { Vec3 } from "@/math";
 import { invokeIfExist } from "../utility/utility";
-import { SceneObject } from "./object";
 import { ProjectionMethods } from "../render/renderer";
 
 export const OperationModes = {
@@ -53,6 +57,8 @@ export const Keys = {
   Backquote: 192,
 }
 
+// Camera orientation presets (kept for convenience; consumed by camera-facing
+// helpers, not by the input layer itself).
 export const Faces = {
   Front: new Vec3(0, 0, 0),
   Back: new Vec3(0, 180, 0),
@@ -64,7 +70,7 @@ export const Faces = {
 
 interface Point { x: number; y: number; }
 
-interface ViewerMouse {
+interface InputMouse {
   position: Point;
   movement: Point;
   dragstart: Point;
@@ -73,17 +79,12 @@ interface ViewerMouse {
   pressedButtons: Set<number>;
 }
 
-export class Viewer {
+export class InputManager {
   renderer: any;
-
-  location: Vec3;
-  angle: Vec3;
-  scale: Vec3;
-  originDistance: number;
 
   firstMovementUpdate: boolean;
 
-  mouse: ViewerMouse;
+  mouse: InputMouse;
   touch: { fingers: number };
 
   pressedKeys: Set<number>;
@@ -91,11 +92,6 @@ export class Viewer {
 
   constructor(renderer: any) {
     this.renderer = renderer;
-
-    this.location = new Vec3(0, 0, 0);
-    this.angle = new Vec3(0, 0, 0);
-    this.scale = new Vec3(1, 1, 1);
-    this.originDistance = 0;
 
     this.firstMovementUpdate = true;
 
@@ -125,7 +121,7 @@ export class Viewer {
     this.pressedKeys = new Set<number>();
     this.operationMode = OperationModes.None;
 
-    const viewer = this;
+    const input = this;
 
     const surface = renderer.surface;
 
@@ -137,7 +133,7 @@ export class Viewer {
       }
 
       surface.addEventListener("mousedown", function (e: MouseEvent) {
-        const mouse = viewer.mouse;
+        const mouse = input.mouse;
         const clientRect = surface.getBoundingClientRect();
         mouse.position.x = e.clientX - clientRect.left;
         mouse.position.y = e.clientY - clientRect.top;
@@ -154,16 +150,16 @@ export class Viewer {
           case 2: mouse.pressedButtons.add(MouseButtons.Right); break;
         }
 
-        viewer.operationMode = OperationModes.DragReady;
+        input.operationMode = OperationModes.DragReady;
 
-        viewer.performSceneMouseDown();
+        input.performSceneMouseDown();
       });
 
       surface.addEventListener("mousemove", function (this: any, e: MouseEvent) {
-        const mouse = viewer.mouse;
-        const scene = viewer.renderer.currentScene;
+        const mouse = input.mouse;
+        const scene = input.renderer.currentScene;
 
-        if (viewer.operationMode == OperationModes.DragReady) {
+        if (input.operationMode == OperationModes.DragReady) {
           if (Math.abs(mouse.position.x - mouse.dragstart.x) > 3
             || Math.abs(mouse.position.y - mouse.dragstart.y) > 3) {
 
@@ -171,25 +167,20 @@ export class Viewer {
               scene.begindrag();
             }
 
-            // FIXME: integrated 2D 3D event system
-            // if (viewer.renderer.current2DScene) {
-            //   viewer.renderer.current2DScene.begindrag();
-            // }
-
-            viewer.operationMode = OperationModes.Dragging;
+            input.operationMode = OperationModes.Dragging;
           }
         }
 
-        if (viewer.operationMode === OperationModes.None) {
+        if (input.operationMode === OperationModes.None) {
           const clientRect = surface.getBoundingClientRect();
           const client = {
             x: e.clientX - clientRect.left,
             y: e.clientY - clientRect.top
           }
-          if (viewer.firstMovementUpdate) {
+          if (input.firstMovementUpdate) {
             mouse.movement.x = 0;
             mouse.movement.y = 0;
-            viewer.firstMovementUpdate = false;
+            input.firstMovementUpdate = false;
           } else {
             mouse.movement.x = client.x - mouse.position.x;
             mouse.movement.y = client.y - mouse.position.y;
@@ -201,18 +192,13 @@ export class Viewer {
           if (scene) {
             scene.mousemove({ position: mouse.position, movement: mouse.movement });
           }
-
-          // FIXME: integrated 2D 3D event system
-          // if (this.renderer.current2DScene) {
-          //   this.renderer.current2DScene.mousemove(this.mouse.position);
-          // }
         }
       });
 
       surface.addEventListener("mousewheel", function (e: any) {
-        viewer.mouse.wheeldelta = e.wheelDelta;
+        input.mouse.wheeldelta = e.wheelDelta;
 
-        const scene = viewer.renderer.currentScene;
+        const scene = input.renderer.currentScene;
 
         if (scene && typeof scene.onmousewheel === "function") {
           scene.onmousewheel();
@@ -221,24 +207,24 @@ export class Viewer {
       }, { passive: false });
 
       surface.addEventListener('keydown', function (e: KeyboardEvent) {
-        viewer.pressedKeys.add(e.keyCode);
+        input.pressedKeys.add(e.keyCode);
 
         let isProcessed = false;
 
-        const scene = viewer.renderer.currentScene;
+        const scene = input.renderer.currentScene;
 
         if (scene) {
-          const renderer = viewer.renderer;
+          const renderer = input.renderer;
 
           if (renderer.options.debugMode) {
             if ((e.keyCode == Keys.Z
               || e.keyCode == Keys.P)
-              && !viewer.pressedKeys.has(Keys.Control)
-              && !viewer.pressedKeys.has(Keys.Shift)
-              && !viewer.pressedKeys.has(Keys.MacCommand_Firefox)
-              && !viewer.pressedKeys.has(Keys.MacCommand_Opera)
-              && !viewer.pressedKeys.has(Keys.MacCommand_Left)
-              && !viewer.pressedKeys.has(Keys.MacCommand_Right)) {
+              && !input.pressedKeys.has(Keys.Control)
+              && !input.pressedKeys.has(Keys.Shift)
+              && !input.pressedKeys.has(Keys.MacCommand_Firefox)
+              && !input.pressedKeys.has(Keys.MacCommand_Opera)
+              && !input.pressedKeys.has(Keys.MacCommand_Left)
+              && !input.pressedKeys.has(Keys.MacCommand_Right)) {
 
               switch (e.keyCode) {
                 case Keys.Z:
@@ -266,8 +252,8 @@ export class Viewer {
               isProcessed = true;
             }
 
-            if (viewer.pressedKeys.has(Keys.Shift)
-              && viewer.pressedKeys.has(Keys.Control)) {
+            if (input.pressedKeys.has(Keys.Shift)
+              && input.pressedKeys.has(Keys.Control)) {
 
               if (e.keyCode == Keys.K) {
                 renderer.debugger.showDebugPanel = !renderer.debugger.showDebugPanel;
@@ -287,8 +273,8 @@ export class Viewer {
         }
 
         // FIXME: integrated 2D 3D event system
-        if (viewer.renderer.current2DScene) {
-          isProcessed = isProcessed || viewer.renderer.current2DScene.keydown(e.keyCode);
+        if (input.renderer.current2DScene) {
+          isProcessed = isProcessed || input.renderer.current2DScene.keydown(e.keyCode);
         }
 
         if (isProcessed) {
@@ -298,19 +284,19 @@ export class Viewer {
       });
 
       surface.addEventListener("blur", function (e: FocusEvent) {
-        viewer.pressedKeys.clear();
-        viewer.mouse.pressedButtons.clear();
+        input.pressedKeys.clear();
+        input.mouse.pressedButtons.clear();
       });
 
       window.addEventListener("blur", function (e) {
-        viewer.pressedKeys.clear();
-        viewer.mouse.pressedButtons.clear();
+        input.pressedKeys.clear();
+        input.mouse.pressedButtons.clear();
       });
 
       window.addEventListener('keyup', function (e: KeyboardEvent) {
-        viewer.pressedKeys.delete(e.keyCode);
+        input.pressedKeys.delete(e.keyCode);
 
-        const scene = viewer.renderer.currentScene;
+        const scene = input.renderer.currentScene;
 
         if (scene) {
           invokeIfExist(scene, "keyup", e.keyCode);
@@ -321,7 +307,7 @@ export class Viewer {
         if (typeof e.touches === "object") {
           const t = e.touches[0];
 
-          const mouse = viewer.mouse;
+          const mouse = input.mouse;
           const clientRect = surface.getBoundingClientRect();
 
           mouse.position.x = t.clientX - clientRect.left;
@@ -333,26 +319,26 @@ export class Viewer {
           mouse.dragstart.x = mouse.position.x;
           mouse.dragstart.y = mouse.position.y;
 
-          viewer.operationMode = OperationModes.DragReady;
-          viewer.touch.fingers = e.touches.length;
+          input.operationMode = OperationModes.DragReady;
+          input.touch.fingers = e.touches.length;
 
-          viewer.performSceneMouseDown();
+          input.performSceneMouseDown();
         }
       }, { passive: true });
 
     }
 
     window.addEventListener("mousemove", function (e: MouseEvent) {
-      const mouse = viewer.mouse;
+      const mouse = input.mouse;
       const clientRect = surface.getBoundingClientRect();
       const client = {
         x: e.clientX - clientRect.left,
         y: e.clientY - clientRect.top
       }
-      if (viewer.firstMovementUpdate) {
+      if (input.firstMovementUpdate) {
         mouse.movement.x = 0;
         mouse.movement.y = 0;
-        viewer.firstMovementUpdate = false;
+        input.firstMovementUpdate = false;
       } else {
         mouse.movement.x = client.x - mouse.position.x;
         mouse.movement.y = client.y - mouse.position.y;
@@ -361,24 +347,24 @@ export class Viewer {
       mouse.position.x = client.x;
       mouse.position.y = client.y;
 
-      switch (viewer.operationMode) {
+      switch (input.operationMode) {
         case OperationModes.Dragging:
-          if (viewer.renderer.currentScene) {
-            viewer.renderer.currentScene.drag();
+          if (input.renderer.currentScene) {
+            input.renderer.currentScene.drag();
           }
 
           // FIXME: integrated 2D 3D event system
-          if (viewer.renderer.current2DScene) {
-            viewer.renderer.current2DScene.drag();
+          if (input.renderer.current2DScene) {
+            input.renderer.current2DScene.drag();
           }
           break;
       }
     });
 
     window.addEventListener("mouseup", function (e: MouseEvent) {
-      const mouse = viewer.mouse;
+      const mouse = input.mouse;
 
-      viewer.performSceneMouseUp();
+      input.performSceneMouseUp();
 
       switch (e.button) {
         case 0: mouse.pressedButtons.delete(MouseButtons.Left); break;
@@ -386,14 +372,14 @@ export class Viewer {
         case 2: mouse.pressedButtons.delete(MouseButtons.Right); break;
       }
 
-      viewer.operationMode = OperationModes.None;
+      input.operationMode = OperationModes.None;
     });
 
     window.addEventListener("touchmove", function (e: TouchEvent) {
       if (typeof e.touches === "object") {
         const t = e.touches[0];
 
-        const mouse = viewer.mouse;
+        const mouse = input.mouse;
         const clientRect = surface.getBoundingClientRect();
         const client = {
           x: t.clientX - clientRect.left,
@@ -405,9 +391,9 @@ export class Viewer {
         mouse.position.x = client.x;
         mouse.position.y = client.y;
 
-        switch (viewer.operationMode) {
+        switch (input.operationMode) {
           case OperationModes.DragReady: {
-            const scene = viewer.renderer.currentScene;
+            const scene = input.renderer.currentScene;
 
             if (scene) {
               scene.begindrag();
@@ -415,12 +401,12 @@ export class Viewer {
 
             e.preventDefault();
 
-            viewer.operationMode = OperationModes.Dragging;
+            input.operationMode = OperationModes.Dragging;
             break;
           }
 
           case OperationModes.Dragging: {
-            const scene = viewer.renderer.currentScene;
+            const scene = input.renderer.currentScene;
 
             if (scene) {
               scene.drag();
@@ -435,14 +421,14 @@ export class Viewer {
 
     window.addEventListener("touchend", function (e: TouchEvent) {
       if (e.touches) {
-        viewer.touch.fingers = e.touches.length;
+        input.touch.fingers = e.touches.length;
       } else {
-        viewer.touch.fingers = 0;
+        input.touch.fingers = 0;
       }
 
-      viewer.performSceneMouseUp();
+      input.performSceneMouseUp();
 
-      viewer.operationMode = OperationModes.None;
+      input.operationMode = OperationModes.None;
     });
 
     window.oncontextmenu = function (e) {
@@ -461,11 +447,6 @@ export class Viewer {
         return;
       }
     }
-
-    // FIXME: integrated 2D 3D event system
-    // if (this.renderer.current2DScene) {
-    //   this.renderer.current2DScene.mousedown(this.mouse.position);
-    // }
   }
 
   performSceneMouseUp(): void {
@@ -478,116 +459,17 @@ export class Viewer {
             scene.mouseup(this.mouse.position);
           }
         }
-
-        // FIXME: integrated 2D 3D event system
-        // if (this.renderer.current2DScene) {
-        //   this.renderer.current2DScene.mouseup(this.mouse.position);
-        // }
         break;
 
       case OperationModes.Dragging:
         if (scene) {
           scene.enddrag(this.mouse.position);
         }
-
-        // FIXME: integrated 2D 3D event system
-        // if (this.renderer.current2DScene) {
-        //   this.renderer.current2DScene.enddrag(this.mouse.position);
-        // }
         break;
     }
   }
 
   setCursor(type: string): void {
     this.renderer.surface.style.cursor = type;
-  }
-
-  focusAt(target: any, options?: any): void {
-    options = options || {};
-
-    let bbox, size = 1;
-    let targetLocation: Vec3;
-
-    if (target instanceof SceneObject) {
-      bbox = target.getBounds();
-      if (bbox) {
-        bbox = new BoundingBox3D(bbox.min, bbox.max);
-        size = Math.max(bbox.size.x, bbox.size.y, bbox.size.z);
-        target = bbox.origin;
-      } else {
-        target = target.worldLocation;
-      }
-
-      targetLocation = target.neg();
-    } else if (target instanceof Vec3) {
-      targetLocation = target;
-    } else {
-      return;
-    }
-
-    let targetScale = options.targetScale || (size * 0.15);
-    if (targetScale < 0.55) targetScale = 0.55;
-
-    const scene = this.renderer.currentScene;
-
-    if (options.animation === true && scene) {
-      const startLocation = this.location.clone();
-      const startScale = this.originDistance;
-
-      scene.animate({
-        name: "_yotei3d_viewer_focus_at",
-        duration: options.duration || 0.5,
-        effect: "smooth",
-      }, (t: number) => {
-        this.location = startLocation.lerp(targetLocation, t);
-        if (options.scaleToFitView) this.originDistance = startScale * (1 - t) + targetScale * t;
-      });
-    } else {
-      this.location = targetLocation;
-      if (options.scaleToFitView) this.originDistance = targetScale;
-      if (scene) scene.requireUpdateFrame();
-    }
-  }
-
-  rotateTo(angles: Vec3, options?: any): void {
-    options = options || {};
-
-    if (options.append) {
-      angles = Vec3.add(angles, this.angle);
-    }
-
-    const scene = this.renderer.currentScene;
-    if (scene) {
-      const curAngles = this.angle;
-
-      scene.animate({
-        name: "_yotei3d_viewer_rotate_to",
-        duration: options.duration || 0.5,
-        effect: options.effect || "smooth",
-      }, (t: number) => {
-        this.angle = curAngles.lerp(angles, t);
-      }, () => {
-        while (this.angle.x > 180) this.angle.x -= 360;
-        while (this.angle.y > 180) this.angle.y -= 360;
-        while (this.angle.z > 180) this.angle.z -= 360;
-        while (this.angle.x < -180) this.angle.x += 360;
-        while (this.angle.y < -180) this.angle.y += 360;
-        while (this.angle.z < -180) this.angle.z += 360;
-      });
-    }
-  }
-
-  private static _moveOffsetMatrix?: Matrix4;
-
-  moveOffset(offsetX: number, offsetY: number, offsetZ: number): void {
-    if (Viewer._moveOffsetMatrix === undefined) Viewer._moveOffsetMatrix = new Matrix4();
-    const m = Viewer._moveOffsetMatrix;
-    m.loadIdentity().rotate(this.angle).invertInPlace();
-
-    const v = new Vec4(offsetX, offsetY, offsetZ, 1).mulMat(m);
-    this.location.offset(v);
-
-    const scene = this.renderer.currentScene;
-    if (scene) scene.requireUpdateFrame();
   }
 }

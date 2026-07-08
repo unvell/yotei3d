@@ -56,6 +56,14 @@ export class Camera extends SceneObject {
   };
   _resolutionRatio: number;     // 3D HDR render scale (0.5 = half-res, cheap)
 
+  // Orthographic half-height (replaces the old global viewer-rig originDistance).
+  // Camera controllers drive this when zooming in ortho projection.
+  orthoSize: number;
+
+  // Attached input controller (orbit / turntable / fly-walk / fps). Assigning it
+  // auto-detaches the previous one and attaches the new one to this camera.
+  _controller: any;
+
   static meshInstance: CameraMesh | null = null;
 
   constructor() {
@@ -98,6 +106,23 @@ export class Camera extends SceneObject {
       luminanceThreshold: 1.0,
     };
     this._resolutionRatio = 1.0;
+
+    this.orthoSize = 1.0;
+    this._controller = undefined;
+  }
+
+  // Attached camera controller. Setting it detaches the previous controller and
+  // attaches the new one to this camera (Unity/Babylon-style: camera owns control).
+  get controller(): any { return this._controller; }
+  set controller(c: any) {
+    if (this._controller === c) return;
+    if (this._controller && typeof this._controller.detach === "function") {
+      this._controller.detach();
+    }
+    this._controller = c;
+    if (c && typeof c.attach === "function") {
+      c.attach(this);
+    }
   }
 
   // 3D render scale. Changing it resizes the HDR pipeline targets, so the

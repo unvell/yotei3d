@@ -17,7 +17,7 @@ import { Archive } from "../utility/archive";
 import { Animation } from "./animation";
 import { arrayRemove, byteArrayToBase64 } from "../utility/utility";
 import { GLTFLoader } from "../utility/gltfloader";
-import { Keys } from "./viewer";
+import { Keys } from "./input";
 
 export class Scene {
 	renderer: any;
@@ -46,6 +46,7 @@ export class Scene {
 	_iblBakedFor: any;
 	_iblIrradianceMap: any;
 	_iblEnvMap: any;
+	_iblSpecularMap: any;
 	_iblMaxLod?: number;
 
 	mainCamera: Camera;
@@ -187,7 +188,7 @@ export class Scene {
     });
   }
 
-  createObjectFromURL(url: string, finishCallback?: any) {
+  createObjectFromURL(url: string, finishCallback?: any, options?: any) {
     if (url.endsWith('.toba') || url.endsWith('.tob')
       || url.endsWith('.soba') || url.endsWith('.sob')) {
       const rm = new ResourceManager();
@@ -206,7 +207,9 @@ export class Scene {
       return loadingSession;
     } else if (url.endsWith(".gltf")) {
       const loader = new GLTFLoader(this);
-      loader.loadFromUrl(url, (obj: any) => finishCallback(obj));
+      loader.loadFromUrl(url, (obj: any) => {
+        if (typeof finishCallback === "function") finishCallback(obj);
+      }, options);
     } else {
     const rm = new ResourceManager();
       const loadingSession = new LoadingSession(rm);
@@ -1057,7 +1060,7 @@ export class Scene {
 	}
 
 	findObjectsByCurrentMousePosition(options?: any) {
-		return this.findObjectsByViewPosition(this.renderer.viewer.mouse.position, options);
+		return this.findObjectsByViewPosition(this.renderer.input.mouse.position, options);
 	}
 
 	findObjectsByViewPosition(p: any, options?: any): any {
@@ -1219,8 +1222,8 @@ export class Scene {
 			var renderer = this.renderer;
 
 			if (renderer.debugger
-				&& renderer.viewer.pressedKeys.has(Keys.Shift)
-				&& renderer.viewer.pressedKeys.has(Keys.Control)) {
+				&& renderer.input.pressedKeys.has(Keys.Shift)
+				&& renderer.input.pressedKeys.has(Keys.Control)) {
 				renderer.debugger.showObjectInfoPanel(obj);
 			}
 
@@ -1286,7 +1289,7 @@ export class Scene {
 	mousemove(pos: any): any {
 		if (this.renderer.options.enableObjectHover) {
 
-			var out = this.findObjectsByViewPosition(this.renderer.viewer.mouse.position);
+			var out = this.findObjectsByViewPosition(this.renderer.input.mouse.position);
 
 			var obj = out.object;
 

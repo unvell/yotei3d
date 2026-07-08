@@ -38,18 +38,59 @@ uniform vec3 fogColor;
 uniform float fogNear;
 uniform float fogFar;
 
+// ship wake foam — a turbulent white trail painted along the path a moving
+// vessel has carved. The CPU streams the recent path samples (Ocean._wake) in
+// as a polyline; here we measure each fragment's distance to that line and lay
+// down foam, brightest along the centre and fanning/fading toward the tail.
+#define WAKE_MAX 48
+uniform int   uWakeCount;          // number of valid samples in uWake (0 = off)
+uniform vec4  uWake[WAKE_MAX];     // xy = world xz, z = strength 0..1, w = half-width
+uniform vec3  uWakeFoamColor;      // foam tint (slightly >1 to bloom)
+uniform float uWakeFoamIntensity;  // overall foam opacity
+uniform float uWakeSparkle;        // sun sparkle on the spray (HDR; 0 = off)
+
+// depth-based contact foam — white water wherever solid geometry breaks the
+// surface (hull waterline, shoreline, rocks). A depth pre-pass packs the
+// nearest opaque linear depth (the ocean excludes itself) into RGBA; we unpack
+// it per pixel and foam where that geometry sits just under the water surface.
+uniform bool      uHasContact;
+uniform sampler2D uContactDepth;
+uniform vec2      uContactRes;       // main framebuffer size, to map gl_FragCoord
+uniform float     uContactNear;
+uniform float     uContactFar;
+uniform float     uContactDist;      // foam fades out this far *below* the surface (world Y units)
+uniform vec3      uContactColor;
+uniform float     uContactIntensity;
+uniform mat4      uInvProjView;      // inverse projection·view, to unproject the solid to world
+
 varying vec3 vWorldPos;
 varying vec3 vNormal;
 varying vec2 vWorldXZ;
 varying float vCrest;
 
+// The procedural noise below is evaluated in WORLD space (vWorldXZ), so its
+// input grows without bound as the surface drifts from the origin — e.g. a
+// followed aircraft flying far out to sea. Once the lattice index reaches a few
+// thousand, hash()'s `p * vec2(123.34, 456.21)` lands in the millions and
+// float32 fract() quantises to a handful of values: adjacent cells collapse to
+// the same hash and the sea degenerates into axis-aligned streaks. The cure is
+// a PERIODIC (tileable) noise: wrap the lattice to a fixed period so every hash
+// input stays small and precise no matter how far out we are. The wrap is
+// seamless (hash is periodic with the same period), so the field never pops.
+// 256 keeps the hash input < 256*456 ≈ 117k (fract still has headroom) while
+// the spatial repeat (period / frequency, hundreds of world units) is far too
+// coarse to read on open water.
+const float NOISE_PERIOD = 256.0;
+
 float hash(vec2 p) {
+	p = mod(p, NOISE_PERIOD);              // tileable + keeps the hash input small
 	p = fract(p * vec2(123.34, 456.21));
 	p += dot(p, p + 45.32);
 	return fract(p.x * p.y);
 }
 
 float valueNoise(vec2 p) {
+	p = mod(p, NOISE_PERIOD);              // bounded domain -> precise floor()/fract()
 	vec2 i = floor(p);
 	vec2 f = fract(p);
 	vec2 u = f * f * (3.0 - 2.0 * f);
@@ -76,6 +117,41 @@ vec3 proceduralSky(vec3 dir) {
 	// a soft glow around the sun reflected off the water
 	float sun = pow(max(dot(dir, sundir), 0.0), 80.0);
 	return sky + sunlight * sun * 0.5;
+}
+
+// unpack the RGBA-packed linear depth written by attribmap.frag (packDepth).
+float unpackDepth(vec4 enc) {
+	return dot(enc, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0));
+}
+
+// distance from point p to segment ab, with t = the closest-point parameter
+// (0 at a .. 1 at b) so per-sample strength/width can be interpolated along it.
+float segDist(vec2 p, vec2 a, vec2 b, out float t) {
+	vec2 ab = b - a;
+	float l2 = max(dot(ab, ab), 1.0e-4);
+	t = clamp(dot(p - a, ab) / l2, 0.0, 1.0);
+	return length(p - (a + ab * t));
+}
+
+// Foam coverage at world point P, walking the wake polyline. Returns 0..1.
+// Per segment: distance gives a soft-edged band (bright centre -> clear edge),
+// scaled by the sample's fading strength; we keep the strongest band hit.
+float wakeFoam(vec2 P) {
+	if (uWakeCount < 2) return 0.0;
+
+	float foam = 0.0;
+	for (int i = 0; i < WAKE_MAX - 1; i++) {
+		if (i >= uWakeCount - 1) break;
+		vec4 a = uWake[i];
+		vec4 b = uWake[i + 1];
+		float t;
+		float d = segDist(P, a.xy, b.xy, t);
+		float halfW = mix(a.w, b.w, t);
+		float strength = mix(a.z, b.z, t);
+		float band = 1.0 - smoothstep(halfW * 0.25, halfW, d);
+		foam = max(foam, band * strength);
+	}
+	return foam;
 }
 
 void main(void) {
@@ -152,6 +228,69 @@ void main(void) {
 	float ggx = a2 / (3.14159265 * dterm * dterm);
 	float sunUp = smoothstep(-0.05, 0.15, sundir.y);
 	color += sunlight * ggx * specStrength * sunUp;
+
+	// --- ship wake foam: turbulent white water churned up along the vessel's
+	// path. The coverage band comes from the wake polyline; two scrolling noise
+	// octaves break it into froth and boiling streaks so it reads as churn
+	// rather than a painted stripe. Laid over the water before fog so the far
+	// trail melts into the haze with the rest of the sea.
+	float wakeF = 0.0;
+	if (uWakeCount >= 2) {
+		wakeF = wakeFoam(vWorldXZ);
+		if (wakeF > 0.0) {
+			vec2 fp = vWorldXZ * 0.18;
+			float n1 = valueNoise(fp + vec2(time * 0.6, -time * 0.4));
+			float n2 = valueNoise(fp * 2.7 - vec2(time * 0.9, time * 0.7));
+			float churn = mix(0.55, 1.15, n1) * mix(0.7, 1.1, n2);
+			wakeF = clamp(wakeF * churn * uWakeFoamIntensity, 0.0, 1.0);
+			color = mix(color, uWakeFoamColor, wakeF);
+		}
+	}
+
+	// --- contact foam: white water where solid geometry breaks the surface
+	// (hull waterline, beach, rock). Foam by how far the solid behind this pixel
+	// sits *below* the water surface (world Y) — a thin waterline band that
+	// excludes the deep submerged hull, props and rudder, and converges at the
+	// stem (no forward smear). The solid's world position is reconstructed from
+	// the pre-pass depth, which is 32-bit packed and so precise: the water
+	// fragment's own gl_FragCoord.z is NOT used, because the 16-bit depth buffer
+	// is only ~±5u accurate this far out and smeared foam over the whole hull.
+	float contactF = 0.0;
+	if (uHasContact) {
+		vec2 uv = gl_FragCoord.xy / uContactRes;
+		float sceneD = unpackDepth(texture2D(uContactDepth, uv));         // 0..1 linear
+		if (sceneD < 0.999) {                                            // skip empty sky (far)
+			float vz = sceneD * (uContactFar - uContactNear) + uContactNear;   // solid view distance
+			vec2 ndc = uv * 2.0 - 1.0;
+			float ndcz = (uContactFar + uContactNear) / (uContactFar - uContactNear)
+			           - (2.0 * uContactFar * uContactNear) / ((uContactFar - uContactNear) * vz);
+			vec4 clip = uInvProjView * vec4(ndc, ndcz, 1.0);
+			vec3 solidPos = clip.xyz / clip.w;
+			float vgap = vWorldPos.y - solidPos.y;                          // >0 = solid below surface
+			float band = (1.0 - smoothstep(0.0, uContactDist, vgap))
+			           * smoothstep(0.0, uContactDist * 0.2, vgap);
+			float cn = valueNoise(vWorldXZ * 0.6 + vec2(time * 0.4, -time * 0.5));
+			contactF = clamp(band * mix(0.6, 1.25, cn) * uContactIntensity, 0.0, 1.0);
+			if (contactF > 0.0) color = mix(color, uContactColor, contactF);
+		}
+	}
+
+	// Sun sparkle across all the churned-up foam/spray: thousands of tiny
+	// droplets each flash as they catch the sun, so we scatter sharp,
+	// fast-twinkling HDR glints over the foam. Two high-frequency noise fields
+	// scroll against each other and are raised to a high power to leave only
+	// sparse pinpoints; density follows the foam and they only fire when the sun
+	// is up, biased toward its specular direction. HDR-bright so the bloom pass
+	// makes them glitter.
+	float foamAll = max(wakeF, contactF);
+	if (uWakeSparkle > 0.0 && sunUp > 0.0 && foamAll > 0.0) {
+		vec2 sp = vWorldXZ * 1.7;
+		float tw = valueNoise(sp + vec2(time * 2.3, -time * 1.7))
+		         * valueNoise(sp * 1.9 - vec2(time * 3.1, time * 2.2));
+		tw = pow(tw, 6.0);
+		float toSun = 0.5 + 0.5 * pow(NoH, 8.0);
+		color += sunlight * (tw * foamAll * uWakeSparkle * sunUp * toSun);
+	}
 
 	// distance fog toward the horizon
 	if (hasFog) {

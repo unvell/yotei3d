@@ -20,6 +20,15 @@ import { ScreenMesh } from './pipeline';
 //      residual mirror so cloud detail stays continuous across the pole/side
 //      seams. This makes the two pole entries intentionally left-handed
 //      (right × up === -forward); that is the correction, not a bug.
+//
+// This single basis is used for EVERY cube bake — equirect/atmosky projection
+// AND cube re-sampling (irradiance, specular prefilter). Its FBO-mirror pole
+// correction is what makes a re-sampled cube match the source env's orientation,
+// so a low-roughness prefilter mip equals the env and the irradiance is seam-
+// free. (A previous CUBE_FACE_BASIS used *nominal* poles for the re-sampling
+// bakes; lacking the side faces' FBO compensation, its pole/side boundary was
+// discontinuous — a visible cube seam on diffuse + glossy surfaces. Verified
+// in-browser: FACE_BASIS gives a seam-free, correctly-lit up-facing surface.)
 const FACE_BASIS = [
 	{ forward: [ 1,  0,  0], right: [ 0,  0, -1], up: [ 0, -1,  0] }, // +X
 	{ forward: [-1,  0,  0], right: [ 0,  0,  1], up: [ 0, -1,  0] }, // -X
@@ -162,6 +171,123 @@ export class IBLBaker {
 		return target;
 	}
 
+	// GGX-prefilter a source environment cubemap into the specular IBL map.
+	//
+	// Each mip level of the returned cube holds the environment convolved with
+	// the GGX specular lobe for a roughness of (mip / maxMip): mip 0 is a sharp
+	// mirror (an identity copy of the source), the coarsest mip a fully rough
+	// blur. The standard shader then reads a physically blurred reflection with
+	// textureCube(refMap, R, roughness*maxLod) instead of the box-downsampled
+	// (still-sharp) mips a plain generateMipmap produces — which made even
+	// moderately rough surfaces mirror the sky.
+	//
+	// The target matches the source face resolution (capped) so a perfect mirror
+	// (roughness 0) stays as crisp as sampling the source env directly did; only
+	// the rougher mips are convolved.
+	//
+	// Returns the prefiltered CubeMap; `_maxLod` is the max mip index, which the
+	// renderer hands to the shader as maxEnvLod so roughness maps onto the chain.
+	prefilterSpecular(envCubemap, size) {
+		const gl = this.renderer.gl;
+
+		const srcFaceSize = (envCubemap.images && envCubemap.images[0] && envCubemap.images[0].width)
+			|| envCubemap.width || 256;
+		// match the source resolution so the mirror mip is full-sharpness; cap to
+		// keep the prefiltered chain's memory / bake cost bounded.
+		if (!size) size = Math.min(srcFaceSize, 1024);
+
+		const target = new CubeMap(this.renderer);
+		target.enableMipmap = true;
+		target.trilinear = true;
+		target.create(size, size, null, { hdr: !!envCubemap.hdr }); // RGBA16F faces on WebGL2
+
+		// Allocate the full mip chain up front (generateMipmap fills it with a
+		// box-downsample we then overwrite mip-by-mip with the GGX prefilter).
+		target.use();
+		target.mipmappable = target.enableMipmap;
+		if (target.mipmappable) {
+			gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+			target.mipmapped = true;
+		}
+		target.setParameters(); // trilinear min filter for smooth roughness blend
+		target.disuse();
+
+		const maxMip = Math.max(0, Math.floor(Math.log2(size)));
+		const faces = target.getLoadingFaces();
+
+		// mip 0 (the perfect-mirror level) is a pixel-exact copy of the source
+		// env, so a roughness-0 reflection is identical to sampling the env cube
+		// directly — no resampling blur, and crucially no orientation drift. (A
+		// shader resample would inherit the FBO render-vs-sample vertical flip
+		// that's invisible once a level is GGX-blurred, but would mirror a sharp
+		// reflection.) Needs matching face sizes; falls back to the shader below.
+		const canCopyMip0 = size === srcFaceSize && envCubemap.glTexture;
+		if (canCopyMip0) {
+			const copyFbo = gl.createFramebuffer();
+			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, copyFbo);
+			target.use();
+			const srcFaces = envCubemap.getLoadingFaces();
+			for (let i = 0; i < 6; i++) {
+				gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+					srcFaces[i], envCubemap.glTexture, 0);
+				gl.copyTexSubImage2D(faces[i], 0, 0, 0, 0, 0, size, size);
+			}
+			target.disuse();
+			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+			gl.deleteFramebuffer(copyFbo);
+		}
+
+		const fbo = gl.createFramebuffer();
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+		gl.disable(gl.DEPTH_TEST);
+
+		const shader = ShaderSources.prefilterspec.instance;
+		this.renderer.useShader(shader);
+		shader.envMapUniform.set(envCubemap);
+		shader.resolutionUniform.set(srcFaceSize);
+
+		// GGX-convolve the rougher mips. mip 0 is the copied mirror above (or, if
+		// sizes didn't match, the shader's own roughness-0 identity path).
+		const startMip = canCopyMip0 ? 1 : 0;
+		for (let mip = startMip; mip <= maxMip; mip++) {
+			const mipSize = Math.max(1, size >> mip);
+			gl.viewport(0, 0, mipSize, mipSize);
+
+			// mip 0 -> roughness 0 (mirror), coarsest mip -> roughness 1
+			const roughness = maxMip > 0 ? mip / maxMip : 0;
+			shader.roughnessUniform.set(roughness);
+
+			for (let i = 0; i < 6; i++) {
+				gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+					faces[i], target.glTexture, mip);
+
+				// FACE_BASIS reproduces the env cube's own orientation (equirect built
+				// it with FACE_BASIS), so a low-roughness mip equals the source env
+				// (seam-free) and every mip stays mutually aligned.
+				const basis = FACE_BASIS[i];
+				shader.setFace(basis.forward, basis.right, basis.up);
+
+				gl.clear(gl.COLOR_BUFFER_BIT);
+
+				shader.beginMesh(this.screenMesh);
+				this.screenMesh.draw(this.renderer);
+				shader.endMesh();
+			}
+		}
+
+		this.renderer.disuseCurrentShader();
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		gl.deleteFramebuffer(fbo);
+		gl.enable(gl.DEPTH_TEST);
+
+		// NB: no generateMipmap here — that would overwrite the prefiltered mips.
+		target.loaded = true;
+		target._maxLod = maxMip;
+
+		return target;
+	}
+
 	// Bake a diffuse irradiance cubemap from the given source environment
 	// cubemap. Returns a CubeMap usable as the diffuse ambient term in the
 	// standard shader — float (RGBA16F) when the source is HDR so highlights
@@ -188,6 +314,9 @@ export class IBLBaker {
 			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
 				faces[i], target.glTexture, 0);
 
+			// FACE_BASIS (same as every other cube bake): a re-sampled cube must
+			// match the env's orientation, and its FBO-compensated poles keep the
+			// pole/side boundary continuous — no cube seam on diffuse surfaces.
 			const basis = FACE_BASIS[i];
 			shader.setFace(basis.forward, basis.right, basis.up);
 

@@ -196,6 +196,12 @@ const exampleItems = ref([
     desc: 'GPU Gerstner-wave ocean: waves are summed on the GPU so only a single time value updates per frame. The surface reflects the skybox cubemap (reusing the IBL environment — no extra reflection pass), with a Fresnel sky/water blend and sharp sun glints. A pod of procedural dolphins leaps along the sun road throwing sparkling spray, while gulls wheel overhead.',
   },
   {
+    title: 'Ocean Editor',
+    thumbnail: '/img/examples/ocean.jpg',
+    link: 'ocean-editor.html',
+    desc: 'The Ocean stripped to water, sun and lens flare, with every Gerstner-wave parameter on a live slider panel — wave shape, ripples, colour & reflection, sun glitter, sun elevation/azimuth and the lens flare. Tune the look and copy the resulting Ocean() options straight to the clipboard.',
+  },
+  {
     title: 'Volumetric Light',
     thumbnail: '/img/examples/volumelight.jpg',
     link: 'volumelight.html',

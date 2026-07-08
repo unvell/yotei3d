@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Ocean Editor - Yotei3D Examples</title>
+	<meta charset="utf-8" />
+	<link href="css/examples.css" rel="stylesheet" type="text/css" />
+	<style>
+		#ocean-panel{position:fixed;top:48px;right:12px;z-index:20;width:248px;
+			background:rgba(18,26,38,.72);color:#eaf2ff;
+			font:12px/1.35 system-ui,-apple-system,sans-serif;
+			border-radius:8px;padding:10px 12px;backdrop-filter:blur(4px);
+			max-height:calc(100vh - 64px);overflow:auto;user-select:none}
+		#ocean-panel .cp-title{font-weight:600;margin-bottom:6px;font-size:13px;
+			display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+		#ocean-panel .cp-sec{margin:12px 0 2px;font-size:11px;font-weight:600;
+			letter-spacing:.04em;text-transform:uppercase;opacity:.55}
+		#ocean-panel .cp-row{margin:6px 0}
+		#ocean-panel .cp-row label{display:flex;justify-content:space-between;margin-bottom:2px}
+		#ocean-panel .cp-row .cp-val{opacity:.75;font-variant-numeric:tabular-nums}
+		#ocean-panel input[type=range]{width:100%;accent-color:#7fb3ff;margin:0}
+		#ocean-panel input[type=color]{width:100%;height:22px;padding:0;border:0;
+			background:none;cursor:pointer}
+		#ocean-panel button{margin-top:10px;width:100%;padding:6px;border:0;border-radius:6px;
+			background:#3b6bd6;color:#fff;cursor:pointer;font-size:12px}
+		#ocean-panel button:hover{background:#4f7ce0}
+		#ocean-panel.collapsed .cp-body{display:none}
+	</style>
+	<script type="module">
+
+    import { Renderer, Ocean, HDRSkyBox, TouchController, LensFlare } from "@";
+
+    window.addEventListener("load", function() {
+
+      const renderer = new Renderer({
+        backColor: [0.70, 0.82, 0.92, 1],
+        enablePostprocess: true,
+        enableAntialias: true,
+        enableShadow: false,        // shadows are expensive and not needed for this demo
+        // Wide open seascape: push the far plane well out so the ocean reaches
+        // the horizon instead of being clipped to sky.
+        perspective: { method: "persp", angle: 60, near: 0.5, far: 3000 },
+        bloomEffect: { enabled: true, threshold: 0.3, gamma: 1.5, intensity: 10.4 },
+        renderingImage: { gamma: 1.1, resolutionRatio: 1.0 },
+      });
+
+      const scene = renderer.createScene();
+      window._scene = scene;
+
+      // --- sky: a cubemap skybox. The renderer bakes IBL from it, and the
+      //     ocean reflects this same cubemap (no extra reflection pass). -------
+      scene.environment = new HDRSkyBox(renderer, "/textures/hdr/kloppenheim_06_puresky_4k.hdr", {
+        faceSize: 1024,
+        rotation: 130,
+      });
+      scene.environment.mat = { color: [0.2, 0.2, 0.2] };
+      scene.environment.intensity = 1.0;
+      scene.mainCamera.exposure = 1.0;
+
+      // haze the sea into the horizon so the water plane's far edge is hidden
+      scene.fog = { near: 100, far: 2000, color: [0.14, 0.23, 0.30] };
+
+      // ...and bleed the same haze into the bottom of the skybox so the sky and
+      // the fogged sea meet at one colour instead of a hard horizon line.
+      scene.skyFog = {
+        color: [0.34, 0.43, 0.50],
+        lower: 0.0,
+        upper: 0.02,
+        density: 0.2,
+      };
+
+      // --- the ocean ---------------------------------------------------------
+      // Start from the tuned preset used by ocean.html; every value here is then
+      // live-editable from the panel on the right.
+      let ocean = new Ocean({
+        "size": 10000,
+        "segments": 10,
+        "level": 0,
+        "wind": [
+          1,
+          0.4
+        ],
+        "waveAmp": 0.02,
+        "waveLen": 6,
+        "waveSpeed": 0,
+        "steepness": 0.53,
+        "timeScale": 1,
+        "sunGlitter": 0.21,
+        "specStrength": 0.08,
+        "fresnelPower": 6.7,
+        "fresnelBias": 0.2,
+        "reflectivity": 0.1,
+        "reflectionBlur": 1.5,
+        "rippleScale": 1,
+        "rippleStrength": 0.15,
+        "rippleDetail": 2.5,
+        "deepColor": [ 0.012, 0.039, 0.067 ],
+        "shallowColor": [ 0.051, 0.114, 0.149 ]
+      })
+      ocean.location.set(0, 0, 0);
+      scene.add(ocean);
+      window._ocean = ocean;
+
+      // size / segments rebuild the grid mesh, so they can't be poked live like
+      // the shading knobs — instead rebuild the Ocean in place, carrying the
+      // current options over and re-pointing the frame loop's `ocean` reference.
+      function rebuildOcean() {
+        const opts = Object.assign({}, ocean.options);
+        scene.remove(ocean);
+        ocean = new Ocean(opts);
+        ocean.location.set(0, opts.level || 0, 0);
+        scene.add(ocean);
+        window._ocean = ocean;
+      }
+
+      // --- sun (太陽) --------------------------------------------------------
+      // scene.sun is the single source of truth for the sun direction: the water
+      // shader lays its glitter "sun road" along it and the lens flare follows
+      // it. We drive it from elevation/azimuth (more intuitive than raw x/y/z):
+      // azimuth 0 = straight ahead (-Z), elevation = height above the horizon.
+      let sunEl = 5.7;   // ≈ the [0, 0.1, -1] low sun used by ocean.html
+      let sunAz = 0;
+      function applySun() {
+        const e = sunEl * Math.PI / 180, a = sunAz * Math.PI / 180;
+        const ce = Math.cos(e);
+        scene.sun.direction = [ce * Math.sin(a), Math.sin(e), -ce * Math.cos(a)];
+        scene.requireUpdateFrame();
+      }
+      applySun();
+      scene.sun.mat.color = [1.3, 1.18, 0.95];
+
+      // --- camera + orbit ----------------------------------------------------
+      scene.mainCamera.fieldOfView = 60;
+      scene.mainCamera.location.set(-100, 10, 60);
+      scene.mainCamera.angle.set(3, -20, 0);
+
+      const controller = new TouchController(scene);
+
+      // --- sun / lens flare (太陽フレア) -------------------------------------
+      // Bound to scene.sun, so the flare tracks the same direction that drives
+      // the water glitter — move the sun and the flare follows live.
+      const lensFlare = new LensFlare(scene, {
+        follow: scene.sun,
+        color: [1, 1, 0.95],
+        intensity: 2,         // strength of the ghost chain (reflection discs)
+        coreIntensity: 0.5,   // sun point + starburst + streak — tune separately
+        scale: 2.0,
+      });
+      window._lensFlare = lensFlare;
+
+      // --- drive the waves ---------------------------------------------------
+      // `drift` slides the camera so the endless-sea follow can be seen working;
+      // off by default so the view stays put while tuning.
+      let drift = false;
+      scene.on("frame", () => {
+        ocean.update();
+        if (drift) scene.mainCamera.location.x += 0.02;
+      });
+      scene.animation = true;
+
+      scene.show();
+
+      // ====================================================================
+      //  live tuning panel — every Ocean tunable, plus the sun + lens flare
+      // ====================================================================
+      // The shading/wave params are read fresh from ocean.options each frame, so
+      // they apply with no rebuild. `rebuild:true` rows (size/segments) rebuild
+      // the mesh on release. Colours below 1.0 use a swatch picker; HDR colours
+      // (the sun, which goes >1) use RGB sliders.
+      const CP = [
+        { sec:'Geometry ジオメトリ' },
+        { label:'size 広さ',      min:100,  max:20000, step:100, rebuild:true, set:v=>ocean.options.size=v,     get:()=>ocean.options.size },
+        { label:'segments 解像度', min:10,   max:400,   step:5,   rebuild:true, set:v=>ocean.options.segments=v, get:()=>ocean.options.segments },
+        { label:'level 水位',      min:-20,  max:20,    step:0.5, set:v=>ocean.options.level=v,     get:()=>ocean.options.level },
+
+        { sec:'Waves 波' },
+        { label:'wind →x',       min:-1,   max:1,     step:0.05, set:v=>ocean.options.wind[0]=v,   get:()=>ocean.options.wind[0] },
+        { label:'wind ↑z',       min:-1,   max:1,     step:0.05, set:v=>ocean.options.wind[1]=v,   get:()=>ocean.options.wind[1] },
+        { label:'amplitude 波高',  min:0,    max:3,     step:0.01, set:v=>ocean.options.waveAmp=v,   get:()=>ocean.options.waveAmp },
+        { label:'wavelength 波長', min:1,    max:300,   step:1,    set:v=>ocean.options.waveLen=v,   get:()=>ocean.options.waveLen },
+        { label:'speed 速度',      min:0,    max:3,     step:0.05, set:v=>ocean.options.waveSpeed=v, get:()=>ocean.options.waveSpeed },
+        { label:'steepness 鋭さ',  min:0,    max:1,     step:0.01, set:v=>ocean.options.steepness=v, get:()=>ocean.options.steepness },
+        { label:'time scale',     min:0,    max:3,     step:0.05, set:v=>ocean.options.timeScale=v, get:()=>ocean.options.timeScale },
+
+        { sec:'Ripples 細波' },
+        { label:'ripple scale',   min:0,    max:3,     step:0.05, set:v=>ocean.options.rippleScale=v,    get:()=>ocean.options.rippleScale },
+        { label:'ripple strength',min:0,    max:2,     step:0.05, set:v=>ocean.options.rippleStrength=v, get:()=>ocean.options.rippleStrength },
+        { label:'ripple detail',  min:0,    max:6,     step:0.5,  set:v=>ocean.options.rippleDetail=v,   get:()=>ocean.options.rippleDetail },
+
+        { sec:'Colour & reflection 色・反射' },
+        { label:'deep colour 深',  color:true, set:v=>ocean.options.deepColor=v,    get:()=>ocean.options.deepColor },
+        { label:'shallow colour 浅',color:true, set:v=>ocean.options.shallowColor=v, get:()=>ocean.options.shallowColor },
+        { label:'reflectivity',   min:0,    max:2,     step:0.01, set:v=>ocean.options.reflectivity=v,   get:()=>ocean.options.reflectivity },
+        { label:'fresnel power',  min:0,    max:10,    step:0.1,  set:v=>ocean.options.fresnelPower=v,   get:()=>ocean.options.fresnelPower },
+        { label:'fresnel bias',   min:0,    max:1,     step:0.01, set:v=>ocean.options.fresnelBias=v,    get:()=>ocean.options.fresnelBias },
+        { label:'reflection blur',min:0,    max:5,     step:0.05, set:v=>ocean.options.reflectionBlur=v, get:()=>ocean.options.reflectionBlur },
+
+        { sec:'Sun glitter 太陽の輝き' },
+        { label:'sun glitter 幅',  min:0,    max:1,     step:0.01, set:v=>ocean.options.sunGlitter=v,   get:()=>ocean.options.sunGlitter },
+        { label:'spec strength',  min:0,    max:3,     step:0.01, set:v=>ocean.options.specStrength=v, get:()=>ocean.options.specStrength },
+
+        { sec:'Sun 太陽' },
+        { label:'elevation 仰角',  min:-10,  max:90,    step:0.5,  set:v=>{sunEl=v;applySun();}, get:()=>sunEl },
+        { label:'azimuth 方位',    min:-180, max:180,   step:1,    set:v=>{sunAz=v;applySun();}, get:()=>sunAz },
+        { label:'sun R',          min:0,    max:2,     step:0.01, set:v=>scene.sun.mat.color[0]=v, get:()=>scene.sun.mat.color[0] },
+        { label:'sun G',          min:0,    max:2,     step:0.01, set:v=>scene.sun.mat.color[1]=v, get:()=>scene.sun.mat.color[1] },
+        { label:'sun B',          min:0,    max:2,     step:0.01, set:v=>scene.sun.mat.color[2]=v, get:()=>scene.sun.mat.color[2] },
+
+        { sec:'Lens flare 太陽フレア' },
+        { label:'intensity 強さ',  min:0,    max:5,     step:0.05, set:v=>lensFlare.intensity=v,     get:()=>lensFlare.intensity },
+        { label:'core intensity', min:0,    max:3,     step:0.05, set:v=>lensFlare.coreIntensity=v, get:()=>lensFlare.coreIntensity },
+        { label:'scale 大きさ',    min:0,    max:5,     step:0.1,  set:v=>lensFlare.scale=v,         get:()=>lensFlare.scale },
+        { label:'flare colour',   color:true, set:v=>lensFlare.color=v, get:()=>lensFlare.color },
+
+        { sec:'Environment 環境' },
+        { label:'exposure 露出',   min:0,    max:2,     step:0.01, set:v=>scene.mainCamera.exposure=v,  get:()=>scene.mainCamera.exposure },
+        { label:'env intensity',  min:0,    max:2,     step:0.01, set:v=>scene.environment.intensity=v, get:()=>scene.environment.intensity },
+      ];
+
+      const decimals = s => { const t = String(s); const i = t.indexOf('.'); return i < 0 ? 0 : t.length - i - 1; };
+      const fmt = (v, step) => (+v).toFixed(decimals(step));
+      const to255 = v => Math.max(0, Math.min(255, Math.round(v * 255)));
+      const rgbToHex = c => '#' + [0,1,2].map(i => to255(c[i]).toString(16).padStart(2,'0')).join('');
+      const hexToRgb = h => { const n = parseInt(h.slice(1), 16); return [(n>>16&255)/255, (n>>8&255)/255, (n&255)/255]; };
+
+      const host = document.getElementById('cp-sliders');
+
+      for (const c of CP) {
+        if (c.sec) {
+          const h = document.createElement('div');
+          h.className = 'cp-sec';
+          h.textContent = c.sec;
+          host.appendChild(h);
+          continue;
+        }
+
+        const row = document.createElement('div');
+        row.className = 'cp-row';
+
+        if (c.color) {
+          // colour swatch — round-trips through 8-bit hex (fine for <=1 colours)
+          row.innerHTML = '<label><span>' + c.label + '</span></label>'
+            + '<input type="color">';
+          const input = row.querySelector('input');
+          input.value = rgbToHex(c.get());
+          input.addEventListener('input', () => {
+            c.set(hexToRgb(input.value));
+            scene.requireUpdateFrame();
+          });
+          host.appendChild(row);
+          continue;
+        }
+
+        const val = c.get();
+        row.innerHTML = '<label><span>' + c.label + '</span><span class="cp-val"></span></label>'
+          + '<input type="range" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">';
+        const input = row.querySelector('input');
+        const out = row.querySelector('.cp-val');
+        input.value = val;
+        out.textContent = fmt(val, c.step);
+
+        const apply = () => {
+          const v = parseFloat(input.value);
+          out.textContent = fmt(v, c.step);
+          c.set(v);
+          if (c.rebuild) rebuildOcean();
+          scene.requireUpdateFrame();
+        };
+        if (c.rebuild) {
+          // rebuild on release only — the readout still tracks while dragging
+          input.addEventListener('input', () => { out.textContent = fmt(parseFloat(input.value), c.step); });
+          input.addEventListener('change', apply);
+        } else {
+          input.addEventListener('input', apply);
+        }
+        host.appendChild(row);
+      }
+
+      // collapse / expand
+      document.getElementById('cp-toggle').addEventListener('click', () => {
+        document.getElementById('ocean-panel').classList.toggle('collapsed');
+      });
+
+      // drift the camera so the endless-sea follow is visible
+      const driftBtn = document.getElementById('cp-drift');
+      driftBtn.addEventListener('click', () => {
+        drift = !drift;
+        driftBtn.textContent = drift ? '⏸ Stop drift' : '▶ Drift camera';
+        scene.requireUpdateFrame();
+      });
+
+      // dump the current tuning as a ready-to-paste Ocean() call (+ sun / flare)
+      document.getElementById('cp-log').addEventListener('click', () => {
+        const o = ocean.options;
+        const dump = {
+          size: o.size, segments: o.segments, level: o.level,
+          wind: [o.wind[0], o.wind[1]],
+          waveAmp: o.waveAmp, waveLen: o.waveLen, waveSpeed: o.waveSpeed,
+          steepness: o.steepness, timeScale: o.timeScale,
+          sunGlitter: o.sunGlitter, specStrength: o.specStrength,
+          fresnelPower: o.fresnelPower, fresnelBias: o.fresnelBias,
+          reflectivity: o.reflectivity, reflectionBlur: o.reflectionBlur,
+          rippleScale: o.rippleScale, rippleStrength: o.rippleStrength, rippleDetail: o.rippleDetail,
+          deepColor: o.deepColor.map(v => +v.toFixed(3)),
+          shallowColor: o.shallowColor.map(v => +v.toFixed(3)),
+        };
+        const text = 'new Ocean(' + JSON.stringify(dump, null, 2) + ')'
+          + '\n\n// sun:   elevation ' + fmt(sunEl, 0.1) + '°, azimuth ' + fmt(sunAz, 1) + '°'
+          + ', colour [' + scene.sun.mat.color.map(v => +v.toFixed(2)).join(', ') + ']'
+          + '\n// flare: intensity ' + lensFlare.intensity + ', core ' + lensFlare.coreIntensity
+          + ', scale ' + lensFlare.scale;
+        console.log(text);
+        if (navigator.clipboard) navigator.clipboard.writeText(text).catch(()=>{});
+      });
+    });
+
+  </script>
+</head>
+<body>
+	<div class="fixed t-0 z-10 w-full px-4 py-2 flex justify-between items-center bg-gray-800/40 text-white">
+		<div class="menu hover:text-sky-600">
+			&lt; <a href="index.html">Back</a>
+		</div>
+    <div>Ocean tuning editor — every Gerstner-wave water parameter, plus the sun and lens flare, on live sliders. Drag to orbit, scroll to zoom.</div>
+		<div class="logo">
+      <img src="/img/logo.svg">
+		</div>
+	</div>
+
+	<div id="canvas-container">
+	</div>
+
+	<div id="ocean-panel">
+		<div class="cp-title" id="cp-toggle"><span>Ocean parameters</span><span>▾</span></div>
+		<div class="cp-body">
+			<button id="cp-drift">▶ Drift camera</button>
+			<div id="cp-sliders"></div>
+			<button id="cp-log">Log / copy params</button>
+		</div>
+	</div>
+</body>
+</html>

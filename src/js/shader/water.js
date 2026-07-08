@@ -2,6 +2,8 @@
 import { Vec3 } from "@/math";
 import { Shader } from "../webgl/shader.js";
 import { CubeMap } from "../webgl/cubemap.js";
+import { FrameBuffer } from "../webgl/buffers.js";
+import { ShaderSources } from "./shadersources.js";
 
 // Shader for the Ocean effect. Selected per-object via `obj.shader = { name:
 // "water" }`. Wave shape is computed entirely on the GPU (see water.vert), so
@@ -9,6 +11,9 @@ import { CubeMap } from "../webgl/cubemap.js";
 // scene's environment cubemap (the skybox) — the same map IBL is baked from —
 // so the ocean costs no extra render pass.
 export class WaterShader extends Shader {
+	// Max wake trail samples; MUST match `#define WAKE_MAX` in water.frag.
+	static WAKE_MAX = 48;
+
 	constructor(renderer, vertShaderSrc, fragShaderSrc) {
 		super(renderer, vertShaderSrc, fragShaderSrc);
 
@@ -42,6 +47,32 @@ export class WaterShader extends Shader {
 		this.rippleStrengthUniform = this.bindUniform("rippleStrength", "float");
 		this.rippleDetailUniform = this.bindUniform("rippleDetail", "float");
 		this.reflectionBlurUniform = this.bindUniform("reflectionBlur", "float");
+
+		// ship wake foam (see water.frag). The trail is a polyline of recent
+		// world-space path samples streamed in from Ocean._wake each frame.
+		this.wakeCountUniform = this.bindUniform("uWakeCount", "int");
+		this.wakeUniforms = this.bindUniformArray("uWake", "vec4", WaterShader.WAKE_MAX);
+		this.wakeFoamColorUniform = this.bindUniform("uWakeFoamColor", "color3");
+		this.wakeFoamIntensityUniform = this.bindUniform("uWakeFoamIntensity", "float");
+		this.wakeSparkleUniform = this.bindUniform("uWakeSparkle", "float");
+
+		// depth-based contact foam (hull waterline / shoreline). Fed by a scene
+		// depth pre-pass this shader runs itself (see runContactDepthPass).
+		this.hasContactUniform = this.bindUniform("uHasContact", "bool");
+		this.contactDepthUniform = this.bindUniform("uContactDepth", "tex2d", 5);
+		this.contactResUniform = this.bindUniform("uContactRes", "vec2");
+		this.contactNearUniform = this.bindUniform("uContactNear", "float");
+		this.contactFarUniform = this.bindUniform("uContactFar", "float");
+		this.contactDistUniform = this.bindUniform("uContactDist", "float");
+		this.contactColorUniform = this.bindUniform("uContactColor", "color3");
+		this.contactIntensityUniform = this.bindUniform("uContactIntensity", "float");
+		this.invProjViewUniform = this.bindUniform("uInvProjView", "mat4");
+
+		this._contactDepthFB = null;       // depth render target (sized to main FB)
+		this._contactDepthTex = null;      // last frame's depth texture (or null)
+		this._contactW = 0; this._contactH = 0;
+		this._contactWanted = false;       // an ocean asked for contact foam this frame
+		this._contactPassRegistered = false;
 
 		// environment cubemap (sky reflection)
 		this.envMapUniform = this.bindUniform("envMap", "texcube", 4);
@@ -146,9 +177,143 @@ export class WaterShader extends Shader {
 		this.rippleDetailUniform.set(num(o.rippleDetail, 1.0));
 		this.reflectionBlurUniform.set(num(o.reflectionBlur, 2.0));
 
+		this.setWakeUniforms(obj);
+		this.setContactUniforms(obj);
+
 		// the ocean grid is one-sided; show it from below too (e.g. underwater
 		// camera) instead of culling to nothing.
 		gl.disable(gl.CULL_FACE);
+	}
+
+	// Feed the depth-based contact-foam uniforms. When obj.options.contactFoam is
+	// on we (a) flag that a scene depth pre-pass is needed next frame and ensure
+	// it is registered, and (b) bind this frame's depth texture (rendered by that
+	// pre-pass at frame start). The first frame has no depth yet → foam off.
+	setContactUniforms(obj) {
+		const cfg = (obj.options && obj.options.contactFoam) || null;
+
+		if (!cfg || cfg.enabled === false) {
+			this.hasContactUniform.set(false);
+			this.contactDepthUniform.set(Shader.emptyTexture);
+			return;
+		}
+
+		this._contactWanted = true;
+		if (!this._contactPassRegistered) {
+			this._contactPassRegistered = true;
+			this.renderer.prePasses.push(() => this.runContactDepthPass());
+		}
+
+		if (this._contactDepthTex) {
+			this.hasContactUniform.set(true);
+			this.contactDepthUniform.set(this._contactDepthTex);
+			this.contactResUniform.set([this._contactW, this._contactH]);
+			this.contactNearUniform.set(this.renderer.options.perspective.near);
+			this.contactFarUniform.set(this.renderer.options.perspective.far);
+			this.contactDistUniform.set(num(cfg.distance, 10));
+			this.contactColorUniform.set(cfg.color || [1.0, 1.05, 1.12]);
+			this.contactIntensityUniform.set(num(cfg.intensity, 1.0));
+			// inverse projection·view to unproject the (precise) pre-pass depth back
+			// to a world position — see the contact-foam block in water.frag.
+			this.invProjViewUniform.set(this.renderer.projectionViewMatrix.inverse());
+		} else {
+			this.hasContactUniform.set(false);
+			this.contactDepthUniform.set(Shader.emptyTexture);
+		}
+	}
+
+	// (Re)create the depth target, matched 1:1 to the main framebuffer so the
+	// water pass can sample it by gl_FragCoord and hit exact texel centres (so
+	// the LINEAR-filtered packed depth returns an un-interpolated value).
+	ensureContactTarget() {
+		const r = this.renderer;
+		const w = r.renderPhysicalSize.width, h = r.renderPhysicalSize.height;
+		if (!this._contactDepthFB || this._contactW !== w || this._contactH !== h) {
+			if (this._contactDepthFB) this._contactDepthFB.destroy();
+			// clearBackground:false so use() keeps the clear colour we set below
+			// (far/white = "no geometry") instead of the scene's sky colour.
+			this._contactDepthFB = new FrameBuffer(r, w, h, { clearBackground: false, depthBuffer: true });
+			this._contactW = w; this._contactH = h;
+		}
+	}
+
+	// Pre-pass (runs at frame start, before the main pass): render packed linear
+	// scene depth into the contact target. The ocean opts out of casting (its
+	// castShadow is false) so the depth holds only solids — exactly what we want
+	// to test the water surface against. Cleared to far so empty sky never foams.
+	runContactDepthPass() {
+		if (!this._contactWanted) { this._contactDepthTex = null; return; }
+		this._contactWanted = false;
+
+		const r = this.renderer, gl = this.gl;
+		const scene = r.currentScene;
+		const shader = ShaderSources.attributemap.instance;
+		if (!scene || !shader) { this._contactDepthTex = null; return; }
+
+		this.ensureContactTarget();
+
+		shader.type = 0;                       // 0 = linear depth
+		gl.clearColor(1.0, 1.0, 1.0, 1.0);     // far = "no geometry here"
+		this._contactDepthFB.use();
+
+		r.useShader(shader);
+		shader.beginScene(scene);
+		for (const obj of scene.objects) this.drawContactDepth(shader, obj);
+		r.disuseCurrentShader();
+
+		this._contactDepthFB.disuse();
+		this._contactDepthTex = this._contactDepthFB.texture;
+	}
+
+	// Recurse the scene drawing depth-only, honouring the same cast opt-out as
+	// the shadow / attribute passes (so the ocean — castShadow=false — is skipped).
+	drawContactDepth(shader, obj) {
+		if (obj.castShadow === false || (obj.mat && obj.mat.castShadow === false)) return;
+
+		shader.beginObject(obj);
+		if (obj.meshes && this.renderer.options.enableDrawMesh) {
+			for (const mesh of obj.meshes) {
+				if (mesh) {
+					shader.beginMesh(mesh);
+					mesh.draw(this.renderer);
+					shader.endMesh(mesh);
+				}
+			}
+		}
+		for (const child of obj.objects) this.drawContactDepth(shader, child);
+		shader.endObject(obj);
+	}
+
+	// Stream the rolling wake trail (Ocean._wake) into the foam uniforms. Each
+	// sample carries a strength that fades with age and a half-width that grows
+	// toward the tail, so the foam narrows + brightens at the stern and fans +
+	// dissolves behind. No trail (or wake disabled) → uWakeCount 0, foam off.
+	setWakeUniforms(obj) {
+		const wake = obj._wake;
+		const cfg = (obj.options && obj.options.wake) || null;
+
+		if (!cfg || !wake || wake.length < 2) {
+			this.wakeCountUniform.set(0);
+			return;
+		}
+
+		const life = num(cfg.life, 14);
+		const baseW = num(cfg.width, 18);
+		const growth = num(cfg.widthGrowth, 5);
+		const cap = Math.min(wake.length, this.wakeUniforms.length);
+
+		for (let i = 0; i < cap; i++) {
+			const p = wake[i];
+			const age01 = Math.min(Math.max(p.age / life, 0), 1);
+			const strength = 1 - age01;                  // fades behind the ship
+			const halfWidth = baseW * (1 + growth * age01); // spreads behind the ship
+			this.wakeUniforms[i].set([p.x, p.z, strength, halfWidth]);
+		}
+
+		this.wakeCountUniform.set(cap);
+		this.wakeFoamColorUniform.set(cfg.foamColor || [0.95, 1.0, 1.05]);
+		this.wakeFoamIntensityUniform.set(num(cfg.foamIntensity, 1.0));
+		this.wakeSparkleUniform.set(num(cfg.sparkle, 0.0));
 	}
 
 	endObject(obj) {

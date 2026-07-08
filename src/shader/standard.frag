@@ -71,6 +71,7 @@ uniform sampler2D normalMap;
 uniform sampler2D lightMap;
 uniform sampler2D shadowMap2D;
 uniform samplerCube refMap;
+uniform samplerCube envSharpMap;   // sharp source env (mirror); refMap is its GGX prefilter
 uniform samplerCube shadowMap;
 
 varying vec3 vertex;
@@ -292,6 +293,13 @@ void main(void) {
 		matRoughness *= mr.g;
 		matMetallic *= mr.b;
 	}
+	// IBL specular reads the prefiltered chain at mip = roughness * maxEnvLod, and
+	// mip 0 is a pixel-exact mirror of the source env. Keep an UNCLAMPED roughness
+	// for that LOD so an authored mirror (roughness 0) lands exactly on mip 0; the
+	// 0.04 floor below would otherwise pull it to LOD 0.04*maxEnvLod, where
+	// trilinear blends in mip 1's GGX blur and visibly softens the mirror. The
+	// floor still applies to direct-light specular + envBRDF (specular-aliasing guard).
+	float iblRoughness = clamp(matRoughness, 0.0, 1.0);
 	matRoughness = clamp(matRoughness, 0.04, 1.0);
 
 	float ao = 1.0;
@@ -360,7 +368,16 @@ void main(void) {
 		// Flip X to match the skybox sampling convention (panorama.vert negates
 		// texcoord.x) so reflections line up left-right with the visible sky.
 		R.x = -R.x;
-		vec3 prefiltered = textureCube(refMap, R, matRoughness * maxEnvLod).rgb;
+		// Low roughness samples the sharp source env (envSharpMap): seam-free and
+		// pixel-exact, a true mirror at roughness 0. Higher roughness samples its
+		// GGX prefilter (refMap): a smooth spherical blur — the env cube's own
+		// coarse box-downsample mips would instead show per-face "cube" faceting.
+		// When no prefilter exists (per-object probe, or none baked) refMap ==
+		// envSharpMap, so this blend is a harmless no-op.
+		float iblLod = iblRoughness * maxEnvLod;
+		vec3 sharpRefl = textureCube(envSharpMap, R, iblLod).rgb;
+		vec3 blurRefl  = textureCube(refMap, R, iblLod).rgb;
+		vec3 prefiltered = mix(sharpRefl, blurRefl, smoothstep(0.0, 0.08, iblRoughness));
 		vec2 ab = envBRDFApprox(NdotV, matRoughness);
 		indirectSpecular = prefiltered * (F0 * ab.x + ab.y) * iblIntensity;
 	}

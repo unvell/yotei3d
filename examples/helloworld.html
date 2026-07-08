@@ -24,7 +24,7 @@
       
       // event to drag and rotate the cube
       cube.ondrag = _ => {
-        cube.angle.y += renderer.viewer.mouse.movement.x;
+        cube.angle.y += renderer.input.mouse.movement.x;
 
         // request renderer to redraw the scene
         scene.requireUpdateFrame();

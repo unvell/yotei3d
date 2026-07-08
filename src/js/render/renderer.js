@@ -12,7 +12,7 @@ import { ShaderSources } from "../shader/shadersources";
 import { ImageSource, ImageToScreenRenderer, DefaultRenderer, ShadowMapRenderer, ShadowMapBlurCacheRenderer, SceneToImageRenderer, ImageFilterRenderer, BlurRenderer } from "./pipeline"
 import { IBLBaker } from "./iblbaker";
 import { ProbeBaker } from "./probebaker";
-import { Viewer } from "../scene/viewer";
+import { InputManager } from "../scene/input";
 import { Scene } from '../scene/scene';
 import { ObjectTypes, ParticleObject } from "../scene/object";
 import { ResourceTypes, Texture, AttributeRenderer, MultipleImagePreviewRenderer, SSAORenderer } from '@';
@@ -268,10 +268,10 @@ export class Renderer {
 
 		this.resetViewport();
 
-		if (typeof Viewer === "function") {
-			this.viewer = new Viewer(this);
+		if (typeof InputManager === "function") {
+			this.input = new InputManager(this);
 		} else {
-			this.viewer = null;
+			this.input = null;
 		}
 
 		this.cachedMeshes = {};
@@ -446,7 +446,12 @@ export class Renderer {
 	}
 
 	orthographicProject(m) {
-		const scale = this.viewer.originDistance;
+		// Ortho zoom is owned by the active camera now (was the global viewer rig
+		// originDistance). Camera controllers drive camera.orthoSize.
+		const cam = this.activeCamera;
+		const scale = (cam && typeof cam.orthoSize === "number" && cam.orthoSize > 0)
+			? cam.orthoSize
+			: 1;
 		m.ortho(-this.aspectRate * scale, this.aspectRate * scale, -scale, scale, -this.options.perspective.far, this.options.perspective.far);
 	}
 
@@ -465,6 +470,14 @@ export class Renderer {
 
 		if (this.initialized) {
 			const scene = this.currentScene;
+
+			// Drive the active camera's controller every animation frame. The
+			// controller integrates its own motion (incl. inertia) and calls
+			// scene.requireUpdateFrame() while it still has velocity, so an idle
+			// controller costs only an early-out here.
+			if (scene && scene.mainCamera && scene.mainCamera.controller) {
+				scene.mainCamera.controller.tick();
+			}
 
 			// FIXME: remove this
 			let clear2d = false;
@@ -761,20 +774,34 @@ export class Renderer {
 			this._iblBaker = new IBLBaker(this);
 		}
 
-		// release the previous irradiance map before re-baking so an animated
+		// release the previous baked maps before re-baking so an animated
 		// (re-baking) skybox like DynamicSky doesn't leak a cubemap per frame.
 		if (scene._iblIrradianceMap && scene._iblIrradianceMap !== src
 			&& scene._iblIrradianceMap.unbind) {
 			scene._iblIrradianceMap.unbind();
 		}
+		if (scene._iblSpecularMap && scene._iblSpecularMap !== src
+			&& scene._iblSpecularMap.unbind) {
+			scene._iblSpecularMap.unbind();
+		}
 
 		scene._iblIrradianceMap = this._iblBaker.bakeIrradiance(src);
-		scene._iblEnvMap = src;
 
-		// max specular mip level from the environment cubemap face size
-		const faceSize = (src.images && src.images[0] && src.images[0].width)
-			|| src.width || 256;
-		scene._iblMaxLod = Math.max(0, Math.floor(Math.log2(faceSize)) - 1);
+		// Dual specular IBL. `_iblEnvMap` is the sharp source env — a seam-free,
+		// pixel-exact mirror at roughness 0 (its box-downsample mips are auto-LOD
+		// friendly, so a curved mirror stays smooth). `_iblSpecularMap` is its GGX
+		// prefilter: a smooth spherical blur for rougher surfaces, where the env
+		// cube's own coarse box-downsample mips would instead show per-face "cube"
+		// faceting. The standard shader reads the sharp env at low roughness and
+		// cross-fades to the prefilter as roughness rises (see standard.frag).
+		// The prefilter is baked with FACE_BASIS so its mip orientation matches the
+		// env cube (a mismatched basis shows cube seams in the reflection).
+		scene._iblEnvMap = src;
+		scene._iblSpecularMap = this._iblBaker.prefilterSpecular(src);
+
+		// roughness maps onto the prefiltered chain's mip levels (mip = rough * maxLod)
+		scene._iblMaxLod = (typeof scene._iblSpecularMap._maxLod === "number")
+			? scene._iblSpecularMap._maxLod : 6;
 		scene._iblBakedFor = src;
 	}
 
@@ -977,20 +1004,10 @@ export class Renderer {
 	}
 
 	makeViewMatrix(m) {
-		const viewer = this.viewer;
-
-		if (viewer) {
-			m.translateZ(-(viewer.originDistance) * 10);
-
-			if ((!viewer.location.equals(0, 0, 0) || !viewer.angle.equals(0, 0, 0)
-				// || !viewer.scale.equals(1, 1, 1)
-			)) {
-				m.rotate(viewer.angle)
-					.translate(viewer.location.x, viewer.location.y, viewer.location.z)
-					//.scale(viewer.scale.z, viewer.scale.z, viewer.scale.z)
-					;
-			}
-		}
+		// The global "viewer" orbit rig has been removed; the camera (a SceneObject
+		// posed by its CameraController) is now the single source of view transform.
+		// makeCameraMatrix() builds the eye transform, so the view matrix stays
+		// identity. Kept as a no-op hook for clarity and future per-view overrides.
 	}
 
 	makeProjectMatrix(projectMethod, m) {

@@ -108,11 +108,11 @@
     
       scene.mainCamera.fieldOfView = 70;
 
-      const modelViewer = new ModelViewer(scene);
-      modelViewer.viewer.angle.x = 10;
-      modelViewer.minRotateX = -10;
-      modelViewer.maxRotateX = 80;
-      modelViewer.enableDragAcceleration = true;
+      const modelViewer = new ModelViewer(scene); // OrbitController
+      modelViewer.pitch = 10;
+      modelViewer.minPitch = -10;
+      modelViewer.maxPitch = 80;
+      // inertia (drag glide) is built into OrbitController
       // const objectController = new ObjectViewController(scene)
       // objectController.targetObject = scene.findObjectByName('floor');
 

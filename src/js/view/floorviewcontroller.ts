@@ -1,6 +1,6 @@
 import { Vec3, BoundingBox3D } from "@/math";
 import { EventDispatcher } from '../utility/event';
-import { TouchController } from './touchcontroller';
+import { FlyWalkController } from './flywalkcontroller';
 
 const ringTobaURL =
   `data:text/plain;base64,
@@ -29,8 +29,6 @@ interface TopViewStatus {
   topViewHeight: number;
   lastCameraLoc?: any;
   lastCameraRot?: any;
-  lastViewerAngleY?: number;
-  lastViewerAngleX?: number;
 }
 
 export class FloorViewController {
@@ -41,7 +39,7 @@ export class FloorViewController {
   cameraFovTop: number;
   _targetObject: any;
   ring: any;
-  cameraController: TouchController;
+  cameraController: FlyWalkController;
 
   // --- members injected by the EventDispatcher mixin (see bottom of file) ---
   declare onbeginChangeMode: (...args: any[]) => any;
@@ -125,17 +123,12 @@ export class FloorViewController {
     });
 
     scene.on("drag", () => {
-      if (this.topViewStatus.topViewMode) {
-        if (this.targetObject) {
-          scene.renderer.viewer.angle.y += scene.renderer.viewer.mouse.movement.x;
-          scene.renderer.viewer.angle.y = scene.renderer.viewer.angle.y % 360;
-
-          scene.renderer.viewer.angle.x += scene.renderer.viewer.mouse.movement.y;
-          if (scene.renderer.viewer.angle.x < -70) scene.renderer.viewer.angle.x = -70;
-          else if (scene.renderer.viewer.angle.x > 10) scene.renderer.viewer.angle.x = 10;
-
-          scene.requireUpdateFrame();
-        }
+      if (this.topViewStatus.topViewMode && this.targetObject) {
+        // Spin the floor plan around the vertical axis (was the viewer rig yaw;
+        // now the overhead camera's own yaw, since the rig is gone).
+        const cam = this.camera;
+        cam.angle.y = (cam.angle.y + scene.renderer.input.mouse.movement.x) % 360;
+        scene.requireUpdateFrame();
       }
     });
 
@@ -152,7 +145,7 @@ export class FloorViewController {
     this.topViewStatus.lastCameraLoc = new Vec3(0, 1.4, 0);
     this.topViewStatus.lastCameraRot = { dir: Vec3.forward, up: Vec3.up };
 
-    this.cameraController = new TouchController(this.scene, {
+    this.cameraController = new FlyWalkController(this.scene, {
       speed: 0.05,
       distance: 2,
       clickToMove: false,
@@ -167,8 +160,8 @@ export class FloorViewController {
           if (scene.mainCamera.location.y < 9) scene.mainCamera.location.y = 9;
           else if (scene.mainCamera.location.y > 40) scene.mainCamera.location.y = 40;
 
-          scene.renderer.viewer.angle.y += (e.deltaX) / 10;
-          scene.renderer.viewer.angle.y %= 360;
+          scene.mainCamera.angle.y += (e.deltaX) / 10;
+          scene.mainCamera.angle.y %= 360;
 
           scene.requireUpdateFrame();
         }
@@ -219,10 +212,10 @@ export class FloorViewController {
 
       this.onbeginChangeMode();
 
+      // camera orientation is handled by moveTo() above; only the FOV is animated
+      // (the former viewer-rig angle blend is gone with the rig).
       this.scene.animate({}, (t: number) => {
         camera.fieldOfView = this.cameraFovWalk + t * (this.cameraFovTop - this.cameraFovWalk);
-        this.scene.renderer.viewer.angle.y = tvs.lastViewerAngleY! * t;
-        this.scene.renderer.viewer.angle.x = tvs.lastViewerAngleX! * t;
       }, () => {
         camera.fieldOfView = this.cameraFovTop;
         this.onmodeChanged();
@@ -232,8 +225,6 @@ export class FloorViewController {
     } else {
       // to walk mode
       tvs.topViewMode = false;
-      tvs.lastViewerAngleY = this.scene.renderer.viewer.angle.y;
-      tvs.lastViewerAngleX = this.scene.renderer.viewer.angle.x;
 
       camera.moveTo((toPos instanceof Vec3) ? toPos : tvs.lastCameraLoc, {
         lookdir: tvs.lastCameraRot.dir,
@@ -244,8 +235,6 @@ export class FloorViewController {
 
       this.scene.animate({}, (t: number) => {
         camera.fieldOfView = this.cameraFovTop - t * (this.cameraFovTop - this.cameraFovWalk);
-        this.scene.renderer.viewer.angle.y = tvs.lastViewerAngleY! * (1 - t);
-        this.scene.renderer.viewer.angle.x = tvs.lastViewerAngleX! * (1 - t);
       }, () => {
         camera.fieldOfView = this.cameraFovWalk;
         this.onmodeChanged();

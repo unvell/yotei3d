@@ -92,8 +92,7 @@
         dirx = MathFunctions.clamp(dirx, -0.1, 0.1);
         diry = MathFunctions.clamp(diry, -0.1, 0.1);
         
-        modelViewer.viewer.angle.x = -(renderer.renderSize.height * 0.5 - e.position.y) * 0.02;
-        modelViewer.viewer.angle.z = (renderer.renderSize.width * 0.5 - e.position.x) * 0.01;
+        // (former viewer-rig parallax tilt removed along with the rig)
       };
       
       setInterval(function() {
@@ -101,15 +100,15 @@
           dirx = 0; diry = 0;
         }
         
-        if (renderer.viewer.pressedKeys.has(Keys.Up)) {
+        if (renderer.input.pressedKeys.has(Keys.Up)) {
           diry = -0.05;
-        } else if (renderer.viewer.pressedKeys.has(Keys.Down)) {
+        } else if (renderer.input.pressedKeys.has(Keys.Down)) {
           diry = 0.05;
         }
-        
-        if (renderer.viewer.pressedKeys.has(Keys.Left)) {
+
+        if (renderer.input.pressedKeys.has(Keys.Left)) {
           dirx = -0.05;
-        } else if (renderer.viewer.pressedKeys.has(Keys.Right)) {
+        } else if (renderer.input.pressedKeys.has(Keys.Right)) {
           dirx = 0.05;
         }
       }, 10);
@@ -121,10 +120,9 @@
       scene.mainCamera.angle.set(-50, 0, 0);
       scene.mainCamera.exposure = 1;
       
-      const modelViewer = new ModelViewer(scene);
-      modelViewer.viewer.angle.x = 10;
-      modelViewer.minRotateX = -40;
-      modelViewer.maxRotateX = 40;
+      const modelViewer = new ModelViewer(scene); // OrbitController
+      modelViewer.minPitch = -40;
+      modelViewer.maxPitch = 40;
       modelViewer.enabled = false;
 
       scene.animation = true;
