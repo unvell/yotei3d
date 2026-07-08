@@ -24,6 +24,3 @@ node_modules
 
 # Playwright MCP screenshots / artifacts
 .playwright-mcp/
-
-# Blender auto-backup files
-*.blend1

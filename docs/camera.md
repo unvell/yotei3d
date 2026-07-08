@@ -243,8 +243,6 @@ Import the new class names from `@`.
 
 - **FloorView top-view tilt** was simplified to a yaw-only spin when the rig was
   removed; the former pitch tilt (`viewer.angle.x`, clamped −70…10) is gone.
-- **`LANDING-SPECS.md`** still references the removed `viewer.originDistance`;
-  update it when the landing sim's camera setup is revisited.
 - The `incorrect data check` console error in `floor-walkthrough.html` is the
   embedded ring-cursor archive failing to decode — pre-existing and unrelated to
   camera control.
